@@ -7585,6 +7585,13 @@ button.calendar-range-event:focus-visible,
   transition: opacity 160ms ease;
 }
 
+/* 菜单展开时，把脚本拆解的章节进度放在侧栏外侧，避免与导航图标重叠。 */
+@media (min-width: 481px) {
+  .workspace-frame:not(.sidebar-collapsed):not(.sidebar-hidden) .script-breakdown-minimap {
+    left: calc(208px + 32px);
+  }
+}
+
 .script-breakdown-minimap.is-visible {
   opacity: 1;
   pointer-events: auto;
