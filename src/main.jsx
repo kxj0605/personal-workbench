@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client';
 import {
   ArrowRight,
   ArrowUp,
-  BookmarkPlus,
   CalendarDays,
+  Check,
   CheckCircle2,
+  ChartNoAxesColumnIncreasing,
+  ChevronDown,
+  ChevronRight,
   ClipboardPaste,
   Clock3,
   Copy,
@@ -13,20 +16,27 @@ import {
   Download,
   FileText,
   Film,
+  Flag,
   Flame,
   Github,
   House,
   ListTodo,
   LibraryBig,
+  LayoutDashboard,
+  Link2,
   LogIn,
   LogOut,
   NotebookPen,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelsTopLeft,
   Pencil,
   Plus,
   Scissors,
   Save,
   Settings2,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Target,
@@ -43,6 +53,7 @@ import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
+import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
 import { getBenchmarkMetadataFields } from './components/BenchmarkVideoDetails';
 import {
   formatDate,
@@ -61,8 +72,13 @@ import {
   isTaskOverdue,
   sortTasks,
 } from './utils/tasks';
-import { isLongTermTask, serializeLongTermTask } from './utils/longTermTasks';
+import { isLongTermTask, parseLongTermTask, serializeLongTermTask } from './utils/longTermTasks';
 import './styles.css';
+
+const DEFAULT_TASK_CATEGORIES = [
+  { id: 'default-life', name: '生活', color: '#12b76a', sort_order: 0 },
+  { id: 'default-work', name: '工作', color: '#2f80ed', sort_order: 1 },
+];
 
 function makeNickname(email = '') {
   const prefix = email.split('@')[0] || '用户';
@@ -121,6 +137,43 @@ function getWorkspacePreviewTasks() {
       task_time: null,
       matrix_category: 'important_not_urgent',
       status: 'in_progress',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'preview-schedule-planning',
+      user_id: 'preview-user',
+      title: '整理本周内容方向',
+      description: '',
+      task_date: today,
+      end_date: getRelativeDate(2),
+      task_time: '09:30',
+      end_time: '10:30',
+      matrix_category: 'important_not_urgent',
+      status: 'not_started',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'preview-schedule-cover',
+      user_id: 'preview-user',
+      title: '确认视频封面方案',
+      description: '',
+      task_date: today,
+      task_time: '14:00',
+      end_time: '15:00',
+      matrix_category: 'important_urgent',
+      status: 'in_progress',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'preview-schedule-review',
+      user_id: 'preview-user',
+      title: '复盘今天的素材收集',
+      description: '',
+      task_date: today,
+      task_time: '19:30',
+      end_time: '20:00',
+      matrix_category: 'not_urgent_not_important',
+      status: 'not_started',
       created_at: new Date().toISOString(),
     },
   ];
@@ -353,6 +406,11 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const [message, setMessage] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [theme, setTheme] = React.useState(() => window.localStorage.getItem('workspace-theme') || 'default');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isSidebarHidden, setIsSidebarHidden] = React.useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  const [taskViewRequest, setTaskViewRequest] = React.useState(null);
+  const [isWebsiteCreateRequested, setIsWebsiteCreateRequested] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
     if (!session || !supabase) return;
@@ -424,8 +482,9 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     [tabs.creatorMaterials]: '素材库',
     [tabs.creatorReview]: '复盘',
     [tabs.notes]: '笔记',
-    [tabs.tasks]: '任务',
+    [tabs.tasks]: '事件',
     [tabs.subscriptions]: '订阅',
+    [tabs.websites]: '常用网址',
     [tabs.publicNotes]: '公开笔记',
     [tabs.profile]: '设置',
   }[activeTab];
@@ -437,53 +496,141 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     [tabs.creatorMaterials]: '沉淀并复用创作中常用的提示词与参考资料。',
     [tabs.creatorReview]: '回看创作过程中的阶段记录与学习沉淀。',
     [tabs.notes]: `共 ${notes.length} 篇笔记，记录想法并决定内容是否公开。`,
-    [tabs.tasks]: `今天有 ${todayTasks.length} 项任务，任务列表、日历和四象限都集中在这里。`,
+    [tabs.tasks]: `今天有 ${todayTasks.length} 项任务，单次任务、日历、四象限与长期追踪都集中在这里。`,
+    [tabs.websites]: '按分类整理常用网站，随时用搜索和两种视图快速找到它。',
   }[activeTab];
+  const displayName = profile?.nickname ?? session.user.email?.split('@')[0] ?? '用户';
+  const accountEmail = session.user.email ?? '';
+  const profileAvatarUrl = profile?.avatar_url;
+  const navigateTo = (tab) => {
+    setTaskViewRequest(tab === tabs.tasks ? taskViews.list : null);
+    setActiveTab(tab);
+    setIsUserMenuOpen(false);
+  };
+
+  const openScheduleManager = () => {
+    setTaskViewRequest(taskViews.calendar);
+    setActiveTab(tabs.tasks);
+  };
+
+  const openWebsiteLibrary = (openCreate = false) => {
+    setIsWebsiteCreateRequested(openCreate);
+    navigateTo(tabs.websites);
+  };
 
   return (
-    <section className={`workspace-frame workspace-theme-${theme}`}>
+    <section className={`workspace-frame workspace-theme-${theme}${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${isSidebarHidden ? ' sidebar-hidden' : ''}`}>
       <aside className="workspace-sidebar">
-        <div className="workspace-mode-switcher" role="tablist" aria-label="工作模式">
-          <button type="button" role="tab" aria-selected={!isCreatorTab} className={!isCreatorTab ? 'active' : ''} onClick={() => setActiveTab(tabs.dashboard)}>个人管理</button>
-          <button type="button" role="tab" aria-selected={isCreatorTab} className={isCreatorTab ? 'active' : ''} onClick={() => setActiveTab(tabs.creator)}>创作工作室</button>
+        <div className="workspace-sidebar-top">
+          <button className="workspace-brand" type="button" onClick={() => navigateTo(tabs.dashboard)} title="日程笔记">
+            <span className="workspace-brand-mark" aria-hidden="true"><Sparkles size={18} /></span>
+            <span className="workspace-brand-text">日程笔记</span>
+          </button>
+          <button
+            className="sidebar-collapse-button"
+            type="button"
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            title={isSidebarCollapsed ? '展开菜单' : '收起菜单'}
+            aria-label={isSidebarCollapsed ? '展开菜单' : '收起菜单'}
+          >
+            {isSidebarCollapsed ? '»' : '«'}
+          </button>
+          <button
+            className="sidebar-hide-button"
+            type="button"
+            onClick={() => {
+              setIsSidebarHidden(true);
+              setIsSidebarCollapsed(false);
+              setIsUserMenuOpen(false);
+            }}
+            title="隐藏菜单"
+            aria-label="隐藏菜单"
+          >
+            <PanelLeftClose size={19} />
+          </button>
         </div>
 
-        <nav className="workspace-nav" aria-label={isCreatorTab ? '创作工作室导航' : '个人管理导航'}>
-          {isCreatorTab ? <>
-            <SidebarButton icon={Target} label="创作概览" active={activeTab === tabs.creator} onClick={() => setActiveTab(tabs.creator)} />
-            <SidebarButton icon={Film} label="项目" active={activeTab === tabs.creatorProjects} onClick={() => setActiveTab(tabs.creatorProjects)} />
-            <SidebarButton icon={BookmarkPlus} label="灵感视频" active={activeTab === tabs.creatorCollection} onClick={() => setActiveTab(tabs.creatorCollection)} />
-            <SidebarButton icon={Scissors} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => setActiveTab(tabs.breakdown)} />
-            <SidebarButton icon={LibraryBig} label="素材库" active={activeTab === tabs.creatorMaterials} onClick={() => setActiveTab(tabs.creatorMaterials)} />
-            <SidebarButton icon={Sparkles} label="复盘" active={activeTab === tabs.creatorReview} onClick={() => setActiveTab(tabs.creatorReview)} />
-          </> : <>
-            <SidebarButton icon={House} label="今日" active={activeTab === tabs.dashboard} onClick={() => setActiveTab(tabs.dashboard)} />
-            <SidebarButton icon={CheckCircle2} label="任务" active={activeTab === tabs.tasks} onClick={() => setActiveTab(tabs.tasks)} />
-            <SidebarButton icon={NotebookPen} label="笔记" active={activeTab === tabs.notes} onClick={() => setActiveTab(tabs.notes)} />
-            <SidebarButton icon={Wifi} label="订阅" active={activeTab === tabs.subscriptions} onClick={() => setActiveTab(tabs.subscriptions)} />
-          </>}
-        </nav>
+        <p className="sidebar-section-label">工作模块</p>
+        <div className="workspace-module-group">
+          <button className={`sidebar-module-button ${!isCreatorTab ? 'active' : ''}`} type="button" onClick={() => navigateTo(tabs.dashboard)} aria-label="个人" title="个人" aria-expanded={!isCreatorTab}>
+            <House size={23} strokeWidth={2.4} />
+            <span>个人</span>
+            {!isCreatorTab ? <ChevronDown size={16} className="sidebar-module-chevron" /> : <ChevronRight size={16} className="sidebar-module-chevron" />}
+          </button>
+          {!isCreatorTab && (
+            <nav className="workspace-nav sidebar-child-list" aria-label="个人导航">
+              <SidebarButton icon={LayoutDashboard} label="首页" active={activeTab === tabs.dashboard} onClick={() => navigateTo(tabs.dashboard)} />
+              <SidebarButton icon={CheckCircle2} label="任务" active={activeTab === tabs.tasks} onClick={() => navigateTo(tabs.tasks)} />
+              <SidebarButton icon={NotebookPen} label="笔记" active={activeTab === tabs.notes} onClick={() => navigateTo(tabs.notes)} />
+              <SidebarButton icon={Wifi} label="订阅" active={activeTab === tabs.subscriptions} onClick={() => navigateTo(tabs.subscriptions)} />
+              <SidebarButton icon={Link2} label="常用网址" active={activeTab === tabs.websites} onClick={() => navigateTo(tabs.websites)} />
+            </nav>
+          )}
+        </div>
 
-        <div className="workspace-sidebar-footer">
-          <button
-            className={activeTab === tabs.publicNotes ? 'sidebar-settings-entry active' : 'sidebar-settings-entry'}
-            onClick={() => setActiveTab(tabs.publicNotes)}
-          >
-            <FileText size={19} />
+        <div className="workspace-module-group">
+          <button className={`sidebar-module-button ${isCreatorTab ? 'active' : ''}`} type="button" onClick={() => navigateTo(tabs.creator)} aria-label="工作台" title="工作台" aria-expanded={isCreatorTab}>
+            <RoundedFolderIcon size={23} strokeWidth={2.4} />
+            <span>工作台</span>
+            {isCreatorTab ? <ChevronDown size={16} className="sidebar-module-chevron" /> : <ChevronRight size={16} className="sidebar-module-chevron" />}
+          </button>
+          {isCreatorTab && (
+            <nav className="workspace-nav sidebar-child-list" aria-label="工作台导航">
+              <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
+              <SidebarButton icon={Flag} label="项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
+              <SidebarButton icon={Film} label="灵感视频" active={activeTab === tabs.creatorCollection} onClick={() => navigateTo(tabs.creatorCollection)} />
+              <SidebarButton icon={PanelsTopLeft} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => navigateTo(tabs.breakdown)} />
+              <SidebarButton icon={LibraryBig} label="素材库" active={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)} />
+              <SidebarButton icon={Clock3} label="复盘" active={activeTab === tabs.creatorReview} onClick={() => navigateTo(tabs.creatorReview)} />
+            </nav>
+          )}
+        </div>
+
+        <div className="workspace-global-actions">
+          <div className="sidebar-divider" />
+          <p className="sidebar-section-label">全局操作</p>
+          <button className={activeTab === tabs.publicNotes ? 'sidebar-global-button active' : 'sidebar-global-button'} type="button" onClick={() => navigateTo(tabs.publicNotes)} aria-label="公开笔记" title="公开笔记">
+            <FileText size={20} />
             <span>公开笔记</span>
           </button>
-          <button
-            className={activeTab === tabs.profile ? 'sidebar-settings-entry active' : 'sidebar-settings-entry'}
-            onClick={() => setActiveTab(tabs.profile)}
-            aria-label="设置"
-          >
-            <Settings2 size={19} />
+          <button className={activeTab === tabs.profile ? 'sidebar-global-button active' : 'sidebar-global-button'} type="button" onClick={() => navigateTo(tabs.profile)} aria-label="设置" title="设置">
+            <Settings2 size={20} />
             <span>设置</span>
           </button>
+        </div>
+
+        <div className="workspace-sidebar-footer">
+          <div className="sidebar-user-area">
+            <button className="profile-entry" type="button" onClick={() => setIsUserMenuOpen((open) => !open)} aria-expanded={isUserMenuOpen} aria-haspopup="menu" aria-label="打开用户菜单">
+              <span className="profile-avatar">
+                {profileAvatarUrl ? <img src={profileAvatarUrl} alt="" /> : displayName.slice(0, 1)}
+              </span>
+              <span className="profile-entry-copy"><span>{displayName}</span><small>{accountEmail}</small></span>
+              <ChevronDown size={15} className="profile-menu-chevron" aria-hidden="true" />
+            </button>
+            {isUserMenuOpen && (
+              <div className="sidebar-user-menu" role="menu" aria-label="用户菜单">
+                <button type="button" role="menuitem" onClick={() => navigateTo(tabs.profile)}>个人资料</button>
+                <button type="button" role="menuitem" onClick={() => navigateTo(tabs.profile)}>账号设置</button>
+                <button type="button" role="menuitem" className="sidebar-user-signout" onClick={onSignOut}>退出</button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
       <div className="workspace-content">
+        {isSidebarHidden && (
+          <button
+            className="sidebar-show-button"
+            type="button"
+            onClick={() => setIsSidebarHidden(false)}
+            title="显示菜单"
+            aria-label="显示菜单"
+          >
+            <PanelLeftOpen size={20} />
+          </button>
+        )}
         {activeTab === tabs.dashboard && (
           <header className="workspace-heading dashboard-heading">
             <div>
@@ -498,7 +645,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </header>
         )}
 
-        {activeTab !== tabs.dashboard && activeTab !== tabs.creatorCollection && (
+        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && (
           <header className="workspace-heading compact-heading">
             <div>
               <h1>{workspaceTitle}</h1>
@@ -511,7 +658,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         {isLoading && <p className="form-message global-message">正在读取数据...</p>}
 
         {activeTab === tabs.dashboard && (
-          <Dashboard notes={notes} tasks={tasks} onOpenTasks={() => setActiveTab(tabs.tasks)} onOpenNotes={() => setActiveTab(tabs.notes)} />
+          <Dashboard notes={notes} tasks={tasks} onOpenTasks={() => navigateTo(tabs.tasks)} onOpenSchedule={openScheduleManager} onOpenNotes={() => navigateTo(tabs.notes)} onOpenWebsites={() => openWebsiteLibrary(false)} onAddWebsite={() => openWebsiteLibrary(true)} onToggleScheduleTask={(task) => updateTaskStatus(task, task.status === 'completed' ? 'in_progress' : 'completed', setTasks, setMessage)} />
         )}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}
         {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" />}
@@ -522,12 +669,13 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           <NotesPanel session={session} notes={notes} setNotes={setNotes} setMessage={setMessage} />
         )}
         {activeTab === tabs.tasks && (
-          <TasksPanel session={session} tasks={tasks} setTasks={setTasks} setMessage={setMessage} />
+          <TasksPanel initialTaskView={taskViewRequest ?? taskViews.list} session={session} tasks={tasks} setTasks={setTasks} setMessage={setMessage} />
         )}
         {activeTab === tabs.breakdown && <ScriptBreakdownPanel collectionVideo={selectedCollectionVideo} />}
         {activeTab === tabs.subscriptions && (
           <SubscriptionsPanel session={session} setMessage={setMessage} />
         )}
+        {activeTab === tabs.websites && <WebsiteNavigationPanel openCreateOnMount={isWebsiteCreateRequested} onCreateRequestHandled={() => setIsWebsiteCreateRequested(false)} />}
         {activeTab === tabs.publicNotes && (
           <PublicNotesPage session={session} profile={profile} onLogin={onLogin} embedded />
         )}
@@ -583,10 +731,18 @@ function ScrollToTopButton() {
   );
 }
 
+function RoundedFolderIcon({ size = 20, strokeWidth = 2.4 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8.25A2.25 2.25 0 0 1 6.25 6h4.15l1.7 1.9h5.65A2.25 2.25 0 0 1 20 10.15v7.6A2.25 2.25 0 0 1 17.75 20H6.25A2.25 2.25 0 0 1 4 17.75z" />
+    </svg>
+  );
+}
+
 function SidebarButton({ icon: Icon, label, active = false, onClick }) {
   return (
-    <button className={active ? 'sidebar-nav-button active' : 'sidebar-nav-button'} onClick={onClick} aria-label={label}>
-      <Icon size={19} />
+    <button className={active ? 'sidebar-nav-button active' : 'sidebar-nav-button'} type="button" onClick={onClick} aria-label={label} title={label}>
+      <Icon size={22} strokeWidth={1.7} />
       <span>{label}</span>
     </button>
   );
@@ -2050,43 +2206,75 @@ function TabButton({ icon: Icon, label, value, activeTab, onClick }) {
   );
 }
 
-function Dashboard({ notes, tasks, onOpenTasks, onOpenNotes }) {
+function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onOpenWebsites, onAddWebsite, onToggleScheduleTask }) {
   const today = getToday();
   const ordinaryTasks = tasks.filter((task) => !isLongTermTask(task));
+  const longTermTasks = tasks.filter((task) => isLongTermTask(task));
   const todayTasks = ordinaryTasks.filter((task) => task.task_date === today).sort(sortTasks);
-  const longTermTasks = tasks
+  const scheduleTasks = todayTasks.sort((first, second) => {
+    const firstCompleted = first.status === 'completed';
+    const secondCompleted = second.status === 'completed';
+    if (firstCompleted !== secondCompleted) return firstCompleted ? 1 : -1;
+    return (first.task_time || '99:99').localeCompare(second.task_time || '99:99');
+  });
+  const upcomingTasks = tasks
     .filter((task) => !isLongTermTask(task) && task.task_date > today && task.status !== 'completed')
     .sort(sortTasks)
     .slice(0, 3);
   const recentNotes = notes.slice(0, 3);
+  const todayDate = new Date(`${today}T12:00:00`);
+  const weekStart = new Date(todayDate);
+  weekStart.setDate(todayDate.getDate() - ((todayDate.getDay() + 6) % 7));
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    return { label: ['一', '二', '三', '四', '五', '六', '日'][index], day: date.getDate(), isToday: date.getDate() === todayDate.getDate() && date.getMonth() === todayDate.getMonth() };
+  });
+  const weekday = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][todayDate.getDay()];
 
   return (
     <div className="dashboard-home">
       <div className="dashboard-top-grid">
-        <section className="panel-card dashboard-today-card">
-          <div className="dashboard-section-heading">
-            <div>
-              <span className="section-icon section-icon-coral"><Target size={18} /></span>
-              <h2>今日任务</h2>
+        <section className="panel-card dashboard-schedule-card" aria-label="今日日程，点击进入日历" role="button" tabIndex={0} onClick={onOpenSchedule} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSchedule(); } }}>
+          <div className="dashboard-schedule-date" aria-label={`${todayDate.getMonth() + 1}月${todayDate.getDate()}日，${weekday}`}>
+            <div className="dashboard-schedule-date-main">
+              <div><span>{todayDate.getMonth() + 1}月</span><b>{weekday}</b></div>
+              <strong>{todayDate.getDate()}</strong>
             </div>
-            <button className="section-link" onClick={onOpenTasks}>查看全部 <ArrowRight size={15} /></button>
+            <div className="dashboard-schedule-week" aria-label="本周日期">
+              {weekDays.map((day) => <span className={day.isToday ? 'today' : ''} key={day.label}><small>{day.label}</small><b>{day.day}</b></span>)}
+            </div>
           </div>
-          <DashboardTaskList tasks={todayTasks} emptyText="今天还没有任务，给自己安排一件最重要的事吧。" />
+          <div className="dashboard-schedule-content">
+            {scheduleTasks.length ? (
+              <div className="dashboard-schedule-list">
+                {scheduleTasks.slice(0, 3).map((task) => (
+                  <div className={`dashboard-schedule-item schedule-${task.matrix_category}${task.status === 'completed' ? ' completed' : ''}`} key={task.id}>
+                    <button className="dashboard-schedule-complete" type="button" aria-label={task.status === 'completed' ? `恢复任务：${task.title}` : `完成任务：${task.title}`} title={task.status === 'completed' ? '恢复为进行中' : '标记已完成'} onClick={(event) => { event.stopPropagation(); onToggleScheduleTask(task); }}>
+                      {task.status === 'completed' && <Check size={14} strokeWidth={3} />}
+                    </button>
+                    <div><strong>{task.title}</strong><small>{task.task_time ? formatTime(task.task_time) : '全天'}</small></div>
+                  </div>
+                ))}
+                {scheduleTasks.length > 3 && <span className="dashboard-schedule-more">还有 {scheduleTasks.length - 3} 项日程 <ArrowRight size={14} /></span>}
+              </div>
+            ) : <p className="dashboard-schedule-empty">今天暂无日程，安排一件最重要的事吧。</p>}
+          </div>
         </section>
 
         <div className="quick-entry-stack">
           <button className="quick-entry-card quick-task" onClick={onOpenTasks}>
             <span><Plus size={22} /></span>
             <strong>新建任务</strong>
-            <small>安排今天或未来要做的事</small>
           </button>
           <button className="quick-entry-card quick-note" onClick={onOpenNotes}>
             <span><NotebookPen size={21} /></span>
             <strong>写点东西</strong>
-            <small>记录此刻的想法与灵感</small>
           </button>
         </div>
       </div>
+
+      <WebsiteQuickLinks onOpenWebsites={onOpenWebsites} onAddWebsite={onAddWebsite} />
 
       <section className="dashboard-section">
         <div className="dashboard-section-heading outside-card">
@@ -2096,11 +2284,11 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenNotes }) {
           </div>
           <button className="section-link" onClick={onOpenTasks}>管理任务 <ArrowRight size={15} /></button>
         </div>
-        {longTermTasks.length === 0 ? (
+        {upcomingTasks.length === 0 ? (
           <div className="panel-card dashboard-empty">暂时没有未来任务，可以在任务中心添加长期计划。</div>
         ) : (
           <div className="long-term-grid">
-            {longTermTasks.map((task, index) => (
+            {upcomingTasks.map((task, index) => (
               <article className={`long-term-card accent-${index + 1}`} key={task.id}>
                 <div className="long-term-card-top">
                   <span className="long-term-icon"><Clock3 size={18} /></span>
@@ -2434,20 +2622,41 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
   );
 }
 
-function TasksPanel({ session, tasks, setTasks, setMessage }) {
+function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks, setMessage }) {
   const [form, setForm] = React.useState({
     title: '',
     description: '',
     task_date: getToday(),
+    end_date: '',
     task_time: '',
+    category: '生活',
     matrix_category: 'important_not_urgent',
     status: 'not_started',
   });
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [matrixFilter, setMatrixFilter] = React.useState('all');
-  const [activeTaskView, setActiveTaskView] = React.useState(taskViews.list);
+  const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [isTaskFilterOpen, setIsTaskFilterOpen] = React.useState(false);
+  const [activeTaskView, setActiveTaskView] = React.useState(initialTaskView);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [categoryDefinitions, setCategoryDefinitions] = React.useState(DEFAULT_TASK_CATEGORIES);
+
+  React.useEffect(() => {
+    let isCurrent = true;
+    if (!supabase || session.user.id === 'preview-user') return undefined;
+    supabase.from('task_categories').select('*').order('sort_order').then(({ data, error }) => {
+      if (!isCurrent || error) return;
+      if (data?.length) {
+        setCategoryDefinitions(data);
+        return;
+      }
+      supabase.from('task_categories').insert(DEFAULT_TASK_CATEGORIES.map(({ name, color, sort_order }) => ({ user_id: session.user.id, name, color, sort_order }))).select('*').then(({ data: created }) => {
+        if (isCurrent && created?.length) setCategoryDefinitions(created);
+      });
+    });
+    return () => { isCurrent = false; };
+  }, [session.user.id]);
 
   function updateForm(key, value) {
     setForm((currentForm) => ({ ...currentForm, [key]: value }));
@@ -2456,11 +2665,21 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
   async function handleCreateTask(event) {
     event.preventDefault();
     setMessage('');
+    if (!form.category.trim()) {
+      setMessage('请填写任务分类。');
+      return;
+    }
+    if (form.end_date && form.end_date < form.task_date) {
+      setMessage('结束日期不能早于开始日期。');
+      return;
+    }
     setIsSaving(true);
     const { data, error } = await supabase
       .from('tasks')
       .insert({
         ...form,
+        category: form.category.trim(),
+        end_date: form.end_date || null,
         task_time: form.task_time || null,
         user_id: session.user.id,
       })
@@ -2478,7 +2697,9 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
       title: '',
       description: '',
       task_date: getToday(),
+      end_date: '',
       task_time: '',
+      category: '生活',
       matrix_category: 'important_not_urgent',
       status: 'not_started',
     });
@@ -2487,16 +2708,106 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
   }
 
   const ordinaryTasks = tasks.filter((task) => !isLongTermTask(task));
-  const visibleTasks = filterTasks(ordinaryTasks, statusFilter, matrixFilter);
-  const emptyText = getTaskListEmptyText(statusFilter, matrixFilter);
+  const longTermTasks = tasks.filter((task) => isLongTermTask(task));
+  const taskCategories = categoryDefinitions.map((category) => category.name);
+  const visibleTasks = filterTasks(ordinaryTasks, statusFilter, matrixFilter, categoryFilter);
+  const emptyText = getTaskListEmptyText(statusFilter, matrixFilter, categoryFilter);
+  const taskStatusTabs = [
+    { value: 'all', label: '全部', count: ordinaryTasks.length },
+    { value: 'unfinished', label: '待办', count: ordinaryTasks.filter((task) => task.status !== 'completed').length },
+    { value: 'in_progress', label: '进行中', count: ordinaryTasks.filter((task) => task.status === 'in_progress').length },
+    { value: 'completed', label: '已完成', count: ordinaryTasks.filter((task) => task.status === 'completed').length },
+  ];
+
+  async function addTaskCategory(name, color) {
+    const normalizedName = name.trim();
+    if (!normalizedName) return setMessage('请填写分类名称。');
+    if (categoryDefinitions.some((category) => category.name === normalizedName)) return setMessage('该分类已存在。');
+    if (categoryDefinitions.length >= 4) return setMessage('分类最多只能保留 4 个。');
+
+    const draft = { id: `local-${Date.now()}`, name: normalizedName, color, sort_order: categoryDefinitions.length };
+    if (!supabase || session.user.id === 'preview-user') {
+      setCategoryDefinitions((current) => [...current, draft]);
+      return;
+    }
+    const { data, error } = await supabase.from('task_categories').insert({ user_id: session.user.id, name: normalizedName, color, sort_order: categoryDefinitions.length }).select('*').single();
+    if (error) return setMessage(`新增分类失败：${error.message}`);
+    setCategoryDefinitions((current) => [...current, data]);
+  }
+
+  async function updateTaskCategoryColor(category, color) {
+    if (!supabase || session.user.id === 'preview-user') {
+      setCategoryDefinitions((current) => current.map((item) => item.id === category.id ? { ...item, color } : item));
+      return;
+    }
+    const { error } = await supabase.from('task_categories').update({ color }).eq('id', category.id);
+    if (error) return setMessage(`更新分类颜色失败：${error.message}`);
+    setCategoryDefinitions((current) => current.map((item) => item.id === category.id ? { ...item, color } : item));
+  }
+
+  async function removeTaskCategory(category) {
+    if (tasks.some((task) => (task.category || '生活') === category.name)) return setMessage(`“${category.name}”仍有任务，请先调整这些任务的分类。`);
+    if (!supabase || session.user.id === 'preview-user') {
+      setCategoryDefinitions((current) => current.filter((item) => item.id !== category.id));
+      return;
+    }
+    const { error } = await supabase.from('task_categories').delete().eq('id', category.id);
+    if (error) return setMessage(`删除分类失败：${error.message}`);
+    setCategoryDefinitions((current) => current.filter((item) => item.id !== category.id));
+  }
+
+  function updateCalendarTaskLocally(taskId, changes) {
+    setTasks((currentTasks) => currentTasks.map((task) => task.id === taskId ? { ...task, ...changes } : task).sort(sortTasks));
+  }
+
+  async function persistCalendarTask(task) {
+    if (!task) return;
+    if (!supabase || session.user.id === 'preview-user') return;
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({
+        title: task.title.trim(),
+        description: task.description ?? '',
+        task_date: task.task_date,
+        end_date: task.end_date || null,
+        task_time: task.task_time || null,
+        end_time: task.end_time || null,
+        category: task.category || '生活',
+      })
+      .eq('id', task.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      setMessage(`更新日历任务失败：${error.message}`);
+      return;
+    }
+
+    setTasks((currentTasks) => currentTasks.map((item) => item.id === task.id ? data : item).sort(sortTasks));
+  }
+
+  async function deleteCalendarTask(task) {
+    if (!task) return;
+    if (!supabase || session.user.id === 'preview-user') {
+      setTasks((currentTasks) => currentTasks.filter((item) => item.id !== task.id));
+      return;
+    }
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (error) {
+      setMessage(`删除日历任务失败：${error.message}`);
+      return;
+    }
+    setTasks((currentTasks) => currentTasks.filter((item) => item.id !== task.id));
+  }
 
   return (
     <div className="tasks-page-layout">
       <div className="task-toolbar">
         <div className="task-view-switcher">
-          <TabButton icon={ListTodo} label="任务列表" value={taskViews.list} activeTab={activeTaskView} onClick={setActiveTaskView} />
-          <TabButton icon={CalendarDays} label="日历视图" value={taskViews.calendar} activeTab={activeTaskView} onClick={setActiveTaskView} />
-          <TabButton icon={Database} label="四象限矩阵" value={taskViews.matrix} activeTab={activeTaskView} onClick={setActiveTaskView} />
+          <TabButton icon={ListTodo} label="列表" value={taskViews.list} activeTab={activeTaskView} onClick={setActiveTaskView} />
+          <TabButton icon={CalendarDays} label="日历" value={taskViews.calendar} activeTab={activeTaskView} onClick={setActiveTaskView} />
+          <TabButton icon={Database} label="四象限" value={taskViews.matrix} activeTab={activeTaskView} onClick={setActiveTaskView} />
           <TabButton icon={Flame} label="长期追踪" value={taskViews.longTerm} activeTab={activeTaskView} onClick={(view) => { setActiveTaskView(view); setIsCreateOpen(false); }} />
         </div>
         <button className="workspace-main-action" onClick={() => setIsCreateOpen((open) => !open)}>
@@ -2516,7 +2827,9 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
             <label className="wide-field">备注<textarea id="task-description" rows={3} value={form.description} onChange={(event) => updateForm('description', event.target.value)} /></label>
             <label>重要紧急程度<select id="task-matrix" value={form.matrix_category} onChange={(event) => updateForm('matrix_category', event.target.value)}>{matrixOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <label>进展状态<select id="task-status" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-            <label>日期<input type="date" value={form.task_date} onChange={(event) => updateForm('task_date', event.target.value)} required /></label>
+            <label>分类<select value={form.category} onChange={(event) => updateForm('category', event.target.value)}>{taskCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+            <label>开始日期<input type="date" value={form.task_date} onChange={(event) => updateForm('task_date', event.target.value)} required /></label>
+            <label>结束日期（可选）<input type="date" value={form.end_date} min={form.task_date} onChange={(event) => updateForm('end_date', event.target.value)} /></label>
             <label>时间<input type="time" value={form.task_time} onChange={(event) => updateForm('task_time', event.target.value)} /></label>
           </div>
           <div className="task-composer-actions">
@@ -2533,34 +2846,74 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
       {activeTaskView === taskViews.list && (
         <div className="task-list-layout">
           <section className="panel-card task-list-panel">
-            <div className="panel-heading-row">
-              <div><h2>全部任务</h2><p className="muted-text">按状态和优先级快速整理。</p></div>
-              <div className="task-filter-row">
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="筛选任务状态">
-                  <option value="all">状态：全部</option>
-                  <option value="unfinished">状态：未完成</option>
-                  <option value="completed">状态：已完成</option>
-                  <option value="in_progress">状态：进行中</option>
-                  <option value="not_started">状态：待开始</option>
-                  <option value="stalled">状态：已停滞</option>
-                </select>
-                <select value={matrixFilter} onChange={(event) => setMatrixFilter(event.target.value)} aria-label="筛选重要紧急程度">
-                  <option value="all">程度：全部</option>
-                  {matrixOptions.map((option) => (
-                    <option value={option.value} key={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+            <div className="task-list-heading">
+              <div>
+                <h2>待办任务</h2>
               </div>
+              <button
+                className={isTaskFilterOpen ? 'task-filter-button active' : 'task-filter-button'}
+                type="button"
+                onClick={() => setIsTaskFilterOpen((open) => !open)}
+                aria-expanded={isTaskFilterOpen}
+                aria-controls="task-list-filters"
+              >
+                <SlidersHorizontal size={16} /> 筛选
+              </button>
             </div>
-            <TaskList tasks={visibleTasks} setTasks={setTasks} setMessage={setMessage} emptyText={emptyText} />
+            <div className="task-status-tabs" role="tablist" aria-label="任务状态">
+              {taskStatusTabs.map((tab) => (
+                <button
+                  className={statusFilter === tab.value ? 'task-status-tab active' : 'task-status-tab'}
+                  type="button"
+                  key={tab.value}
+                  role="tab"
+                  aria-selected={statusFilter === tab.value}
+                  onClick={() => setStatusFilter(tab.value)}
+                >
+                  {tab.label}（{tab.count}）
+                </button>
+              ))}
+            </div>
+            {isTaskFilterOpen && (
+              <div className="task-filter-popover" id="task-list-filters">
+                <label>
+                  <span>进展</span>
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="筛选任务状态">
+                    <option value="all">全部</option>
+                    <option value="unfinished">未完成</option>
+                    <option value="completed">已完成</option>
+                    <option value="in_progress">进行中</option>
+                    <option value="not_started">待开始</option>
+                    <option value="stalled">已停滞</option>
+                  </select>
+                </label>
+                <label>
+                  <span>重要紧急程度</span>
+                  <select value={matrixFilter} onChange={(event) => setMatrixFilter(event.target.value)} aria-label="筛选重要紧急程度">
+                    <option value="all">全部</option>
+                    {matrixOptions.map((option) => (
+                      <option value={option.value} key={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>分类</span>
+                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="筛选任务分类">
+                    <option value="all">全部</option>
+                    {taskCategories.map((category) => <option value={category} key={category}>{category}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
+            <TaskList tasks={visibleTasks} setTasks={setTasks} setMessage={setMessage} emptyText={emptyText} categoryOptions={taskCategories} />
           </section>
         </div>
       )}
 
-      {activeTaskView === taskViews.calendar && <CalendarPanel tasks={ordinaryTasks} />}
-      {activeTaskView === taskViews.matrix && <MatrixPanel tasks={ordinaryTasks} setTasks={setTasks} setMessage={setMessage} />}
+      {activeTaskView === taskViews.calendar && <CalendarPanel tasks={ordinaryTasks} longTermTasks={longTermTasks} categories={categoryDefinitions} onAddCategory={addTaskCategory} onUpdateCategoryColor={updateTaskCategoryColor} onRemoveCategory={removeTaskCategory} onUpdateTask={updateCalendarTaskLocally} onPersistTask={persistCalendarTask} onDeleteTask={deleteCalendarTask} />}
+      {activeTaskView === taskViews.matrix && <MatrixPanel tasks={ordinaryTasks} setTasks={setTasks} setMessage={setMessage} categoryOptions={taskCategories} />}
       {activeTaskView === taskViews.longTerm && (
         <LongTermTasksPanel
           session={session}
@@ -2569,32 +2922,35 @@ function TasksPanel({ session, tasks, setTasks, setMessage }) {
           setMessage={setMessage}
           isCreateOpen={isCreateOpen}
           setIsCreateOpen={setIsCreateOpen}
+          categoryOptions={taskCategories}
         />
       )}
     </div>
   );
 }
 
-function TaskList({ tasks, setTasks, setMessage, variant = 'default', emptyText = '这里暂时没有任务。' }) {
+function TaskList({ tasks, setTasks, setMessage, categoryOptions = ['生活', '工作'], variant = 'default', emptyText = '这里暂时没有任务。' }) {
   if (tasks.length === 0) return <EmptyState text={emptyText} />;
 
   return (
     <div className="card-list">
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} setTasks={setTasks} setMessage={setMessage} variant={variant} />
+        <TaskCard key={task.id} task={task} setTasks={setTasks} setMessage={setMessage} categoryOptions={categoryOptions} variant={variant} />
       ))}
     </div>
   );
 }
 
-function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'default' }) {
+function TaskCard({ task, setTasks, setMessage, categoryOptions = ['生活', '工作'], compact = false, variant = 'default' }) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [isCompleting, setIsCompleting] = React.useState(false);
   const [editForm, setEditForm] = React.useState({
     title: task.title,
     description: task.description ?? '',
     task_date: task.task_date,
+    end_date: task.end_date ?? '',
     task_time: task.task_time ?? '',
+    category: task.category || '生活',
     matrix_category: task.matrix_category,
     status: task.status,
   });
@@ -2607,7 +2963,9 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
         title: task.title,
         description: task.description ?? '',
         task_date: task.task_date,
+        end_date: task.end_date ?? '',
         task_time: task.task_time ?? '',
+        category: task.category || '生活',
         matrix_category: task.matrix_category,
         status: task.status,
       });
@@ -2624,7 +2982,9 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
       title: task.title,
       description: task.description ?? '',
       task_date: task.task_date,
+      end_date: task.end_date ?? '',
       task_time: task.task_time ?? '',
+      category: task.category || '生活',
       matrix_category: task.matrix_category,
       status: task.status,
     });
@@ -2688,6 +3048,14 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
       setMessage?.('任务标题不能为空。');
       return;
     }
+    if (!editForm.category.trim()) {
+      setMessage?.('请填写任务分类。');
+      return;
+    }
+    if (editForm.end_date && editForm.end_date < editForm.task_date) {
+      setMessage?.('结束日期不能早于开始日期。');
+      return;
+    }
 
     setIsUpdating(true);
     const { data, error } = await supabase
@@ -2695,6 +3063,8 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
       .update({
         ...editForm,
         title: editForm.title.trim(),
+        category: editForm.category.trim(),
+        end_date: editForm.end_date || null,
         task_time: editForm.task_time || null,
       })
       .eq('id', task.id)
@@ -2716,6 +3086,14 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
 
   const timingInfo = getTaskTimingInfo(task);
   const isMatrixView = variant === 'matrix';
+  const taskMeta = (
+    <>
+      <span className="tag task-category-tag">{task.category || '生活'}</span>
+      <span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span>
+      <span className={`tag task-status-tag status-${task.status}`}>{getLabel(statusOptions, task.status)}</span>
+      <span className={timingInfo.className}>{timingInfo.label}</span>
+    </>
+  );
 
   return (
     <article className={[task.status === 'completed' ? 'item-card completed' : 'item-card', isTaskOverdue(task) ? 'task-overdue' : '', `task-accent-${task.matrix_category}`, isMatrixView ? 'matrix-task-card' : '', isCompleting ? 'task-completing' : ''].filter(Boolean).join(' ')}>
@@ -2736,6 +3114,13 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
             onChange={(event) => updateEditForm('description', event.target.value)}
           />
           <div className="form-grid">
+            <label>
+              分类
+              <select value={editForm.category} onChange={(event) => updateEditForm('category', event.target.value)}>
+                {!categoryOptions.includes(editForm.category) && <option value={editForm.category}>{editForm.category}</option>}
+                {categoryOptions.map((category) => <option value={category} key={category}>{category}</option>)}
+              </select>
+            </label>
             <label>
               重要紧急程度
               <select
@@ -2767,12 +3152,21 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
           </div>
           <div className="form-grid">
             <label>
-              日期
+              开始日期
               <input
                 type="date"
                 value={editForm.task_date}
                 onChange={(event) => updateEditForm('task_date', event.target.value)}
                 required
+              />
+            </label>
+            <label>
+              结束日期（可选）
+              <input
+                type="date"
+                value={editForm.end_date}
+                min={editForm.task_date}
+                onChange={(event) => updateEditForm('end_date', event.target.value)}
               />
             </label>
             <label>
@@ -2803,10 +3197,22 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
       ) : (
         <>
           <div className="item-top">
+            {!compact && !isMatrixView && (
+              <button
+                className={task.status === 'completed' || isCompleting ? 'task-complete-checkbox checked' : 'task-complete-checkbox'}
+                onClick={handleToggleComplete}
+                disabled={isCompleting}
+                aria-label={task.status === 'completed' ? '恢复为进行中' : '标记已完成'}
+                title={task.status === 'completed' ? '恢复为进行中' : '完成任务'}
+              >
+                {(task.status === 'completed' || isCompleting) && <CheckCircle2 size={18} />}
+              </button>
+            )}
             <div className="task-title-row">
               <span className="task-card-symbol"><Target size={17} /></span>
               <h3>{task.title}</h3>
             </div>
+            {!isMatrixView && <div className="tag-row task-list-inline-meta">{taskMeta}</div>}
             {!compact && <div className="item-actions task-card-actions">
               <button
                 className="task-edit-button"
@@ -2820,7 +3226,7 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
               >
                 <Pencil size={17} />
               </button>
-              <button
+              {isMatrixView && <button
                 className={task.status === 'completed' || isCompleting ? 'task-complete-checkbox checked' : 'task-complete-checkbox'}
                 onClick={handleToggleComplete}
                 disabled={isCompleting}
@@ -2828,15 +3234,11 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
                 title={task.status === 'completed' ? '恢复为进行中' : '完成任务'}
               >
                 {(task.status === 'completed' || isCompleting) && <CheckCircle2 size={18} />}
-              </button>
+              </button>}
             </div>}
           </div>
           {task.description && <p>{task.description}</p>}
-          <div className="tag-row">
-            <span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span>
-            <span className={timingInfo.className}>{timingInfo.label}</span>
-            <span className={`tag task-status-tag status-${task.status}`}>{getLabel(statusOptions, task.status)}</span>
-          </div>
+          {isMatrixView && <div className="tag-row">{taskMeta}</div>}
         </>
       )}
     </article>
@@ -2844,6 +3246,17 @@ function TaskCard({ task, setTasks, setMessage, compact = false, variant = 'defa
 }
 
 async function updateTaskStatus(task, status, setTasks, setMessage) {
+  if (task.user_id === 'preview-user') {
+    setTasks?.((currentTasks) => currentTasks.map((item) => (item.id === task.id ? { ...item, status } : item)).sort(sortTasks));
+    setMessage?.('任务状态已更新。');
+    return;
+  }
+
+  if (!supabase) {
+    setMessage?.('任务服务尚未配置，暂时无法更新状态。');
+    return;
+  }
+
   const { error } = await supabase.from('tasks').update({ status }).eq('id', task.id);
   if (error) {
     setMessage?.(`更新任务失败：${error.message}`);
@@ -2853,12 +3266,128 @@ async function updateTaskStatus(task, status, setTasks, setMessage) {
   setMessage?.('任务状态已更新。');
 }
 
-function CalendarPanel({ tasks }) {
+function getCalendarLongTermRanges(tasks, monthDays) {
+  const visibleStart = monthDays[0]?.date;
+  const visibleEnd = monthDays[monthDays.length - 1]?.date;
+  if (!visibleStart || !visibleEnd) return [];
+
+  return tasks
+    .map((task, index) => {
+      const metadata = parseLongTermTask(task);
+      const startDate = metadata?.startDate || task.task_date;
+      const endDate = metadata?.endDate || visibleEnd;
+      if (!metadata || metadata.lifecycle === 'archived' || !startDate || startDate > visibleEnd || endDate < visibleStart) return null;
+      return {
+        ...task,
+        endDate: endDate > visibleEnd ? visibleEnd : endDate,
+        lane: index,
+        startDate: startDate < visibleStart ? visibleStart : startDate,
+      };
+    })
+    .filter(Boolean);
+}
+
+function getCalendarCrossDayTaskRanges(tasks, monthDays) {
+  const visibleStart = monthDays[0]?.date;
+  const visibleEnd = monthDays[monthDays.length - 1]?.date;
+  if (!visibleStart || !visibleEnd) return [];
+
+  return tasks
+    .map((task) => {
+      const startDate = task.task_date;
+      const endDate = task.end_date;
+      if (!startDate || !endDate || endDate <= startDate || startDate > visibleEnd || endDate < visibleStart) return null;
+      return {
+        ...task,
+        kind: 'cross-day-task',
+        startDate: startDate < visibleStart ? visibleStart : startDate,
+        endDate: endDate > visibleEnd ? visibleEnd : endDate,
+      };
+    })
+    .filter(Boolean);
+}
+
+function getCalendarRangeSegments(ranges, weekDays) {
+  const weekStart = weekDays[0].date;
+  const weekEnd = weekDays[weekDays.length - 1].date;
+  return ranges.reduce((segments, range) => {
+    if (range.startDate > weekEnd || range.endDate < weekStart) return segments;
+    const startDate = range.startDate > weekStart ? range.startDate : weekStart;
+    const endDate = range.endDate < weekEnd ? range.endDate : weekEnd;
+    const startIndex = weekDays.findIndex((day) => day.date === startDate);
+    const endIndex = weekDays.findIndex((day) => day.date === endDate);
+    if (startIndex >= 0 && endIndex >= startIndex) {
+      segments.push({ ...range, startIndex, span: endIndex - startIndex + 1 });
+    }
+    return segments;
+  }, []);
+}
+
+function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CATEGORIES, onAddCategory, onUpdateCategoryColor, onRemoveCategory, onUpdateTask, onPersistTask, onDeleteTask }) {
   const [currentDate, setCurrentDate] = React.useState(new Date());
+  const [selectedCategories, setSelectedCategories] = React.useState(() => categories.map((category) => category.name));
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
+  const [newCategoryColor, setNewCategoryColor] = React.useState('#f2b200');
+  const [selectedTaskId, setSelectedTaskId] = React.useState(null);
+  const [editorPosition, setEditorPosition] = React.useState({ top: 16, left: 16 });
+  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
   const monthDays = getMonthDays(currentDate);
+  const monthWeeks = Array.from({ length: Math.ceil(monthDays.length / 7) }, (_, index) => monthDays.slice(index * 7, index * 7 + 7));
+  const matchesSelectedCategories = (task) => selectedCategories.includes(task.category || '生活');
+  const visibleTasks = tasks.filter(matchesSelectedCategories);
+  const visibleLongTermTasks = longTermTasks.filter(matchesSelectedCategories);
+  const longTermRanges = getCalendarLongTermRanges(visibleLongTermTasks, monthDays);
+  const crossDayTaskRanges = getCalendarCrossDayTaskRanges(visibleTasks, monthDays);
+  const calendarRanges = [...longTermRanges, ...crossDayTaskRanges].map((range, lane) => ({ ...range, lane }));
+  const rangeCount = calendarRanges.length;
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
 
   function shiftMonth(delta) {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1));
+  }
+
+  function toggleCategory(category) {
+    setSelectedCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category]);
+  }
+
+  async function handleAddCategory(event) {
+    event.preventDefault();
+    await onAddCategory?.(newCategoryName, newCategoryColor);
+    if (newCategoryName.trim()) setNewCategoryName('');
+  }
+
+  function openTaskEditor(task, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const editorWidth = Math.min(302, window.innerWidth - 32);
+    setEditorPosition({
+      top: Math.max(16, Math.min(rect.bottom + 10, window.innerHeight - 540)),
+      left: Math.max(16, Math.min(rect.left, window.innerWidth - editorWidth - 16)),
+    });
+    setSelectedTaskId(task.id);
+    setIsConfirmingDelete(false);
+  }
+
+  function closeTaskEditor() {
+    setSelectedTaskId(null);
+    setIsConfirmingDelete(false);
+  }
+
+  function updateSelectedTask(changes, shouldPersist = true) {
+    if (!selectedTask) return;
+    const nextTask = { ...selectedTask, ...changes };
+    onUpdateTask?.(selectedTask.id, changes);
+    if (shouldPersist) onPersistTask?.(nextTask);
+  }
+
+  function persistSelectedTask() {
+    if (selectedTask) onPersistTask?.(selectedTask);
+  }
+
+  async function handleDeleteSelectedTask() {
+    if (!selectedTask) return;
+    await onDeleteTask?.(selectedTask);
+    closeTaskEditor();
   }
 
   return (
@@ -2872,39 +3401,304 @@ function CalendarPanel({ tasks }) {
           </div>
           <button className="text-button" onClick={() => setCurrentDate(new Date())}>回到今天</button>
         </div>
-        <div className="calendar-grid">
-          {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
-            <span className="calendar-head" key={day}>{day}</span>
-          ))}
-          {monthDays.map((day) => {
-            const dayTasks = tasks.filter((task) => task.task_date === day.date);
-            const isToday = day.date === getToday();
-            const isPast = day.isCurrentMonth && day.date < getToday();
-            return (
-              <div
-                className={[
-                  'calendar-cell',
-                  day.isCurrentMonth ? '' : 'muted',
-                  isToday ? 'today' : '',
-                  isPast ? 'past' : '',
-                ].join(' ')}
-                key={day.date}
+        <div className="calendar-category-filter" role="group" aria-label="按任务分类筛选日历">
+          <div className="calendar-category-heading">
+            <span>分类</span>
+            <div className="calendar-category-manager-anchor">
+              <button
+                className={isCategoryManagerOpen ? 'calendar-category-settings is-open' : 'calendar-category-settings'}
+                type="button"
+                onClick={() => setIsCategoryManagerOpen((open) => !open)}
+                aria-label={isCategoryManagerOpen ? '关闭分类管理' : '管理分类'}
+                aria-expanded={isCategoryManagerOpen}
+                aria-controls="calendar-category-manager"
               >
-                <strong>{day.dayNumber}</strong>
-                {dayTasks.slice(0, 2).map((task) => (
-                  <span className={`calendar-event event-${task.matrix_category}`} key={task.id}>{task.title}</span>
-                ))}
-                {dayTasks.length > 2 && <small>+{dayTasks.length - 2}</small>}
-              </div>
-            );
-          })}
+                <Settings2 size={15} aria-hidden="true" />
+              </button>
+              {isCategoryManagerOpen && <section id="calendar-category-manager" className="calendar-category-manager" aria-label="分类管理">
+                <p>最多 4 个分类。颜色会用于日历中的任务圆点和跨天任务条。</p>
+                {categories.map((category) => <div className="calendar-category-manager-row" key={category.id}><input type="color" value={category.color} aria-label={`${category.name}的颜色`} onChange={(event) => onUpdateCategoryColor?.(category, event.target.value)} /><strong>{category.name}</strong><button type="button" className="text-button" onClick={() => onRemoveCategory?.(category)}>删除</button></div>)}
+                {categories.length < 4 && <form onSubmit={handleAddCategory} className="calendar-category-add"><input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="新增分类名称" maxLength={16} /><input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} aria-label="新分类颜色" /><button className="secondary-action" type="submit">添加分类</button></form>}
+              </section>}
+            </div>
+          </div>
+          {categories.map((category) => (
+            <label key={category.id} style={{ '--category-color': category.color }}>
+              <input type="checkbox" checked={selectedCategories.includes(category.name)} onChange={() => toggleCategory(category.name)} />
+              <span className="calendar-category-checkbox" aria-hidden="true" />
+              {category.name}
+            </label>
+          ))}
+          {selectedCategories.length < categories.length && <button className="text-button" type="button" onClick={() => setSelectedCategories(categories.map((category) => category.name))}>全选分类</button>}
         </div>
+        <div className="calendar-grid" style={{ '--calendar-range-space': `${rangeCount * 26}px` }}>
+          <div className="calendar-weekdays">
+            {['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'].map((day) => (
+              <span className="calendar-head" key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="calendar-month-grid">
+            {monthWeeks.map((weekDays) => {
+              const rangeSegments = getCalendarRangeSegments(calendarRanges, weekDays);
+              return (
+                <div className="calendar-week" key={weekDays[0].date}>
+                  <div className="calendar-week-cells">
+                    {weekDays.map((day) => {
+                      const dayTasks = visibleTasks.filter((task) => task.task_date === day.date && !(task.end_date && task.end_date > task.task_date));
+                      const isToday = day.date === getToday();
+                      const isPast = day.isCurrentMonth && day.date < getToday();
+                      return (
+                        <div
+                          className={[
+                            'calendar-cell',
+                            day.isCurrentMonth ? '' : 'muted',
+                            isToday ? 'today' : '',
+                            isPast ? 'past' : '',
+                          ].join(' ')}
+                          key={day.date}
+                        >
+                          <strong>{day.dayNumber}</strong>
+                          <div className="calendar-day-events">
+                            {dayTasks.slice(0, 3).map((task) => (
+                              <button type="button" className={`calendar-event event-${task.matrix_category}`} key={task.id} style={{ color: categories.find((category) => category.name === (task.category || '生活'))?.color }} onClick={(event) => openTaskEditor(task, event)}>
+                                <i aria-hidden="true" />
+                                <b>{task.title}</b>
+                              </button>
+                            ))}
+                            {dayTasks.length > 3 && <small>+{dayTasks.length - 3}</small>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="calendar-range-layer" aria-label="跨天任务与长期任务时间轴">
+                    {rangeSegments.map((range) => (
+                      range.kind === 'cross-day-task' ? (
+                      <button
+                        type="button"
+                        className={`calendar-range-event${range.kind === 'cross-day-task' ? ' calendar-cross-day-range' : ''} event-${range.matrix_category}`}
+                        key={`${range.id}-${weekDays[0].date}`}
+                        style={{
+                          '--calendar-range-left': `${(range.startIndex / 7) * 100}%`,
+                          '--calendar-range-top': `${range.lane * 26}px`,
+                          '--calendar-range-width': `${(range.span / 7) * 100}%`,
+                          '--task-category-color': categories.find((category) => category.name === (range.category || '生活'))?.color,
+                        }}
+                        title={`${range.title}：${range.startDate} 至 ${range.endDate}`}
+                        onClick={(event) => openTaskEditor(range, event)}
+                      >
+                        {range.title}
+                      </button>
+                      ) : (
+                      <span
+                        className={`calendar-range-event event-${range.matrix_category}`}
+                        key={`${range.id}-${weekDays[0].date}`}
+                        style={{
+                          '--calendar-range-left': `${(range.startIndex / 7) * 100}%`,
+                          '--calendar-range-top': `${range.lane * 26}px`,
+                          '--calendar-range-width': `${(range.span / 7) * 100}%`,
+                        }}
+                        title={`${range.title}：${range.startDate} 至 ${range.endDate}`}
+                      >
+                        {range.title}
+                      </span>
+                      )
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+      {selectedTask && (
+        <CalendarTaskEditor
+          task={selectedTask}
+          categories={categories}
+          position={editorPosition}
+          isConfirmingDelete={isConfirmingDelete}
+          onClose={closeTaskEditor}
+          onUpdate={updateSelectedTask}
+          onPersist={persistSelectedTask}
+          onConfirmDelete={() => setIsConfirmingDelete(true)}
+          onCancelDelete={() => setIsConfirmingDelete(false)}
+          onDelete={handleDeleteSelectedTask}
+        />
+      )}
+    </div>
+  );
+}
+
+function CalendarTaskEditor({ task, categories, position, isConfirmingDelete, onClose, onUpdate, onPersist, onConfirmDelete, onCancelDelete, onDelete }) {
+  const isAllDay = !task.task_time && !task.end_time;
+  const endDate = task.end_date || task.task_date;
+
+  function changeStartDate(date) {
+    const changes = { task_date: date };
+    if (task.end_date && task.end_date < date) changes.end_date = date;
+    onUpdate(changes);
+  }
+
+  function changeEndDate(date) {
+    onUpdate({ end_date: date === task.task_date ? null : date });
+  }
+
+  function toggleAllDay() {
+    if (isAllDay) {
+      onUpdate({ task_time: '09:00', end_time: '10:00' });
+      return;
+    }
+    onUpdate({ task_time: null, end_time: null });
+  }
+
+  return (
+    <div className="calendar-task-editor-backdrop" onMouseDown={onClose}>
+      <section
+        className="calendar-task-editor"
+        aria-label={`编辑任务：${task.title}`}
+        onMouseDown={(event) => event.stopPropagation()}
+        style={{ '--calendar-editor-top': `${position.top}px`, '--calendar-editor-left': `${position.left}px` }}
+      >
+        <div className="calendar-editor-title-row">
+          <input
+            aria-label="任务标题"
+            value={task.title}
+            onChange={(event) => onUpdate({ title: event.target.value }, false)}
+            onBlur={onPersist}
+            placeholder="填写任务标题"
+          />
+          <button type="button" className="calendar-editor-close" onClick={onClose} aria-label="关闭任务设置">×</button>
+        </div>
+
+        <div className="calendar-editor-schedule">
+          <div className="calendar-editor-properties-row">
+          <label className="calendar-editor-category">
+            <span className="calendar-editor-category-dot" style={{ background: categories.find((item) => item.name === (task.category || '生活'))?.color }} aria-hidden="true" />
+            <select value={task.category || '生活'} onChange={(event) => onUpdate({ category: event.target.value })} aria-label="任务分类">
+              {categories.map((category) => <option value={category.name} key={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label className="calendar-editor-specific-time">
+            <input type="checkbox" checked={!isAllDay} onChange={toggleAllDay} />
+            <span>具体时间</span>
+          </label>
+          </div>
+          <div className={isAllDay ? 'calendar-editor-schedule-row is-all-day' : 'calendar-editor-schedule-row'}>
+            <CalendarDateInput label="开始" value={task.task_date} onChange={changeStartDate} />
+            {!isAllDay && <label className="calendar-editor-time"><Clock3 size={15} aria-hidden="true" /><input type="time" value={task.task_time || ''} onChange={(event) => onUpdate({ task_time: event.target.value }, false)} onBlur={onPersist} aria-label="开始时间" /></label>}
+          </div>
+          <div className={isAllDay ? 'calendar-editor-schedule-row is-all-day' : 'calendar-editor-schedule-row'}>
+            <CalendarDateInput label="结束" value={endDate} min={task.task_date} onChange={changeEndDate} />
+            {!isAllDay && <label className="calendar-editor-time"><Clock3 size={15} aria-hidden="true" /><input type="time" value={task.end_time || ''} onChange={(event) => onUpdate({ end_time: event.target.value }, false)} onBlur={onPersist} aria-label="结束时间" /></label>}
+          </div>
+        </div>
+
+        <label className="calendar-editor-notes">
+          <input value={task.description ?? ''} onChange={(event) => onUpdate({ description: event.target.value }, false)} onBlur={onPersist} placeholder="备注" aria-label="备注" />
+        </label>
+
+        {isConfirmingDelete ? (
+          <div className="calendar-editor-delete-confirm">
+            <span>确认删除此事件？</span>
+            <button type="button" onClick={onDelete}>确认删除</button>
+            <button type="button" onClick={onCancelDelete}>取消</button>
+          </div>
+        ) : (
+          <button className="calendar-editor-delete" type="button" onClick={onConfirmDelete}><Trash2 size={16} /> 删除事件</button>
+        )}
       </section>
     </div>
   );
 }
 
-function MatrixPanel({ tasks, setTasks, setMessage }) {
+function CalendarDateInput({ label, value, min, onChange }) {
+  const [text, setText] = React.useState(formatCalendarDateInput(value));
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setText(formatCalendarDateInput(value));
+  }, [value]);
+
+  function applyManualDate() {
+    const parsedDate = parseCalendarDateInput(text);
+    if (!parsedDate || (min && parsedDate < min)) {
+      setText(formatCalendarDateInput(value));
+      return;
+    }
+    onChange(parsedDate);
+  }
+
+  return (
+    <label className="calendar-editor-date">
+      <span>{label}</span>
+      <div className="calendar-date-input-wrap">
+        <button type="button" className="calendar-date-picker-button" onClick={() => setIsPickerOpen((open) => !open)} aria-label={`选择${label}日期`} aria-expanded={isPickerOpen}>
+          <CalendarDays size={18} />
+        </button>
+        <input
+          value={text}
+          inputMode="numeric"
+          placeholder="9 / 15 / 2026"
+          onChange={(event) => setText(event.target.value)}
+          onBlur={applyManualDate}
+          aria-label={`${label}日期，可输入月日年`}
+        />
+      </div>
+      {isPickerOpen && <CalendarDatePicker value={value} min={min} onSelect={(date) => { onChange(date); setIsPickerOpen(false); }} />}
+    </label>
+  );
+}
+
+function CalendarDatePicker({ value, min, onSelect }) {
+  const [activeMonth, setActiveMonth] = React.useState(() => new Date(`${value}T12:00:00`));
+  const monthDays = getMonthDays(activeMonth);
+
+  return (
+    <div className="calendar-date-picker" role="dialog" aria-label="选择日期">
+      <div className="calendar-date-picker-header">
+        <button type="button" onClick={() => setActiveMonth((date) => new Date(date.getFullYear() - 1, date.getMonth(), 1))} aria-label="上一年">«</button>
+        <button type="button" onClick={() => setActiveMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))} aria-label="上个月">‹</button>
+        <strong>{activeMonth.getFullYear()}年{activeMonth.getMonth() + 1}月</strong>
+        <button type="button" onClick={() => setActiveMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))} aria-label="下个月">›</button>
+        <button type="button" onClick={() => setActiveMonth((date) => new Date(date.getFullYear() + 1, date.getMonth(), 1))} aria-label="下一年">»</button>
+      </div>
+      <div className="calendar-date-picker-weekdays" aria-hidden="true">
+        {['一', '二', '三', '四', '五', '六', '日'].map((day) => <span key={day}>{day}</span>)}
+      </div>
+      <div className="calendar-date-picker-days">
+        {monthDays.map((day) => (
+          <button
+            type="button"
+            key={day.date}
+            className={[day.isCurrentMonth ? '' : 'muted', day.date === value ? 'selected' : ''].filter(Boolean).join(' ')}
+            disabled={Boolean(min && day.date < min)}
+            onClick={() => onSelect(day.date)}
+          >
+            {day.dayNumber}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatCalendarDateInput(date) {
+  if (!date) return '';
+  const [year, month, day] = date.split('-').map(Number);
+  return `${month} / ${day} / ${year}`;
+}
+
+function parseCalendarDateInput(value) {
+  const parts = value.match(/\d+/g)?.map(Number);
+  if (!parts || parts.length !== 3) return null;
+  const [first, second, third] = parts;
+  const [year, month, day] = String(first).length === 4 ? [first, second, third] : [third, first, second];
+  const candidate = new Date(year, month - 1, day);
+  if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function MatrixPanel({ tasks, setTasks, setMessage, categoryOptions }) {
   return (
     <div className="matrix-grid">
       {matrixOptions.map((matrix) => {
@@ -2922,6 +3716,7 @@ function MatrixPanel({ tasks, setTasks, setMessage }) {
               tasks={matrixTasks}
               setTasks={setTasks}
               setMessage={setMessage}
+              categoryOptions={categoryOptions}
               variant="matrix"
               emptyText="这个象限暂时没有任务。"
             />

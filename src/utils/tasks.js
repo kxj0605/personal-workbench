@@ -4,59 +4,68 @@ export function getLabel(options, value) {
   return options.find((item) => item.value === value)?.label ?? value;
 }
 
-export function getTaskListEmptyText(statusFilter, matrixFilter) {
-  if (statusFilter === 'all' && matrixFilter === 'all') {
+export function getTaskListEmptyText(statusFilter, matrixFilter, categoryFilter = 'all') {
+  if (statusFilter === 'all' && matrixFilter === 'all' && categoryFilter === 'all') {
     return '还没有任务，先在左侧新增一条安排。';
   }
 
   return '没有符合当前筛选的任务，可以换个状态或程度看看。';
 }
 
-export function filterTasks(tasks, statusFilter = 'all', matrixFilter = 'all') {
+export function filterTasks(tasks, statusFilter = 'all', matrixFilter = 'all', categoryFilter = 'all') {
   return tasks.filter((task) => {
     const matchesStatus =
-      (statusFilter === 'all' && task.status !== 'completed') ||
+      statusFilter === 'all' ||
       (statusFilter === 'unfinished' && task.status !== 'completed') ||
       task.status === statusFilter;
     const matchesMatrix = matrixFilter === 'all' || task.matrix_category === matrixFilter;
+    const matchesCategory = categoryFilter === 'all' || (task.category || '生活') === categoryFilter;
 
-    return matchesStatus && matchesMatrix;
+    return matchesStatus && matchesMatrix && matchesCategory;
   });
 }
 
 export function isTaskOverdue(task) {
   if (!task.task_date || task.status === 'completed') return false;
 
+  const dueDate = getTaskDueDate(task);
   const today = getToday();
-  if (task.task_date < today) return true;
-  if (task.task_date > today) return false;
+  if (dueDate < today) return true;
+  if (dueDate > today) return false;
   if (!task.task_time) return false;
 
-  return new Date(`${task.task_date}T${task.task_time}`).getTime() < Date.now();
+  return new Date(`${dueDate}T${task.task_time}`).getTime() < Date.now();
 }
 
 export function getTaskTimingInfo(task) {
   const timeText = formatTime(task.task_time);
+  const dueDate = getTaskDueDate(task);
+  const isCrossDayTask = dueDate > task.task_date;
+  const dateRangeText = isCrossDayTask ? `${formatDate(task.task_date)} 至 ${formatDate(dueDate)}` : formatDate(task.task_date);
 
   if (isTaskOverdue(task)) {
-    const dateText = task.task_date === getToday() ? '今天' : formatDate(task.task_date);
+    const dateText = dueDate === getToday() ? '今天' : formatDate(dueDate);
     return {
       className: 'tag timing-overdue',
-      label: `已逾期 · ${dateText}${timeText ? ` ${timeText}` : ''}`,
+      label: `${dateText}${timeText ? ` ${timeText}` : ''} · 已逾期`,
     };
   }
 
-  if (task.status !== 'completed' && task.task_date === getToday()) {
+  if (task.status !== 'completed' && task.task_date <= getToday() && dueDate >= getToday()) {
     return {
       className: 'tag timing-today',
-      label: `今天${timeText ? ` · ${timeText}` : ''}`,
+      label: isCrossDayTask ? `进行中 · 至 ${formatDate(dueDate)}` : `今天${timeText ? ` · ${timeText}` : ''}`,
     };
   }
 
   return {
     className: 'tag',
-    label: `${formatDate(task.task_date)} ${timeText}`.trim(),
+    label: `${dateRangeText}${timeText ? ` ${timeText}` : ''}`,
   };
+}
+
+function getTaskDueDate(task) {
+  return task.end_date && task.end_date >= task.task_date ? task.end_date : task.task_date;
 }
 
 export function sortTasks(a, b) {

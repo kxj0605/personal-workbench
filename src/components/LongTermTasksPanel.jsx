@@ -14,6 +14,7 @@ import {
   RotateCcw,
   SkipForward,
   Target,
+  Trash2,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import {
@@ -51,6 +52,7 @@ function getDefaultForm() {
   return {
     type: 'account',
     title: '',
+    category: '生活',
     startDate: getLongTermDate(),
     endDate: '',
     scheduleType: 'daily',
@@ -63,11 +65,12 @@ function getDefaultForm() {
   };
 }
 
-export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCreateOpen, setIsCreateOpen }) {
+export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCreateOpen, setIsCreateOpen, categoryOptions = ['生活', '工作'] }) {
   const [activeSection, setActiveSection] = React.useState('today');
   const [form, setForm] = React.useState(getDefaultForm);
   const [isSaving, setIsSaving] = React.useState(false);
   const [skipTarget, setSkipTarget] = React.useState(null);
+  const [deleteTarget, setDeleteTarget] = React.useState(null);
   const [skipReason, setSkipReason] = React.useState('');
   const [nextSteps, setNextSteps] = React.useState({});
   const [selectedReviewTaskId, setSelectedReviewTaskId] = React.useState(null);
@@ -76,8 +79,8 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
   const longTermTasks = tasks
     .map((task) => ({ task, metadata: parseLongTermTask(task) }))
     .filter((item) => item.metadata);
-  const activeTasks = longTermTasks.filter((item) => item.metadata.lifecycle !== 'archived');
-  const archivedTasks = longTermTasks.filter((item) => item.metadata.lifecycle === 'archived');
+  const activeTasks = longTermTasks.filter((item) => item.metadata.lifecycle === 'active');
+  const inactiveTasks = longTermTasks.filter((item) => item.metadata.lifecycle !== 'active');
   const dueTasks = activeTasks.filter((item) => isLongTermTaskDue(item.metadata, today));
   const accountTasks = activeTasks.filter((item) => item.metadata.type === 'account');
   const todayAccountTasks = accountTasks.filter((item) => isLongTermTaskDue(item.metadata, today));
@@ -135,6 +138,10 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
       setMessage('请填写任务名称。');
       return;
     }
+    if (!form.category.trim()) {
+      setMessage('请填写任务分类。');
+      return;
+    }
     if (form.type === 'account' && form.accounts.some((account) => !account.name.trim())) {
       setMessage('请填写每个账号的名称。');
       return;
@@ -146,7 +153,13 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
 
     const schedule = { type: form.scheduleType };
     if (form.scheduleType === 'interval') schedule.intervalDays = Math.max(1, Number(form.intervalDays) || 1);
-    if (form.scheduleType === 'weekly') schedule.weekdays = form.weekdays;
+    if (form.scheduleType === 'weekly') {
+      schedule.weekdays = [...new Set(form.weekdays)].filter((day) => day >= 0 && day <= 6);
+      if (schedule.weekdays.length === 0) {
+        setMessage('请至少选择一个执行星期。');
+        return;
+      }
+    }
     if (form.scheduleType === 'monthly') {
       schedule.monthDays = [...new Set(form.monthDays.split(',')
         .map((value) => Number(value.trim()))
@@ -185,6 +198,7 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
         description: serializeLongTermTask(metadata),
         task_date: form.startDate,
         task_time: null,
+        category: form.category.trim(),
         matrix_category: 'important_not_urgent',
         status: 'in_progress',
         user_id: session.user.id,
@@ -236,6 +250,20 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
     await persistMetadata(task, next, `任务状态已改为“${lifecycleLabels[lifecycle]}”。`);
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+
+    const { error } = await supabase.from('tasks').delete().eq('id', deleteTarget.id);
+    if (error) {
+      setMessage(`删除长期任务失败：${error.message}`);
+      return;
+    }
+
+    setTasks((current) => current.filter((item) => item.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    setMessage('长期任务已永久删除。');
+  }
+
   async function completeProjectStep(task, metadata) {
     if (!metadata.currentStep) return;
     const next = cloneMetadata(metadata);
@@ -269,7 +297,7 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
       <div className="long-term-subtabs" role="tablist" aria-label="长期追踪分类">
         <button className={activeSection === 'today' ? 'active' : ''} onClick={() => setActiveSection('today')}>今日打卡</button>
         <button className={activeSection === 'review' ? 'active' : ''} onClick={() => setActiveSection('review')}>数据回顾</button>
-        <button className={activeSection === 'archive' ? 'active' : ''} onClick={() => setActiveSection('archive')}>已归档</button>
+        <button className={activeSection === 'archive' ? 'active' : ''} onClick={() => setActiveSection('archive')}>暂停与归档</button>
       </div>
 
       {isCreateOpen && (
@@ -280,6 +308,7 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
           setForm={setForm}
           isSaving={isSaving}
           onSubmit={handleCreate}
+          categoryOptions={categoryOptions}
         />
       )}
 
@@ -305,6 +334,7 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
                   onChangeCount={changeAccountCount}
                   onSkip={() => { setSkipTarget({ task, metadata }); setSkipReason(''); }}
                   onLifecycleChange={changeLifecycle}
+                  onDelete={() => setDeleteTarget(task)}
                 />
               ) : (
                 <ProjectLongTermCard
@@ -316,6 +346,7 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
                   onComplete={() => completeProjectStep(task, metadata)}
                   onAddStep={() => addProjectStep(task, metadata)}
                   onLifecycleChange={changeLifecycle}
+                  onDelete={() => setDeleteTarget(task)}
                 />
               ))}
             </div>
@@ -340,12 +371,13 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
                 metadata={selectedReviewTask.metadata}
                 today={today}
                 onLifecycleChange={changeLifecycle}
+                onDelete={() => setDeleteTarget(selectedReviewTask.task)}
               />
               {activeTasks.some((item) => item.metadata.type === 'project') && (
                 <section className="review-project-summary" aria-label="项目推进回顾">
                   <div><h2>项目推进</h2><p>项目型任务按步骤回顾，不纳入打卡热力图。</p></div>
                   {activeTasks.filter((item) => item.metadata.type === 'project').map(({ task, metadata }) => (
-                    <ProjectReviewCard key={task.id} task={task} metadata={metadata} onLifecycleChange={changeLifecycle} />
+                    <ProjectReviewCard key={task.id} task={task} metadata={metadata} onLifecycleChange={changeLifecycle} onDelete={() => setDeleteTarget(task)} />
                   ))}
                 </section>
               )}
@@ -356,10 +388,13 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
 
       {activeSection === 'archive' && (
         <div className="long-term-card-list">
-          {archivedTasks.length === 0 ? <div className="panel-card long-term-empty"><Archive size={24} /><h2>暂时没有已归档任务</h2></div> : archivedTasks.map(({ task, metadata }) => (
+          {inactiveTasks.length === 0 ? <div className="panel-card long-term-empty"><Archive size={24} /><h2>暂时没有暂停、已结束或已归档的任务</h2></div> : inactiveTasks.map(({ task, metadata }) => (
             <article className="panel-card archived-long-term-card" key={task.id}>
-              <div><h2>{task.title}</h2><p>{metadata.type === 'account' ? `${metadata.accounts.length} 个账号` : `${metadata.stepHistory?.length ?? 0} 个已完成步骤`}</p></div>
-              <button className="secondary-action" onClick={() => changeLifecycle(task, metadata, 'active')}><RotateCcw size={16} />恢复为进行中</button>
+              <div><h2>{task.title}</h2><p><span className={`long-term-lifecycle-label lifecycle-${metadata.lifecycle}`}>{lifecycleLabels[metadata.lifecycle]}</span>{metadata.type === 'account' ? `${metadata.accounts.length} 个账号` : `${metadata.stepHistory?.length ?? 0} 个已完成步骤`}</p></div>
+              <div className="long-term-card-actions">
+                <button className="secondary-action" onClick={() => changeLifecycle(task, metadata, 'active')}><RotateCcw size={16} />恢复为进行中</button>
+                <LifecycleSelect value={metadata.lifecycle} onChange={(value) => changeLifecycle(task, metadata, value)} onDelete={() => setDeleteTarget(task)} />
+              </div>
             </article>
           ))}
         </div>
@@ -380,11 +415,24 @@ export function LongTermTasksPanel({ session, tasks, setTasks, setMessage, isCre
           </div>
         </div>
       )}
+
+      {deleteTarget && (
+        <div className="long-term-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteTarget(null); }}>
+          <div className="long-term-modal" role="dialog" aria-modal="true" aria-labelledby="delete-long-term-title">
+            <h2 id="delete-long-term-title">永久删除长期任务？</h2>
+            <p>“{deleteTarget.title}”及其打卡记录、账号或步骤历史将无法恢复。</p>
+            <div className="long-term-modal-actions">
+              <button className="secondary-action" onClick={() => setDeleteTarget(null)}>取消</button>
+              <button className="danger-confirm-button" onClick={confirmDelete}><Trash2 size={15} />确认永久删除</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function LongTermCreateForm({ form, updateForm, updateAccount, setForm, isSaving, onSubmit }) {
+function LongTermCreateForm({ form, updateForm, updateAccount, setForm, isSaving, onSubmit, categoryOptions }) {
   return (
     <form className="panel-card long-term-create-form" onSubmit={onSubmit}>
       <div className="form-card-heading">
@@ -397,6 +445,7 @@ function LongTermCreateForm({ form, updateForm, updateAccount, setForm, isSaving
       </div>
       <div className="long-term-form-grid">
         <label className="wide-field">任务名称<input value={form.title} onChange={(event) => updateForm('title', event.target.value)} placeholder="例如：每天进行直播" required /></label>
+        <label>分类<select value={form.category} onChange={(event) => updateForm('category', event.target.value)}>{categoryOptions.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
         <label>开始日期<input type="date" value={form.startDate} onChange={(event) => updateForm('startDate', event.target.value)} required /></label>
         <label>结束日期（可选）<input type="date" value={form.endDate} min={form.startDate} onChange={(event) => updateForm('endDate', event.target.value)} /></label>
         <label>执行周期<select value={form.scheduleType} onChange={(event) => updateForm('scheduleType', event.target.value)}><option value="daily">每天</option><option value="interval">每隔 N 天</option><option value="weekly">每周指定星期</option><option value="monthly">每月指定日期</option></select></label>
@@ -435,15 +484,15 @@ function LongTermMetric({ icon: Icon, label, value, tone }) {
   return <article className={`long-term-metric tone-${tone}`}><div><span>{label}</span><i><Icon size={17} /></i></div><strong>{value}</strong></article>;
 }
 
-function AccountLongTermCard({ task, metadata, today, onChangeCount, onSkip, onLifecycleChange }) {
+function AccountLongTermCard({ task, metadata, today, onChangeCount, onSkip, onLifecycleChange, onDelete }) {
   const status = getAccountDayStatus(metadata, today);
   const label = status.state === 'complete' ? '今日完成' : status.state === 'partial' ? '部分完成' : status.state === 'skipped' ? '已跳过' : '待打卡';
   const progress = status.total ? Math.round(status.completed / status.total * 100) : 0;
   return (
     <article className="panel-card account-long-term-card">
       <div className="long-term-card-heading">
-        <div className="long-term-title"><span className="long-term-icon tone-danger"><Activity size={19} /></span><div><h2>{task.title}</h2><p><Clock3 size={13} />{getLongTermScheduleLabel(metadata)} · 00:00 换日</p></div></div>
-        <div className="long-term-card-controls"><span className={`long-term-status status-${status.state}`}>{label}</span><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} /></div>
+        <div className="long-term-title"><span className="long-term-icon tone-danger"><Activity size={19} /></span><div><h2>{task.title}</h2><p><span className="long-term-category-label">{task.category || '生活'}</span><Clock3 size={13} />{getLongTermScheduleLabel(metadata)} · 00:00 换日</p></div></div>
+        <div className="long-term-card-controls"><span className={`long-term-status status-${status.state}`}>{label}</span><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} onDelete={onDelete} /></div>
       </div>
       <div className="long-term-progress"><div><span style={{ width: `${progress}%` }} /></div><strong>{status.completed}/{status.total}</strong></div>
       <div className="long-term-account-list">
@@ -468,12 +517,12 @@ function AccountLongTermCard({ task, metadata, today, onChangeCount, onSkip, onL
   );
 }
 
-function ProjectLongTermCard({ task, metadata, nextStep, onNextStepChange, onComplete, onAddStep, onLifecycleChange }) {
+function ProjectLongTermCard({ task, metadata, nextStep, onNextStepChange, onComplete, onAddStep, onLifecycleChange, onDelete }) {
   return (
     <article className="panel-card project-long-term-card">
       <div className="long-term-card-heading">
-        <div className="long-term-title"><span className="long-term-icon tone-creative"><Layers3 size={19} /></span><div><h2>{task.title}</h2><p>分步骤长期任务 · 今天推进一步即可</p></div></div>
-        <LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} />
+        <div className="long-term-title"><span className="long-term-icon tone-creative"><Layers3 size={19} /></span><div><h2>{task.title}</h2><p><span className="long-term-category-label">{task.category || '生活'}</span>分步骤长期任务 · 今天推进一步即可</p></div></div>
+        <div className="long-term-card-actions"><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} onDelete={onDelete} /></div>
       </div>
       {metadata.currentStep ? (
         <div className="current-step-box"><div><span>当前小步骤 · {metadata.currentStep.startedAt}</span><strong>{metadata.currentStep.title}</strong>{metadata.currentStep.notes && <p>{metadata.currentStep.notes}</p>}</div><button className="account-check" onClick={onComplete}><Check size={16} />完成这一步</button></div>
@@ -485,8 +534,16 @@ function ProjectLongTermCard({ task, metadata, nextStep, onNextStepChange, onCom
   );
 }
 
-function LifecycleSelect({ value, onChange }) {
-  return <select className="lifecycle-select" value={value} onChange={(event) => onChange(event.target.value)} aria-label="长期任务状态"><option value="active">进行中</option><option value="paused">暂停</option><option value="ended">已结束</option><option value="archived">已归档</option></select>;
+function LifecycleSelect({ value, onChange, onDelete }) {
+  function handleChange(event) {
+    if (event.target.value === 'delete') {
+      onDelete?.();
+      return;
+    }
+    onChange(event.target.value);
+  }
+
+  return <select className="lifecycle-select" value={value} onChange={handleChange} aria-label="长期任务状态"><option value="active">进行中</option><option value="paused">暂停</option><option value="ended">已结束</option><option value="archived">已归档</option><option value="delete">永久删除</option></select>;
 }
 
 function ReviewTaskPicker({ tasks, selectedTaskId, today, onSelect }) {
@@ -522,7 +579,7 @@ function ReviewTaskPicker({ tasks, selectedTaskId, today, onSelect }) {
   );
 }
 
-function ReviewCard({ task, metadata, today, onLifecycleChange }) {
+function ReviewCard({ task, metadata, today, onLifecycleChange, onDelete }) {
   const stats = getAccountTaskStats(metadata, today);
   const dates = [];
   const cursor = new Date(`${today}T12:00:00`);
@@ -537,7 +594,7 @@ function ReviewCard({ task, metadata, today, onLifecycleChange }) {
   }
   return (
     <article className="panel-card review-card">
-      <div className="panel-heading-row"><div><h2>{task.title}</h2><p>{getLongTermScheduleLabel(metadata)}</p></div><div className="review-heading-actions"><strong>{stats.cumulativeDays} 个完成日</strong><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} /></div></div>
+      <div className="panel-heading-row"><div><h2>{task.title}</h2><p>{getLongTermScheduleLabel(metadata)}</p></div><div className="review-heading-actions"><strong>{stats.cumulativeDays} 个完成日</strong><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} onDelete={onDelete} /></div></div>
       <div className="review-heatmap-wrap">
         <div className="review-weekday-labels" aria-hidden="true">{['一', '二', '三', '四', '五', '六', '日'].map((day) => <span key={day}>{day}</span>)}</div>
         <div className="review-heatmap">{dates.map((item) => <span className={`heat-${item.status}`} title={`${item.date} · ${item.status}`} key={item.date} />)}</div>
@@ -547,11 +604,11 @@ function ReviewCard({ task, metadata, today, onLifecycleChange }) {
   );
 }
 
-function ProjectReviewCard({ task, metadata, onLifecycleChange }) {
+function ProjectReviewCard({ task, metadata, onLifecycleChange, onDelete }) {
   return (
     <article className="panel-card archived-long-term-card">
       <div><h2>{task.title}</h2><p>已完成 {metadata.stepHistory?.length ?? 0} 个步骤{metadata.currentStep ? ` · 当前：${metadata.currentStep.title}` : ' · 暂无下一步'}</p></div>
-      <LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} />
+      <div className="long-term-card-actions"><LifecycleSelect value={metadata.lifecycle} onChange={(value) => onLifecycleChange(task, metadata, value)} onDelete={onDelete} /></div>
     </article>
   );
 }
