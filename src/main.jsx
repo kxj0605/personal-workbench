@@ -202,6 +202,13 @@ function App() {
   const [session, setSession] = React.useState(isWorkspacePreview ? { user: { id: 'preview-user', email: 'preview@example.com' } } : null);
   const [profile, setProfile] = React.useState(isWorkspacePreview ? { id: 'preview-user', nickname: '预览账号' } : null);
   const [authReady, setAuthReady] = React.useState(isWorkspacePreview);
+  const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
+  const [authModalMode, setAuthModalMode] = React.useState('login');
+
+  const openAuthModal = React.useCallback((mode = 'login') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  }, []);
 
   React.useEffect(() => {
     if (isWorkspacePreview) return undefined;
@@ -221,7 +228,10 @@ function App() {
         setCurrentPage(pages.resetPassword);
         return;
       }
-      if (nextSession) setCurrentPage(pages.workspace);
+      if (nextSession) {
+        setIsAuthModalOpen(false);
+        setCurrentPage(pages.workspace);
+      }
     });
 
     return () => listener.subscription.unsubscribe();
@@ -257,6 +267,7 @@ function App() {
     if (!supabase) return;
     await supabase.auth.signOut();
     setCurrentPage(pages.home);
+    setIsAuthModalOpen(false);
   }
 
   return (
@@ -325,12 +336,12 @@ function App() {
             </>
           ) : (
             <>
-              <button className="text-button" onClick={() => setCurrentPage(pages.login)}>
+              <button className="text-button" onClick={() => openAuthModal('login')}>
                 <LogIn size={17} />
                 登录
               </button>
               {currentPage !== pages.home && (
-                <button className="primary-button" onClick={() => setCurrentPage(pages.register)}>
+                <button className="primary-button" onClick={() => openAuthModal('register')}>
                   <UserPlus size={17} />
                   注册
                 </button>
@@ -344,8 +355,8 @@ function App() {
         <HomePage
           authReady={authReady}
           session={session}
-          onLogin={() => setCurrentPage(pages.login)}
-          onRegister={() => setCurrentPage(pages.register)}
+          onLogin={() => openAuthModal('login')}
+          onRegister={() => openAuthModal('register')}
           onWorkspace={() => {
             setWorkspaceTab(tabs.dashboard);
             setCurrentPage(pages.workspace);
@@ -390,16 +401,51 @@ function App() {
           }}
         />
       )}
-      {currentPage === pages.publicNotes && <PublicNotesPage session={session} profile={profile} onLogin={() => setCurrentPage(pages.login)} />}
+      {currentPage === pages.publicNotes && <PublicNotesPage session={session} profile={profile} onLogin={() => openAuthModal('login')} />}
       {currentPage === pages.workspace && (
         <WorkspacePage
           session={session}
           profile={profile}
           initialTab={workspaceTab}
           onProfileChange={setProfile}
-          onLogin={() => setCurrentPage(pages.login)}
+          onLogin={() => openAuthModal('login')}
           onSignOut={handleSignOut}
         />
+      )}
+      {isAuthModalOpen && (
+        <div className="auth-modal" role="dialog" aria-modal="true" aria-label={authModalMode === 'login' ? '登录' : '注册'} onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setIsAuthModalOpen(false);
+        }}>
+          <div className="auth-modal-panel">
+            <button className="auth-modal-close" type="button" onClick={() => setIsAuthModalOpen(false)} aria-label="关闭登录窗口" title="关闭">
+              <X size={18} />
+            </button>
+            {authModalMode === 'login' ? (
+              <LoginPage
+                onRegister={() => setAuthModalMode('register')}
+                onForgotPassword={(email) => {
+                  setPasswordRecoveryEmail(email);
+                  setIsAuthModalOpen(false);
+                  setCurrentPage(pages.forgotPassword);
+                }}
+                onDone={() => {
+                  setWorkspaceTab(tabs.dashboard);
+                  setIsAuthModalOpen(false);
+                  setCurrentPage(pages.workspace);
+                }}
+              />
+            ) : (
+              <RegisterPage
+                onLogin={() => setAuthModalMode('login')}
+                onDone={() => {
+                  setWorkspaceTab(tabs.dashboard);
+                  setIsAuthModalOpen(false);
+                  setCurrentPage(pages.workspace);
+                }}
+              />
+            )}
+          </div>
+        </div>
       )}
     </main>
   );
