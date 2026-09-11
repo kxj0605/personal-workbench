@@ -1,12 +1,88 @@
 import React from 'react';
-import { LockKeyhole, LogIn, ShieldCheck, Sparkles, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Github, LockKeyhole, LogIn, Mail, Sparkles, UserPlus } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../supabaseClient';
 
+const pendingVerificationEmailStorageKey = 'personal-workbench-pending-verification-email';
+
+function readPendingVerificationEmail() {
+  try {
+    return window.sessionStorage.getItem(pendingVerificationEmailStorageKey) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function savePendingVerificationEmail(email) {
+  try {
+    window.sessionStorage.setItem(pendingVerificationEmailStorageKey, email);
+  } catch {
+    // The email field still works when browser storage is unavailable.
+  }
+}
+
+function clearPendingVerificationEmail() {
+  try {
+    window.sessionStorage.removeItem(pendingVerificationEmailStorageKey);
+  } catch {
+    // Nothing else is needed when browser storage is unavailable.
+  }
+}
+
+function AuthModeSwitcher({ mode, onLogin, onRegister }) {
+  const isRegister = mode === 'register';
+
+  return (
+    <div className={`auth-mode-switcher${isRegister ? ' is-register' : ''}`} role="tablist" aria-label="账户操作">
+      <span className="auth-mode-switcher-indicator" aria-hidden="true" />
+      <button
+        className={isRegister ? '' : 'active'}
+        type="button"
+        role="tab"
+        aria-selected={!isRegister}
+        onClick={() => {
+          if (isRegister) onLogin();
+        }}
+      >
+        登录
+      </button>
+      <button
+        className={isRegister ? 'active' : ''}
+        type="button"
+        role="tab"
+        aria-selected={isRegister}
+        onClick={() => {
+          if (!isRegister) onRegister();
+        }}
+      >
+        注册
+      </button>
+    </div>
+  );
+}
+
+function getMailboxUrl(email) {
+  const domain = email.split('@')[1]?.toLowerCase();
+  const inboxUrls = {
+    'qq.com': 'https://mail.qq.com/',
+    'foxmail.com': 'https://mail.qq.com/',
+    'gmail.com': 'https://mail.google.com/',
+    'outlook.com': 'https://outlook.live.com/mail/',
+    'hotmail.com': 'https://outlook.live.com/mail/',
+    'live.com': 'https://outlook.live.com/mail/',
+    '163.com': 'https://mail.163.com/',
+    '126.com': 'https://mail.126.com/',
+  };
+
+  return inboxUrls[domain] ?? null;
+}
+
 export function LoginPage({ onRegister, onForgotPassword, onDone }) {
-  const [email, setEmail] = React.useState('');
+  const [email, setEmail] = React.useState(readPendingVerificationEmail);
   const [password, setPassword] = React.useState('');
   const [message, setMessage] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
+  const [isGithubLoading, setIsGithubLoading] = React.useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -40,6 +116,7 @@ export function LoginPage({ onRegister, onForgotPassword, onDone }) {
         return;
       }
 
+      clearPendingVerificationEmail();
       onDone();
     } catch (error) {
       setMessage(
@@ -52,16 +129,31 @@ export function LoginPage({ onRegister, onForgotPassword, onDone }) {
     }
   }
 
+  async function handleGitHubLogin() {
+    setMessage('');
+
+    if (!isSupabaseConfigured) {
+      setMessage('Supabase 还没有配置好。');
+      return;
+    }
+
+    setIsGithubLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: { redirectTo: window.location.origin },
+    });
+
+    if (error) {
+      setIsGithubLoading(false);
+      setMessage(`GitHub 登录暂不可用：${error.message}`);
+    }
+  }
+
   return (
-    <section className="auth-page">
+    <section className="auth-page login-page auth-mode-page">
       <div className="auth-card">
-        <div className="auth-card-heading">
-          <span className="auth-heading-icon"><LockKeyhole size={22} /></span>
-          <div>
-            <p className="eyebrow"><Sparkles size={15} /> 欢迎回来</p>
-            <h1>进入私人工作台</h1>
-            <p className="muted-text">继续管理你的任务、笔记和生活记录。</p>
-          </div>
+        <div className="auth-card-heading auth-mode-card-heading">
+          <AuthModeSwitcher mode="login" onRegister={onRegister} />
         </div>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label htmlFor="login-email">邮箱</label>
@@ -74,27 +166,43 @@ export function LoginPage({ onRegister, onForgotPassword, onDone }) {
             required
           />
           <label htmlFor="login-password">密码</label>
-          <input
-            id="login-password"
-            type="password"
-            placeholder="请输入密码"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
+          <div className="auth-password-field">
+            <input
+              id="login-password"
+              type={isPasswordVisible ? 'text' : 'password'}
+              placeholder="请输入密码"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <button
+              className="password-visibility-button"
+              type="button"
+              onClick={() => setIsPasswordVisible((visible) => !visible)}
+              aria-label={isPasswordVisible ? '隐藏密码' : '显示密码'}
+              title={isPasswordVisible ? '隐藏密码' : '显示密码'}
+            >
+              {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <div className="login-options">
+            <label className="remember-password-option">
+              <input type="checkbox" defaultChecked />
+              <span>记住密码</span>
+            </label>
+            <button className="forgot-password-button" type="button" onClick={() => onForgotPassword(email)}>忘记密码？</button>
+          </div>
           <button className="primary-button large" type="submit" disabled={isLoading}>
             <LogIn size={18} />
             {isLoading ? '登录中...' : '登录'}
           </button>
         </form>
         {message && <p className="form-message">{message}</p>}
-        <button className="link-button secondary-link-button" onClick={() => onForgotPassword(email)}>
-          忘记密码？
+        <button className="github-login-button" type="button" onClick={handleGitHubLogin} disabled={isGithubLoading}>
+          <Github size={19} />
+          {isGithubLoading ? '正在跳转 GitHub…' : '使用 GitHub 登录'}
         </button>
-        <button className="link-button" onClick={onRegister}>
-          还没有账号，去注册
-        </button>
-        <p className="auth-trust-note"><ShieldCheck size={15} /> 安全登录到你的私人空间</p>
+        <p className="login-register-copy">还没有账号？<button className="inline-register-button" type="button" onClick={onRegister}>立即注册</button></p>
       </div>
     </section>
   );
@@ -232,6 +340,17 @@ export function RegisterPage({ onLogin, onDone }) {
   const [password, setPassword] = React.useState('');
   const [message, setMessage] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
+  const [verificationEmail, setVerificationEmail] = React.useState('');
+  const [resendMessage, setResendMessage] = React.useState('');
+  const [resendSeconds, setResendSeconds] = React.useState(0);
+  const [isResending, setIsResending] = React.useState(false);
+
+  React.useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+
+    const timer = window.setTimeout(() => setResendSeconds((seconds) => seconds - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -243,7 +362,11 @@ export function RegisterPage({ onLogin, onDone }) {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: window.location.origin },
+    });
     setIsLoading(false);
 
     if (error) {
@@ -252,23 +375,84 @@ export function RegisterPage({ onLogin, onDone }) {
     }
 
     if (data.session) {
+      clearPendingVerificationEmail();
       onDone();
       return;
     }
 
-    setMessage('注册成功。请去邮箱确认账号，然后回来登录。');
+    savePendingVerificationEmail(email);
+    setVerificationEmail(email);
+    setResendSeconds(60);
+  }
+
+  async function handleResend() {
+    if (!verificationEmail || resendSeconds > 0 || isResending) return;
+
+    setResendMessage('');
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: verificationEmail,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setIsResending(false);
+
+    if (error) {
+      setResendMessage(`发送失败：${error.message}`);
+      return;
+    }
+
+    setResendSeconds(60);
+    setResendMessage('验证邮件已重新发送，请检查收件箱和垃圾邮件箱。');
+  }
+
+  if (verificationEmail) {
+    const mailboxUrl = getMailboxUrl(verificationEmail);
+
+    return (
+      <section className="auth-page register-page auth-mode-page">
+        <div className="auth-card">
+          <div className="auth-card-heading auth-mode-card-heading">
+            <AuthModeSwitcher mode="register" onLogin={onLogin} />
+          </div>
+          <div className="email-verification-card">
+            <span className="email-verification-icon"><Mail size={24} /></span>
+            <div>
+              <h1>验证你的邮箱</h1>
+              <p>我们已向下面的邮箱发送确认邮件：</p>
+              <strong>{verificationEmail}</strong>
+            </div>
+            <p className="email-verification-hint">请点击邮件中的确认链接。若在手机完成验证，请回到此设备登录进入工作台。</p>
+            <div className="email-verification-actions">
+              {mailboxUrl ? (
+                <a className="primary-button large verification-mail-link" href={mailboxUrl} target="_blank" rel="noreferrer">打开邮箱</a>
+              ) : (
+                <p className="email-client-hint">请打开你的邮箱客户端查收验证邮件。</p>
+              )}
+              <button className="verification-resend-button" type="button" onClick={handleResend} disabled={resendSeconds > 0 || isResending}>
+                {isResending ? '正在发送…' : resendSeconds > 0 ? `${resendSeconds} 秒后可重新发送` : '重新发送验证邮件'}
+              </button>
+              <button className="verification-change-email" type="button" onClick={() => {
+                clearPendingVerificationEmail();
+                setVerificationEmail('');
+                setResendMessage('');
+              }}>
+                更换邮箱地址
+              </button>
+            </div>
+            {resendMessage && <p className="form-message">{resendMessage}</p>}
+            <p className="email-verification-tip">未收到邮件？请检查垃圾邮件箱。</p>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <section className="auth-page">
+    <section className="auth-page register-page auth-mode-page">
       <div className="auth-card">
-        <div className="auth-card-heading">
-          <span className="auth-heading-icon"><UserPlus size={22} /></span>
-          <div>
-            <p className="eyebrow"><Sparkles size={15} /> 创建空间</p>
-            <h1>创建你的私人工作台</h1>
-            <p className="muted-text">用一个账号，安放你的任务、笔记和生活记录。</p>
-          </div>
+        <div className="auth-card-heading auth-mode-card-heading">
+          <AuthModeSwitcher mode="register" onLogin={onLogin} />
         </div>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label htmlFor="register-email">邮箱</label>
@@ -296,10 +480,6 @@ export function RegisterPage({ onLogin, onDone }) {
           </button>
         </form>
         {message && <p className="form-message">{message}</p>}
-        <button className="link-button" onClick={onLogin}>
-          已经有账号，去登录
-        </button>
-        <p className="auth-trust-note"><ShieldCheck size={15} /> 私人内容默认仅自己可见</p>
       </div>
     </section>
   );

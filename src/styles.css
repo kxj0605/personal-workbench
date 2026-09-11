@@ -7209,7 +7209,7 @@ button.calendar-range-event:focus-visible,
 
 .auth-app-shell .auth-page {
   position: relative;
-  min-height: calc(100vh - 104px);
+  min-height: 100vh;
   margin-top: 0;
   place-items: center;
   padding: 48px 20px 80px;
@@ -7253,11 +7253,159 @@ button.calendar-range-event:focus-visible,
   -webkit-backdrop-filter: blur(22px);
 }
 
+.auth-app-shell .auth-mode-page .auth-card {
+  width: min(100%, 460px);
+  padding: 28px;
+}
+
 .auth-card-heading {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 28px;
+}
+
+.auth-card-heading.auth-mode-card-heading {
+  display: block;
+  text-align: center;
+}
+
+.auth-mode-switcher {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 12px;
+  padding: 4px;
+  background: rgba(152, 162, 179, 0.13);
+}
+
+.auth-mode-switcher-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(52, 63, 84, 0.08);
+  transition: transform 200ms ease;
+}
+
+.auth-mode-switcher button {
+  position: relative;
+  z-index: 1;
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  transition: color 200ms ease;
+}
+
+.auth-mode-switcher button.active {
+  color: var(--ws-text);
+}
+
+.auth-mode-switcher.is-register .auth-mode-switcher-indicator {
+  transform: translateX(100%);
+}
+
+.auth-mode-switcher button:focus-visible {
+  outline: 2px solid var(--ws-primary);
+  outline-offset: 2px;
+}
+
+.email-verification-card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.email-verification-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eaf3ff 0%, #f0eaff 100%);
+  color: #3976d5;
+}
+
+.email-verification-card h1,
+.email-verification-card p {
+  margin: 0;
+}
+
+.email-verification-card h1 {
+  color: var(--ws-text);
+  font-size: 24px;
+}
+
+.email-verification-card p {
+  margin-top: 8px;
+  color: var(--ws-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.email-verification-card strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ws-text);
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.email-verification-card .email-verification-hint {
+  max-width: 330px;
+  margin-top: 0;
+}
+
+.email-verification-actions {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+}
+
+.verification-mail-link {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.verification-resend-button,
+.verification-change-email {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ws-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.verification-resend-button:disabled {
+  color: var(--ws-muted);
+  cursor: not-allowed;
+}
+
+.email-verification-actions .email-client-hint {
+  margin: 0;
+}
+
+.email-verification-card .form-message,
+.email-verification-card .email-verification-tip {
+  margin-top: 0;
 }
 
 .auth-heading-icon {
@@ -7335,6 +7483,131 @@ button.calendar-range-event:focus-visible,
   background: #27364d;
   font-weight: 700;
   box-shadow: 0 10px 28px rgba(52, 63, 84, 0.14);
+}
+
+.auth-password-field {
+  position: relative;
+}
+
+.auth-app-shell .auth-password-field input {
+  padding-right: 52px;
+}
+
+.password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  padding: 0;
+  color: #667085;
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.password-visibility-button:hover,
+.password-visibility-button:focus-visible {
+  color: #3976d5;
+  background: #eaf3ff;
+  outline: none;
+}
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 2px 0 4px;
+}
+
+.remember-password-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-app-shell .remember-password-option input {
+  min-height: 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: #3976d5;
+}
+
+.forgot-password-button,
+.inline-register-button {
+  border: 0;
+  padding: 0;
+  color: #3976d5;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.forgot-password-button:hover,
+.forgot-password-button:focus-visible,
+.inline-register-button:hover,
+.inline-register-button:focus-visible {
+  color: #275da9;
+  text-decoration: underline;
+  outline: none;
+}
+
+.github-login-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 12px;
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 12px;
+  padding: 0 16px;
+  color: #344054;
+  background: #f2f4f7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.github-login-button:hover,
+.github-login-button:focus-visible {
+  background: #eaecf0;
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.github-login-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.login-register-copy {
+  margin: 20px 0 0;
+  color: #98a2b3;
+  font-size: 13px;
+  text-align: center;
+}
+
+.login-register-copy .inline-register-button {
+  margin-left: 4px;
 }
 
 .auth-app-shell .link-button {

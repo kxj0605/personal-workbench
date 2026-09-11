@@ -50,7 +50,6 @@ import {
 import { supabase } from './supabaseClient';
 import { matrixOptions, pages, statusOptions, tabs, taskViews } from './config';
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages/AuthPages';
-import { HomePage } from './pages/HomePage';
 import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
@@ -193,7 +192,7 @@ function App() {
   const isPasswordReset = new URLSearchParams(window.location.search).has('reset-password');
   const requestedPreviewTab = new URLSearchParams(window.location.search).get('workspace-tab');
   const [currentPage, setCurrentPage] = React.useState(
-    isWorkspacePreview ? pages.workspace : isPasswordReset ? pages.resetPassword : pages.home,
+    isWorkspacePreview ? pages.workspace : isPasswordReset ? pages.resetPassword : pages.workspace,
   );
   const [passwordRecoveryEmail, setPasswordRecoveryEmail] = React.useState('');
   const [workspaceTab, setWorkspaceTab] = React.useState(
@@ -201,7 +200,6 @@ function App() {
   );
   const [session, setSession] = React.useState(isWorkspacePreview ? { user: { id: 'preview-user', email: 'preview@example.com' } } : null);
   const [profile, setProfile] = React.useState(isWorkspacePreview ? { id: 'preview-user', nickname: '预览账号' } : null);
-  const [authReady, setAuthReady] = React.useState(isWorkspacePreview);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [authModalMode, setAuthModalMode] = React.useState('login');
 
@@ -213,13 +211,11 @@ function App() {
   React.useEffect(() => {
     if (isWorkspacePreview) return undefined;
     if (!supabase) {
-      setAuthReady(true);
       return undefined;
     }
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setAuthReady(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -266,7 +262,7 @@ function App() {
   async function handleSignOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
-    setCurrentPage(pages.home);
+    setCurrentPage(pages.workspace);
     setIsAuthModalOpen(false);
   }
 
@@ -276,14 +272,12 @@ function App() {
         ? 'app-shell workspace-app-shell'
       : currentPage === pages.publicNotes
           ? 'app-shell public-app-shell'
-          : currentPage === pages.login || currentPage === pages.register || currentPage === pages.forgotPassword || currentPage === pages.resetPassword
+          : currentPage === pages.forgotPassword || currentPage === pages.resetPassword
             ? 'app-shell auth-app-shell'
-          : currentPage === pages.home
-            ? 'app-shell home-app-shell'
-            : 'app-shell'
+          : 'app-shell'
     }>
       {currentPage !== pages.workspace && <nav className="top-nav" aria-label="主导航">
-        <button className="brand" onClick={() => setCurrentPage(pages.home)}>
+        <button className="brand" onClick={() => setCurrentPage(pages.workspace)}>
           <span className="brand-mark">
             <NotebookPen size={20} />
           </span>
@@ -351,50 +345,21 @@ function App() {
         </div>
       </nav>}
 
-      {currentPage === pages.home && (
-        <HomePage
-          authReady={authReady}
-          session={session}
-          onLogin={() => openAuthModal('login')}
-          onRegister={() => openAuthModal('register')}
-          onWorkspace={() => {
-            setWorkspaceTab(tabs.dashboard);
-            setCurrentPage(pages.workspace);
-          }}
-          onPublicNotes={() => setCurrentPage(pages.publicNotes)}
-        />
-      )}
-      {currentPage === pages.login && (
-        <LoginPage
-          onRegister={() => setCurrentPage(pages.register)}
-          onForgotPassword={(email) => {
-            setPasswordRecoveryEmail(email);
-            setCurrentPage(pages.forgotPassword);
-          }}
-          onDone={() => {
-            setWorkspaceTab(tabs.dashboard);
-            setCurrentPage(pages.workspace);
-          }}
-        />
-      )}
-      {currentPage === pages.register && (
-        <RegisterPage
-          onLogin={() => setCurrentPage(pages.login)}
-          onDone={() => {
-            setWorkspaceTab(tabs.dashboard);
-            setCurrentPage(pages.workspace);
-          }}
-        />
-      )}
       {currentPage === pages.forgotPassword && (
         <ForgotPasswordPage
           initialEmail={passwordRecoveryEmail}
-          onLogin={() => setCurrentPage(pages.login)}
+          onLogin={() => {
+            setCurrentPage(pages.workspace);
+            openAuthModal('login');
+          }}
         />
       )}
       {currentPage === pages.resetPassword && (
         <ResetPasswordPage
-          onLogin={() => setCurrentPage(pages.login)}
+          onLogin={() => {
+            setCurrentPage(pages.workspace);
+            openAuthModal('login');
+          }}
           onDone={() => {
             setWorkspaceTab(tabs.dashboard);
             setCurrentPage(pages.workspace);
@@ -506,22 +471,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     window.localStorage.setItem('workspace-theme', theme);
   }, [theme]);
 
-  if (!session) {
-    return (
-      <section className="auth-page">
-        <div className="auth-card">
-          <p className="eyebrow">需要登录</p>
-          <h1>先登录，再进入工作台</h1>
-          <p className="form-message">工作台会保存你的笔记和任务。</p>
-          <button className="primary-button large" onClick={onLogin}>
-            <LogIn size={18} />
-            去登录
-          </button>
-        </div>
-      </section>
-    );
-  }
-
+  const isGuest = !session;
   const today = getToday();
   const todayTasks = tasks.filter((task) => !isLongTermTask(task) && task.task_date === today);
   const importantTodayTasks = todayTasks.filter(
@@ -554,30 +504,42 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     [tabs.tasks]: `今天有 ${todayTasks.length} 项任务，单次任务、日历、四象限与长期追踪都集中在这里。`,
     [tabs.websites]: '按分类整理常用网站，随时用搜索和两种视图快速找到它。',
   }[activeTab];
-  const displayName = profile?.nickname ?? session.user.email?.split('@')[0] ?? '用户';
-  const accountEmail = session.user.email ?? '';
+  const displayName = isGuest ? '访客' : profile?.nickname ?? session.user.email?.split('@')[0] ?? '用户';
+  const accountEmail = isGuest ? '登录后开始使用' : session.user.email ?? '';
   const profileAvatarUrl = profile?.avatar_url;
   const navigateTo = (tab) => {
+    if (isGuest && tab !== tabs.dashboard && tab !== tabs.publicNotes) {
+      onLogin();
+      return;
+    }
     setTaskViewRequest(tab === tabs.tasks ? taskViews.list : null);
     setActiveTab(tab);
     setIsUserMenuOpen(false);
   };
 
   const openScheduleManager = () => {
+    if (isGuest) {
+      onLogin();
+      return;
+    }
     setTaskViewRequest(taskViews.calendar);
     setActiveTab(tabs.tasks);
   };
 
   const openWebsiteLibrary = (openCreate = false) => {
+    if (isGuest) {
+      onLogin();
+      return;
+    }
     setIsWebsiteCreateRequested(openCreate);
     navigateTo(tabs.websites);
   };
 
   return (
-    <section className={`workspace-frame workspace-theme-${theme}${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${isSidebarHidden ? ' sidebar-hidden' : ''}`}>
+    <section className={`workspace-frame workspace-theme-${theme}${isGuest ? ' workspace-guest' : ''}${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${isSidebarHidden ? ' sidebar-hidden' : ''}`}>
       <aside className="workspace-sidebar">
         <div className="workspace-sidebar-top">
-          <button className="workspace-brand" type="button" onClick={() => navigateTo(tabs.dashboard)} title="日程笔记">
+          <button className="workspace-brand" type="button" onClick={() => isGuest ? setActiveTab(tabs.dashboard) : navigateTo(tabs.dashboard)} title="日程笔记">
             <span className="workspace-brand-mark" aria-hidden="true"><Sparkles size={18} /></span>
             <span className="workspace-brand-text">日程笔记</span>
           </button>
@@ -656,14 +618,14 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
 
         <div className="workspace-sidebar-footer">
           <div className="sidebar-user-area">
-            <button className="profile-entry" type="button" onClick={() => setIsUserMenuOpen((open) => !open)} aria-expanded={isUserMenuOpen} aria-haspopup="menu" aria-label="打开用户菜单">
+            <button className="profile-entry" type="button" onClick={() => isGuest ? onLogin() : setIsUserMenuOpen((open) => !open)} aria-expanded={isGuest ? false : isUserMenuOpen} aria-haspopup={isGuest ? undefined : 'menu'} aria-label={isGuest ? '登录或注册' : '打开用户菜单'}>
               <span className="profile-avatar">
                 {profileAvatarUrl ? <img src={profileAvatarUrl} alt="" /> : displayName.slice(0, 1)}
               </span>
               <span className="profile-entry-copy"><span>{displayName}</span><small>{accountEmail}</small></span>
               <ChevronDown size={15} className="profile-menu-chevron" aria-hidden="true" />
             </button>
-            {isUserMenuOpen && (
+            {!isGuest && isUserMenuOpen && (
               <div className="sidebar-user-menu" role="menu" aria-label="用户菜单">
                 <button type="button" role="menuitem" onClick={() => navigateTo(tabs.profile)}>个人资料</button>
                 <button type="button" role="menuitem" onClick={() => navigateTo(tabs.profile)}>账号设置</button>
@@ -689,13 +651,22 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         {activeTab === tabs.dashboard && (
           <header className="workspace-heading dashboard-heading">
             <div>
-              <h1 className="dashboard-greeting">
-                <span>{getGreeting()}</span>
-                <span className="greeting-wave" aria-hidden="true">👋</span>
-              </h1>
-              <p className="auth-state dashboard-date-line">
-                今天是 {formatFullDate()}。你今天有 <strong>{importantTodayTasks.length} 个重要任务</strong> 待办。
-              </p>
+              {isGuest ? (
+                <>
+                  <h1 className="dashboard-greeting">个人工作台</h1>
+                  <p className="auth-state dashboard-date-line">登录后即可记录任务、笔记与创作内容。</p>
+                </>
+              ) : (
+                <>
+                  <h1 className="dashboard-greeting">
+                    <span>{getGreeting()}</span>
+                    <span className="greeting-wave" aria-hidden="true">👋</span>
+                  </h1>
+                  <p className="auth-state dashboard-date-line">
+                    今天是 {formatFullDate()}。你今天有 <strong>{importantTodayTasks.length} 个重要任务</strong> 待办。
+                  </p>
+                </>
+              )}
             </div>
           </header>
         )}
@@ -713,7 +684,13 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         {isLoading && <p className="form-message global-message">正在读取数据...</p>}
 
         {activeTab === tabs.dashboard && (
-          <Dashboard notes={notes} tasks={tasks} onOpenTasks={() => navigateTo(tabs.tasks)} onOpenSchedule={openScheduleManager} onOpenNotes={() => navigateTo(tabs.notes)} onOpenWebsites={() => openWebsiteLibrary(false)} onAddWebsite={() => openWebsiteLibrary(true)} onToggleScheduleTask={(task) => updateTaskStatus(task, task.status === 'completed' ? 'in_progress' : 'completed', setTasks, setMessage)} />
+          <Dashboard notes={notes} tasks={tasks} onOpenTasks={() => navigateTo(tabs.tasks)} onOpenSchedule={openScheduleManager} onOpenNotes={() => navigateTo(tabs.notes)} onOpenWebsites={() => openWebsiteLibrary(false)} onAddWebsite={() => openWebsiteLibrary(true)} onToggleScheduleTask={(task) => {
+            if (isGuest) {
+              onLogin();
+              return;
+            }
+            updateTaskStatus(task, task.status === 'completed' ? 'in_progress' : 'completed', setTasks, setMessage);
+          }} />
         )}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}
         {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" />}
