@@ -26,6 +26,7 @@ import {
   Link2,
   LogIn,
   LogOut,
+  MoreHorizontal,
   NotebookPen,
   Palette,
   PanelLeftClose,
@@ -43,6 +44,7 @@ import {
   Trash2,
   UserPlus,
   Wifi,
+  X,
   Zap,
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -76,8 +78,15 @@ import { isLongTermTask, parseLongTermTask, serializeLongTermTask } from './util
 import './styles.css';
 
 const DEFAULT_TASK_CATEGORIES = [
-  { id: 'default-life', name: '生活', color: '#12b76a', sort_order: 0 },
-  { id: 'default-work', name: '工作', color: '#2f80ed', sort_order: 1 },
+  { id: 'default-life', name: '生活', color: '#247b55', sort_order: 0 },
+  { id: 'default-work', name: '工作', color: '#3976d5', sort_order: 1 },
+];
+
+const TASK_CATEGORY_COLOR_PRESETS = [
+  { name: '松绿', value: '#247b55' },
+  { name: '信息蓝', value: '#3976d5' },
+  { name: '柔橙', value: '#c97808' },
+  { name: '创意紫', value: '#7647c8' },
 ];
 
 function makeNickname(email = '') {
@@ -560,7 +569,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           {!isCreatorTab && (
             <nav className="workspace-nav sidebar-child-list" aria-label="个人导航">
               <SidebarButton icon={LayoutDashboard} label="首页" active={activeTab === tabs.dashboard} onClick={() => navigateTo(tabs.dashboard)} />
-              <SidebarButton icon={CheckCircle2} label="任务" active={activeTab === tabs.tasks} onClick={() => navigateTo(tabs.tasks)} />
+              <SidebarButton icon={CheckCircle2} label="待办" active={activeTab === tabs.tasks} onClick={() => navigateTo(tabs.tasks)} />
               <SidebarButton icon={NotebookPen} label="笔记" active={activeTab === tabs.notes} onClick={() => navigateTo(tabs.notes)} />
               <SidebarButton icon={Wifi} label="订阅" active={activeTab === tabs.subscriptions} onClick={() => navigateTo(tabs.subscriptions)} />
               <SidebarButton icon={Link2} label="常用网址" active={activeTab === tabs.websites} onClick={() => navigateTo(tabs.websites)} />
@@ -2641,6 +2650,9 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
   const [isSaving, setIsSaving] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [categoryDefinitions, setCategoryDefinitions] = React.useState(DEFAULT_TASK_CATEGORIES);
+  const [isTaskCategoryManagerOpen, setIsTaskCategoryManagerOpen] = React.useState(false);
+  const [newTaskCategoryName, setNewTaskCategoryName] = React.useState('');
+  const [newTaskCategoryColor, setNewTaskCategoryColor] = React.useState('#c97808');
 
   React.useEffect(() => {
     let isCurrent = true;
@@ -2745,15 +2757,78 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
     setCategoryDefinitions((current) => current.map((item) => item.id === category.id ? { ...item, color } : item));
   }
 
+  async function renameTaskCategory(category, nextName) {
+    const normalizedName = nextName.trim();
+    if (!normalizedName) {
+      setMessage('请填写分类名称。');
+      return false;
+    }
+    if (normalizedName === category.name) return true;
+    if (categoryDefinitions.some((item) => item.id !== category.id && item.name === normalizedName)) {
+      setMessage('该分类已存在。');
+      return false;
+    }
+
+    if (!supabase || session.user.id === 'preview-user') {
+      setCategoryDefinitions((current) => current.map((item) => item.id === category.id ? { ...item, name: normalizedName } : item));
+      setTasks((current) => current.map((task) => (task.category || '生活') === category.name ? { ...task, category: normalizedName } : task));
+      return true;
+    }
+
+    const { error: tasksError } = await supabase.from('tasks').update({ category: normalizedName }).eq('user_id', session.user.id).eq('category', category.name);
+    if (tasksError) {
+      setMessage(`更新任务分类失败：${tasksError.message}`);
+      return false;
+    }
+    const { error: categoryError } = await supabase.from('task_categories').update({ name: normalizedName }).eq('id', category.id);
+    if (categoryError) {
+      setMessage(`修改分类名称失败：${categoryError.message}`);
+      return false;
+    }
+    setCategoryDefinitions((current) => current.map((item) => item.id === category.id ? { ...item, name: normalizedName } : item));
+    setTasks((current) => current.map((task) => (task.category || '生活') === category.name ? { ...task, category: normalizedName } : task));
+    return true;
+  }
+
   async function removeTaskCategory(category) {
-    if (tasks.some((task) => (task.category || '生活') === category.name)) return setMessage(`“${category.name}”仍有任务，请先调整这些任务的分类。`);
+    const remainingCategories = categoryDefinitions.filter((item) => item.id !== category.id);
+    if (remainingCategories.length === 0) {
+      setMessage('至少保留一个分类。');
+      return false;
+    }
+    const replacementCategory = remainingCategories[0];
+    const affectedTaskCount = tasks.filter((task) => (task.category || '生活') === category.name).length;
     if (!supabase || session.user.id === 'preview-user') {
       setCategoryDefinitions((current) => current.filter((item) => item.id !== category.id));
-      return;
+      setTasks((current) => current.map((task) => (task.category || '生活') === category.name ? { ...task, category: replacementCategory.name } : task));
+      if (affectedTaskCount) setMessage(`已删除“${category.name}”，${affectedTaskCount} 项任务已转入“${replacementCategory.name}”。`);
+      return true;
+    }
+    const { error: tasksError } = await supabase.from('tasks').update({ category: replacementCategory.name }).eq('user_id', session.user.id).eq('category', category.name);
+    if (tasksError) {
+      setMessage(`迁移分类任务失败：${tasksError.message}`);
+      return false;
     }
     const { error } = await supabase.from('task_categories').delete().eq('id', category.id);
-    if (error) return setMessage(`删除分类失败：${error.message}`);
+    if (error) {
+      setMessage(`删除分类失败：${error.message}`);
+      return false;
+    }
     setCategoryDefinitions((current) => current.filter((item) => item.id !== category.id));
+    setTasks((current) => current.map((task) => (task.category || '生活') === category.name ? { ...task, category: replacementCategory.name } : task));
+    if (affectedTaskCount) setMessage(`已删除“${category.name}”，${affectedTaskCount} 项任务已转入“${replacementCategory.name}”。`);
+    return true;
+  }
+
+  async function handleAddTaskCategory(event) {
+    event.preventDefault();
+    const name = newTaskCategoryName.trim();
+    if (!name || categoryDefinitions.some((category) => category.name === name) || categoryDefinitions.length >= 4) {
+      await addTaskCategory(name, newTaskCategoryColor);
+      return;
+    }
+    await addTaskCategory(name, newTaskCategoryColor);
+    setNewTaskCategoryName('');
   }
 
   function updateCalendarTaskLocally(taskId, changes) {
@@ -2816,6 +2891,20 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
         </button>
       </div>
 
+      {isTaskCategoryManagerOpen && (
+        <TaskCategoryManager
+          categories={categoryDefinitions}
+          newCategoryName={newTaskCategoryName}
+          newCategoryColor={newTaskCategoryColor}
+          onChangeName={setNewTaskCategoryName}
+          onChangeColor={setNewTaskCategoryColor}
+          onAdd={handleAddTaskCategory}
+          onUpdateColor={updateTaskCategoryColor}
+          onRemove={removeTaskCategory}
+          onClose={() => setIsTaskCategoryManagerOpen(false)}
+        />
+      )}
+
       {isCreateOpen && activeTaskView !== taskViews.longTerm && (
         <form className="panel-card form-stack task-composer" onSubmit={handleCreateTask}>
           <div className="form-card-heading">
@@ -2827,7 +2916,13 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
             <label className="wide-field">备注<textarea id="task-description" rows={3} value={form.description} onChange={(event) => updateForm('description', event.target.value)} /></label>
             <label>重要紧急程度<select id="task-matrix" value={form.matrix_category} onChange={(event) => updateForm('matrix_category', event.target.value)}>{matrixOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <label>进展状态<select id="task-status" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-            <label>分类<select value={form.category} onChange={(event) => updateForm('category', event.target.value)}>{taskCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+            <TaskCategoryPillPicker
+              className="wide-field"
+              categories={categoryDefinitions}
+              value={form.category}
+              onChange={(category) => updateForm('category', category)}
+              onOpenSettings={() => setIsTaskCategoryManagerOpen((open) => !open)}
+            />
             <label>开始日期<input type="date" value={form.task_date} onChange={(event) => updateForm('task_date', event.target.value)} required /></label>
             <label>结束日期（可选）<input type="date" value={form.end_date} min={form.task_date} onChange={(event) => updateForm('end_date', event.target.value)} /></label>
             <label>时间<input type="time" value={form.task_time} onChange={(event) => updateForm('task_time', event.target.value)} /></label>
@@ -2907,13 +3002,13 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
                 </label>
               </div>
             )}
-            <TaskList tasks={visibleTasks} setTasks={setTasks} setMessage={setMessage} emptyText={emptyText} categoryOptions={taskCategories} />
+            <TaskList tasks={visibleTasks} setTasks={setTasks} setMessage={setMessage} emptyText={emptyText} categoryOptions={taskCategories} categoryDefinitions={categoryDefinitions} onOpenCategorySettings={() => setIsTaskCategoryManagerOpen((open) => !open)} />
           </section>
         </div>
       )}
 
-      {activeTaskView === taskViews.calendar && <CalendarPanel tasks={ordinaryTasks} longTermTasks={longTermTasks} categories={categoryDefinitions} onAddCategory={addTaskCategory} onUpdateCategoryColor={updateTaskCategoryColor} onRemoveCategory={removeTaskCategory} onUpdateTask={updateCalendarTaskLocally} onPersistTask={persistCalendarTask} onDeleteTask={deleteCalendarTask} />}
-      {activeTaskView === taskViews.matrix && <MatrixPanel tasks={ordinaryTasks} setTasks={setTasks} setMessage={setMessage} categoryOptions={taskCategories} />}
+      {activeTaskView === taskViews.calendar && <CalendarPanel tasks={ordinaryTasks} longTermTasks={longTermTasks} categories={categoryDefinitions} onAddCategory={addTaskCategory} onUpdateCategoryColor={updateTaskCategoryColor} onRenameCategory={renameTaskCategory} onRemoveCategory={removeTaskCategory} onUpdateTask={updateCalendarTaskLocally} onPersistTask={persistCalendarTask} onDeleteTask={deleteCalendarTask} />}
+      {activeTaskView === taskViews.matrix && <MatrixPanel tasks={ordinaryTasks} setTasks={setTasks} setMessage={setMessage} categoryOptions={taskCategories} categoryDefinitions={categoryDefinitions} onOpenCategorySettings={() => setIsTaskCategoryManagerOpen((open) => !open)} />}
       {activeTaskView === taskViews.longTerm && (
         <LongTermTasksPanel
           session={session}
@@ -2929,19 +3024,128 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
   );
 }
 
-function TaskList({ tasks, setTasks, setMessage, categoryOptions = ['生活', '工作'], variant = 'default', emptyText = '这里暂时没有任务。' }) {
+function TaskCategoryPillPicker({ categories = DEFAULT_TASK_CATEGORIES, value, onChange, onOpenSettings, className = '' }) {
+  const visibleCategories = categories.some((category) => category.name === value)
+    ? categories
+    : [...categories, { id: `legacy-${value}`, name: value, color: '#98a2b3' }];
+
+  return (
+    <div className={`task-category-picker ${className}`.trim()}>
+      <span className="task-category-picker-label">分类</span>
+      <div className="task-category-pill-row" role="radiogroup" aria-label="任务分类">
+        {visibleCategories.map((category) => (
+          <button
+            className={value === category.name ? 'task-category-pill selected' : 'task-category-pill'}
+            type="button"
+            role="radio"
+            aria-checked={value === category.name}
+            key={category.id}
+            style={{ '--task-category-color': category.color }}
+            onClick={() => onChange?.(category.name)}
+          >
+            {category.name}
+          </button>
+        ))}
+        <button className="task-category-settings-pill" type="button" onClick={onOpenSettings}>
+          <Settings2 size={15} /> 设置分类
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CategoryColorPicker({ category, isOpen, onToggle, onChange }) {
+  return (
+    <div className="category-color-picker">
+      <button className="category-color-swatch" type="button" style={{ '--category-color': category.color }} onClick={onToggle} aria-label={`设置${category.name}的颜色`} aria-expanded={isOpen}>
+        <span aria-hidden="true" />
+      </button>
+      {isOpen && (
+        <div className="category-color-popover" role="dialog" aria-label={`${category.name}的颜色选项`}>
+          <span>选择颜色</span>
+          <div className="category-color-presets">
+            {TASK_CATEGORY_COLOR_PRESETS.map((preset) => (
+              <button
+                className={category.color.toLowerCase() === preset.value ? 'selected' : ''}
+                type="button"
+                key={preset.value}
+                title={preset.name}
+                aria-label={`${preset.name} ${preset.value}`}
+                style={{ '--preset-color': preset.value }}
+                onClick={() => onChange?.(preset.value)}
+              />
+            ))}
+          </div>
+          <label className="category-color-custom">
+            自定义
+            <input type="color" value={category.color} onChange={(event) => onChange?.(event.target.value)} aria-label={`自定义${category.name}的颜色`} />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskCategoryManager({ categories, newCategoryName, newCategoryColor, onChangeName, onChangeColor, onAdd, onUpdateColor, onRemove, onClose }) {
+  const [colorPickerCategoryId, setColorPickerCategoryId] = React.useState(null);
+  const [isNewCategoryColorPickerOpen, setIsNewCategoryColorPickerOpen] = React.useState(false);
+
+  function updateCategoryColor(category, color) {
+    onUpdateColor?.(category, color);
+    setColorPickerCategoryId(null);
+  }
+
+  React.useEffect(() => {
+    if (!colorPickerCategoryId && !isNewCategoryColorPickerOpen) return undefined;
+    const closeColorPicker = (event) => {
+      if (!event.target.closest('.category-color-picker')) {
+        setColorPickerCategoryId(null);
+        setIsNewCategoryColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeColorPicker);
+    return () => document.removeEventListener('pointerdown', closeColorPicker);
+  }, [colorPickerCategoryId, isNewCategoryColorPickerOpen]);
+
+  return (
+    <section className="task-category-manager" id="task-category-manager" aria-label="分类管理">
+      <div className="task-category-manager-heading">
+        <div><h2>分类设置</h2><p>最多 4 个分类。颜色会用于分类胶囊和日历任务。</p></div>
+        <button className="icon-button" type="button" onClick={onClose} aria-label="关闭分类设置"><X size={17} /></button>
+      </div>
+      <div className="task-category-manager-list">
+        {categories.map((category) => (
+          <div className="task-category-manager-row" key={category.id}>
+            <CategoryColorPicker category={category} isOpen={colorPickerCategoryId === category.id} onToggle={() => setColorPickerCategoryId((current) => current === category.id ? null : category.id)} onChange={(color) => updateCategoryColor(category, color)} />
+            <strong>{category.name}</strong>
+            <button className="text-button" type="button" onClick={() => onRemove?.(category)}>删除</button>
+          </div>
+        ))}
+      </div>
+      {categories.length < 4 && (
+        <form className="task-category-add" onSubmit={onAdd}>
+          <input value={newCategoryName} onChange={(event) => onChangeName(event.target.value)} placeholder="新增分类名称" maxLength={16} aria-label="新增分类名称" />
+          <CategoryColorPicker category={{ id: 'new-task-category', name: '新增分类', color: newCategoryColor }} isOpen={isNewCategoryColorPickerOpen} onToggle={() => setIsNewCategoryColorPickerOpen((open) => !open)} onChange={(color) => { onChangeColor(color); setIsNewCategoryColorPickerOpen(false); }} />
+          <button className="secondary-action" type="submit">添加分类</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function TaskList({ tasks, setTasks, setMessage, categoryOptions = ['生活', '工作'], categoryDefinitions = DEFAULT_TASK_CATEGORIES, onOpenCategorySettings, variant = 'default', emptyText = '这里暂时没有任务。' }) {
   if (tasks.length === 0) return <EmptyState text={emptyText} />;
 
   return (
     <div className="card-list">
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} setTasks={setTasks} setMessage={setMessage} categoryOptions={categoryOptions} variant={variant} />
+        <TaskCard key={task.id} task={task} setTasks={setTasks} setMessage={setMessage} categoryOptions={categoryOptions} categoryDefinitions={categoryDefinitions} onOpenCategorySettings={onOpenCategorySettings} variant={variant} />
       ))}
     </div>
   );
 }
 
-function TaskCard({ task, setTasks, setMessage, categoryOptions = ['生活', '工作'], compact = false, variant = 'default' }) {
+function TaskCard({ task, setTasks, setMessage, categoryOptions = ['生活', '工作'], categoryDefinitions = DEFAULT_TASK_CATEGORIES, onOpenCategorySettings, compact = false, variant = 'default' }) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [isCompleting, setIsCompleting] = React.useState(false);
   const [editForm, setEditForm] = React.useState({
@@ -3086,9 +3290,10 @@ function TaskCard({ task, setTasks, setMessage, categoryOptions = ['生活', '�
 
   const timingInfo = getTaskTimingInfo(task);
   const isMatrixView = variant === 'matrix';
+  const taskCategory = categoryDefinitions.find((category) => category.name === (task.category || '生活'));
   const taskMeta = (
     <>
-      <span className="tag task-category-tag">{task.category || '生活'}</span>
+      <span className="tag task-category-tag" style={{ '--task-category-color': taskCategory?.color ?? '#98a2b3' }}>{task.category || '生活'}</span>
       <span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span>
       <span className={`tag task-status-tag status-${task.status}`}>{getLabel(statusOptions, task.status)}</span>
       <span className={timingInfo.className}>{timingInfo.label}</span>
@@ -3096,102 +3301,121 @@ function TaskCard({ task, setTasks, setMessage, categoryOptions = ['生活', '�
   );
 
   return (
-    <article className={[task.status === 'completed' ? 'item-card completed' : 'item-card', isTaskOverdue(task) ? 'task-overdue' : '', `task-accent-${task.matrix_category}`, isMatrixView ? 'matrix-task-card' : '', isCompleting ? 'task-completing' : ''].filter(Boolean).join(' ')}>
+    <article className={[task.status === 'completed' ? 'item-card completed' : 'item-card', isTaskOverdue(task) ? 'task-overdue' : '', `task-accent-${task.matrix_category}`, isMatrixView ? 'matrix-task-card' : '', isEditing ? 'task-editing' : '', isCompleting ? 'task-completing' : ''].filter(Boolean).join(' ')}>
       {isEditing ? (
         <form className="form-stack edit-task-form" onSubmit={handleUpdateTask}>
-          <label htmlFor={`edit-task-title-${task.id}`}>任务标题</label>
-          <input
-            id={`edit-task-title-${task.id}`}
-            value={editForm.title}
-            onChange={(event) => updateEditForm('title', event.target.value)}
-            required
-          />
-          <label htmlFor={`edit-task-description-${task.id}`}>备注</label>
-          <textarea
-            id={`edit-task-description-${task.id}`}
-            rows={4}
-            value={editForm.description}
-            onChange={(event) => updateEditForm('description', event.target.value)}
-          />
-          <div className="form-grid">
-            <label>
-              分类
-              <select value={editForm.category} onChange={(event) => updateEditForm('category', event.target.value)}>
-                {!categoryOptions.includes(editForm.category) && <option value={editForm.category}>{editForm.category}</option>}
-                {categoryOptions.map((category) => <option value={category} key={category}>{category}</option>)}
-              </select>
-            </label>
-            <label>
-              重要紧急程度
-              <select
-                id={`edit-task-matrix-${task.id}`}
-                value={editForm.matrix_category}
-                onChange={(event) => updateEditForm('matrix_category', event.target.value)}
-              >
-                {matrixOptions.map((option) => (
-                  <option value={option.value} key={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              进展状态
-              <select
-                id={`edit-task-status-${task.id}`}
-                value={editForm.status}
-                onChange={(event) => updateEditForm('status', event.target.value)}
-              >
-                {statusOptions.map((option) => (
-                  <option value={option.value} key={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>
-              开始日期
+          <div className="edit-task-input-row">
+            <label className="edit-task-title-field" htmlFor={`edit-task-title-${task.id}`}>
               <input
-                type="date"
-                value={editForm.task_date}
-                onChange={(event) => updateEditForm('task_date', event.target.value)}
+                id={`edit-task-title-${task.id}`}
+                value={editForm.title}
+                onChange={(event) => updateEditForm('title', event.target.value)}
+                placeholder="（必填）事件"
+                aria-label="任务标题"
                 required
               />
             </label>
-            <label>
-              结束日期（可选）
+            <label className="edit-task-description-field" htmlFor={`edit-task-description-${task.id}`}>
               <input
-                type="date"
-                value={editForm.end_date}
-                min={editForm.task_date}
-                onChange={(event) => updateEditForm('end_date', event.target.value)}
+                id={`edit-task-description-${task.id}`}
+                value={editForm.description}
+                onChange={(event) => updateEditForm('description', event.target.value)}
+                placeholder="备注"
+                aria-label="备注"
               />
             </label>
-            <label>
-              时间
-              <input type="time" value={editForm.task_time} onChange={(event) => updateEditForm('task_time', event.target.value)} />
-            </label>
           </div>
-          <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={isUpdating}>
-              <Pencil size={16} />
-              {isUpdating ? '保存中...' : '保存修改'}
-            </button>
-            <button className="text-button" type="button" onClick={cancelEditTask} disabled={isUpdating}>
-              取消
-            </button>
-            {isConfirmingDelete ? (
-              <>
-                <button className="danger-confirm-button" type="button" onClick={handleDeleteTask}>确认删除</button>
-                <button className="cancel-confirm-button" type="button" onClick={() => setIsConfirmingDelete(false)}>保留任务</button>
-              </>
-            ) : (
-              <button className="edit-form-delete" type="button" onClick={() => setIsConfirmingDelete(true)}>
-                <Trash2 size={15} /> 删除任务
+          <TaskCategoryPillPicker
+            categories={categoryDefinitions}
+            value={editForm.category}
+            onChange={(category) => updateEditForm('category', category)}
+            onOpenSettings={onOpenCategorySettings}
+          />
+          <section className="edit-task-section" aria-label="任务属性">
+            <p className="edit-task-section-title">任务属性</p>
+            <div className="edit-task-grid edit-task-meta-grid">
+              <label>
+                重要紧急程度
+                <select
+                  id={`edit-task-matrix-${task.id}`}
+                  value={editForm.matrix_category}
+                  onChange={(event) => updateEditForm('matrix_category', event.target.value)}
+                >
+                  {matrixOptions.map((option) => (
+                    <option value={option.value} key={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                进展状态
+                <select
+                  id={`edit-task-status-${task.id}`}
+                  value={editForm.status}
+                  onChange={(event) => updateEditForm('status', event.target.value)}
+                >
+                  {statusOptions.map((option) => (
+                    <option value={option.value} key={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+          <section className="edit-task-section" aria-label="时间安排">
+            <p className="edit-task-section-title">时间安排</p>
+            <div className="edit-task-grid">
+              <label>
+                开始日期
+                <input
+                  type="date"
+                  value={editForm.task_date}
+                  onChange={(event) => updateEditForm('task_date', event.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                结束日期（可选）
+                <input
+                  type="date"
+                  value={editForm.end_date}
+                  min={editForm.task_date}
+                  onChange={(event) => updateEditForm('end_date', event.target.value)}
+                />
+              </label>
+              <label>
+                时间
+                <input type="time" value={editForm.task_time} onChange={(event) => updateEditForm('task_time', event.target.value)} />
+              </label>
+            </div>
+          </section>
+          <div className="form-actions edit-task-actions">
+            <div className="edit-task-primary-actions">
+              <button className="primary-button" type="submit" disabled={isUpdating}>
+                <Pencil size={16} />
+                {isUpdating ? '保存中...' : '保存修改'}
               </button>
-            )}
+              <button className="text-button" type="button" onClick={cancelEditTask} disabled={isUpdating}>
+                取消
+              </button>
+            </div>
+            <details className="edit-task-danger">
+              <summary><MoreHorizontal size={17} /> 更多操作</summary>
+              <div className="edit-task-danger-actions">
+                {isConfirmingDelete ? (
+                  <>
+                    <button className="danger-confirm-button" type="button" onClick={handleDeleteTask}>确认删除</button>
+                    <button className="cancel-confirm-button" type="button" onClick={() => setIsConfirmingDelete(false)}>保留任务</button>
+                  </>
+                ) : (
+                  <button className="edit-form-delete" type="button" onClick={() => setIsConfirmingDelete(true)}>
+                    <Trash2 size={15} /> 删除任务
+                  </button>
+                )}
+              </div>
+            </details>
           </div>
         </form>
       ) : (
@@ -3323,15 +3547,27 @@ function getCalendarRangeSegments(ranges, weekDays) {
   }, []);
 }
 
-function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CATEGORIES, onAddCategory, onUpdateCategoryColor, onRemoveCategory, onUpdateTask, onPersistTask, onDeleteTask }) {
+function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CATEGORIES, onAddCategory, onUpdateCategoryColor, onRenameCategory, onRemoveCategory, onUpdateTask, onPersistTask, onDeleteTask }) {
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [selectedCategories, setSelectedCategories] = React.useState(() => categories.map((category) => category.name));
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = React.useState(false);
+  const [colorPickerCategoryId, setColorPickerCategoryId] = React.useState(null);
+  const [isNewCategoryColorPickerOpen, setIsNewCategoryColorPickerOpen] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState('');
-  const [newCategoryColor, setNewCategoryColor] = React.useState('#f2b200');
+  const [newCategoryColor, setNewCategoryColor] = React.useState('#c97808');
+  const [newCategoryError, setNewCategoryError] = React.useState('');
+  const [isAddingCategory, setIsAddingCategory] = React.useState(false);
+  const [editingCategoryId, setEditingCategoryId] = React.useState(null);
+  const [editingCategoryName, setEditingCategoryName] = React.useState('');
+  const categoryManagerAnchorRef = React.useRef(null);
+  const newCategoryNameInputRef = React.useRef(null);
   const [selectedTaskId, setSelectedTaskId] = React.useState(null);
   const [editorPosition, setEditorPosition] = React.useState({ top: 16, left: 16 });
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+  const normalizedCategories = categories.map((category, index) => ({
+    ...category,
+    name: category.name?.trim() || DEFAULT_TASK_CATEGORIES[index]?.name || '',
+  }));
   const monthDays = getMonthDays(currentDate);
   const monthWeeks = Array.from({ length: Math.ceil(monthDays.length / 7) }, (_, index) => monthDays.slice(index * 7, index * 7 + 7));
   const matchesSelectedCategories = (task) => selectedCategories.includes(task.category || '生活');
@@ -3353,9 +3589,88 @@ function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CA
 
   async function handleAddCategory(event) {
     event.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) {
+      setNewCategoryError('请先填写分类名称。');
+      newCategoryNameInputRef.current?.focus();
+      return;
+    }
+    if (categories.some((category) => category.name === name)) {
+      setNewCategoryError('该分类已存在。');
+      newCategoryNameInputRef.current?.focus();
+      return;
+    }
     await onAddCategory?.(newCategoryName, newCategoryColor);
-    if (newCategoryName.trim()) setNewCategoryName('');
+    setNewCategoryName('');
+    setNewCategoryError('');
+    setIsNewCategoryColorPickerOpen(false);
+    setIsAddingCategory(false);
   }
+
+  function beginAddCategory() {
+    setIsAddingCategory(true);
+    setNewCategoryError('');
+    window.setTimeout(() => newCategoryNameInputRef.current?.focus(), 0);
+  }
+
+  function beginEditCategory(category) {
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+  }
+
+  async function saveCategoryName(category) {
+    const name = editingCategoryName.trim();
+    if (!name) return;
+    const isSaved = await onRenameCategory?.(category, name);
+    if (isSaved) {
+      setSelectedCategories((current) => current.map((item) => item === category.name ? name : item));
+      setEditingCategoryId(null);
+      setEditingCategoryName('');
+    }
+  }
+
+  async function removeCategory(category) {
+    const isRemoved = await onRemoveCategory?.(category);
+    if (isRemoved) {
+      setSelectedCategories((current) => current.filter((item) => item !== category.name));
+      if (editingCategoryId === category.id) {
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+      }
+    }
+  }
+
+  function updateCategoryColor(category, color) {
+    onUpdateCategoryColor?.(category, color);
+    setColorPickerCategoryId(null);
+  }
+
+  React.useEffect(() => {
+    if (!colorPickerCategoryId && !isNewCategoryColorPickerOpen) return undefined;
+    const closeColorPicker = (event) => {
+      if (!event.target.closest('.category-color-picker')) {
+        setColorPickerCategoryId(null);
+        setIsNewCategoryColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeColorPicker);
+    return () => document.removeEventListener('pointerdown', closeColorPicker);
+  }, [colorPickerCategoryId, isNewCategoryColorPickerOpen]);
+
+  React.useEffect(() => {
+    if (!isCategoryManagerOpen) return undefined;
+    const closeCategoryManager = (event) => {
+      if (!categoryManagerAnchorRef.current?.contains(event.target)) {
+        setIsCategoryManagerOpen(false);
+        setColorPickerCategoryId(null);
+        setIsNewCategoryColorPickerOpen(false);
+        setIsAddingCategory(false);
+        setEditingCategoryId(null);
+      }
+    };
+    document.addEventListener('pointerdown', closeCategoryManager);
+    return () => document.removeEventListener('pointerdown', closeCategoryManager);
+  }, [isCategoryManagerOpen]);
 
   function openTaskEditor(task, event) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -3404,7 +3719,7 @@ function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CA
         <div className="calendar-category-filter" role="group" aria-label="按任务分类筛选日历">
           <div className="calendar-category-heading">
             <span>分类</span>
-            <div className="calendar-category-manager-anchor">
+            <div className="calendar-category-manager-anchor" ref={categoryManagerAnchorRef}>
               <button
                 className={isCategoryManagerOpen ? 'calendar-category-settings is-open' : 'calendar-category-settings'}
                 type="button"
@@ -3416,20 +3731,28 @@ function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CA
                 <Settings2 size={15} aria-hidden="true" />
               </button>
               {isCategoryManagerOpen && <section id="calendar-category-manager" className="calendar-category-manager" aria-label="分类管理">
+                <h3>分类设置</h3>
                 <p>最多 4 个分类。颜色会用于日历中的任务圆点和跨天任务条。</p>
-                {categories.map((category) => <div className="calendar-category-manager-row" key={category.id}><input type="color" value={category.color} aria-label={`${category.name}的颜色`} onChange={(event) => onUpdateCategoryColor?.(category, event.target.value)} /><strong>{category.name}</strong><button type="button" className="text-button" onClick={() => onRemoveCategory?.(category)}>删除</button></div>)}
-                {categories.length < 4 && <form onSubmit={handleAddCategory} className="calendar-category-add"><input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="新增分类名称" maxLength={16} /><input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} aria-label="新分类颜色" /><button className="secondary-action" type="submit">添加分类</button></form>}
+                {normalizedCategories.map((category) => <div className="calendar-category-manager-row" key={category.id}>
+                  <CategoryColorPicker category={category} isOpen={colorPickerCategoryId === category.id} onToggle={() => setColorPickerCategoryId((current) => current === category.id ? null : category.id)} onChange={(color) => updateCategoryColor(category, color)} />
+                  <div className="calendar-category-name-field">
+                    <input className="calendar-category-name-input" value={editingCategoryId === category.id ? editingCategoryName : category.name} onChange={(event) => setEditingCategoryName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); saveCategoryName(category); } if (event.key === 'Escape') setEditingCategoryId(null); }} maxLength={16} aria-label={`修改${category.name}分类名称`} readOnly={editingCategoryId !== category.id} autoFocus={editingCategoryId === category.id} />
+                    <button type="button" className="calendar-category-edit-button" onClick={() => editingCategoryId === category.id ? saveCategoryName(category) : beginEditCategory(category)} aria-label={editingCategoryId === category.id ? `保存${category.name}分类名称` : `编辑${category.name}分类名称`}>{editingCategoryId === category.id ? '保存' : <Pencil size={15} aria-hidden="true" />}</button>
+                  </div>
+                  <button type="button" className="text-button" onClick={() => removeCategory(category)}>删除</button>
+                </div>)}
+                {normalizedCategories.length < 4 && <form onSubmit={handleAddCategory} className="calendar-category-add"><CategoryColorPicker category={{ id: 'new-category', name: '新增分类', color: newCategoryColor }} isOpen={isNewCategoryColorPickerOpen} onToggle={() => setIsNewCategoryColorPickerOpen((open) => !open)} onChange={(color) => { setNewCategoryColor(color); setIsNewCategoryColorPickerOpen(false); }} /><div className="calendar-category-name-field"><input ref={newCategoryNameInputRef} className="calendar-category-name-input" value={newCategoryName} onChange={(event) => { setNewCategoryName(event.target.value); setNewCategoryError(''); }} placeholder="添加新分类" maxLength={16} aria-label="新增分类名称" readOnly={!isAddingCategory} /><button className="calendar-category-edit-button" type={isAddingCategory ? 'submit' : 'button'} onClick={isAddingCategory ? undefined : beginAddCategory} aria-label={isAddingCategory ? '保存新增分类' : '编辑新增分类'}>{isAddingCategory ? '保存' : <Pencil size={15} aria-hidden="true" />}</button></div>{newCategoryError && <span className="calendar-category-add-error" role="alert">{newCategoryError}</span>}</form>}
               </section>}
             </div>
           </div>
-          {categories.map((category) => (
+          {normalizedCategories.map((category) => (
             <label key={category.id} style={{ '--category-color': category.color }}>
               <input type="checkbox" checked={selectedCategories.includes(category.name)} onChange={() => toggleCategory(category.name)} />
               <span className="calendar-category-checkbox" aria-hidden="true" />
               {category.name}
             </label>
           ))}
-          {selectedCategories.length < categories.length && <button className="text-button" type="button" onClick={() => setSelectedCategories(categories.map((category) => category.name))}>全选分类</button>}
+          {selectedCategories.length < normalizedCategories.length && <button className="text-button" type="button" onClick={() => setSelectedCategories(normalizedCategories.map((category) => category.name))}>全选分类</button>}
         </div>
         <div className="calendar-grid" style={{ '--calendar-range-space': `${rangeCount * 26}px` }}>
           <div className="calendar-weekdays">
@@ -3698,7 +4021,7 @@ function parseCalendarDateInput(value) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function MatrixPanel({ tasks, setTasks, setMessage, categoryOptions }) {
+function MatrixPanel({ tasks, setTasks, setMessage, categoryOptions, categoryDefinitions, onOpenCategorySettings }) {
   return (
     <div className="matrix-grid">
       {matrixOptions.map((matrix) => {
@@ -3717,6 +4040,8 @@ function MatrixPanel({ tasks, setTasks, setMessage, categoryOptions }) {
               setTasks={setTasks}
               setMessage={setMessage}
               categoryOptions={categoryOptions}
+              categoryDefinitions={categoryDefinitions}
+              onOpenCategorySettings={onOpenCategorySettings}
               variant="matrix"
               emptyText="这个象限暂时没有任务。"
             />
