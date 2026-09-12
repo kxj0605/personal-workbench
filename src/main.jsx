@@ -2478,7 +2478,7 @@ function TabButton({ icon: Icon, label, value, activeTab, onClick }) {
   );
 }
 
-function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onOpenWebsites, onAddWebsite, onToggleScheduleTask }) {
+function LegacyDashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onOpenWebsites, onAddWebsite, onToggleScheduleTask }) {
   const today = getToday();
   const ordinaryTasks = tasks.filter((task) => !isLongTermTask(task));
   const longTermTasks = tasks.filter((task) => isLongTermTask(task));
@@ -2606,6 +2606,245 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'personal-workbench-dashboard-layout-v3';
+const LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY = 'personal-workbench-dashboard-layout-v2';
+const dashboardSizeOptions = [
+  { width: 2, height: 2, label: '2 × 2' },
+  { width: 3, height: 2, label: '3 × 2' },
+  { width: 4, height: 2, label: '4 × 2' },
+  { width: 3, height: 3, label: '3 × 3' },
+  { width: 6, height: 2, label: '6 × 2' },
+  { width: 6, height: 3, label: '6 × 3' },
+];
+
+const defaultDashboardCards = [
+  { id: 'schedule', label: '今日日程', width: 6, height: 3, x: 0, y: 0, visible: true },
+  { id: 'quick-task', label: '新建任务', width: 1, height: 1, x: 0, y: 3, visible: true },
+  { id: 'quick-note', label: '写点东西', width: 1, height: 1, x: 1, y: 3, visible: true },
+  { id: 'websites', label: '常用网址', width: 6, height: 2, x: 0, y: 4, visible: true },
+  { id: 'upcoming', label: '未来任务', width: 6, height: 3, x: 0, y: 6, visible: true },
+  { id: 'notes', label: '最近笔记', width: 6, height: 3, x: 0, y: 9, visible: true },
+];
+
+function loadDashboardCards() {
+  try {
+    const savedCards = JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) || window.localStorage.getItem(LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY) || '[]');
+    if (!Array.isArray(savedCards)) return defaultDashboardCards;
+    const savedById = new Map(savedCards.map((card) => [card.id, card]));
+    const savedOrder = savedCards.map((card) => card.id);
+    const restoredCards = defaultDashboardCards.map((card) => ({ ...card, ...savedById.get(card.id) })).sort((left, right) => (savedOrder.indexOf(left.id) === -1 ? 999 : savedOrder.indexOf(left.id)) - (savedOrder.indexOf(right.id) === -1 ? 999 : savedOrder.indexOf(right.id)));
+    return assignDashboardPositions(restoredCards);
+  } catch {
+    return defaultDashboardCards;
+  }
+}
+
+function getDashboardSizeOptions(card) {
+  return card.id === 'quick-task' || card.id === 'quick-note'
+    ? [{ width: 1, height: 1, label: '1 × 1' }, ...dashboardSizeOptions]
+    : dashboardSizeOptions;
+}
+
+function dashboardCardsOverlap(first, second) {
+  return first.x < second.x + second.width && first.x + first.width > second.x && first.y < second.y + second.height && first.y + first.height > second.y;
+}
+
+function assignDashboardPositions(cards) {
+  const positioned = [];
+  return cards.map((card) => {
+    const hasPosition = Number.isInteger(card.x) && Number.isInteger(card.y) && card.x >= 0 && card.y >= 0 && card.x + card.width <= 6;
+    if (hasPosition) {
+      positioned.push(card);
+      return card;
+    }
+    let position = { x: 0, y: 0 };
+    let found = false;
+    for (let y = 0; y < 100 && !found; y += 1) {
+      for (let x = 0; x <= 6 - card.width; x += 1) {
+        const candidate = { ...card, x, y };
+        if (!positioned.some((placed) => placed.visible && dashboardCardsOverlap(candidate, placed))) {
+          position = { x, y };
+          found = true;
+          break;
+        }
+      }
+    }
+    const positionedCard = { ...card, ...position };
+    positioned.push(positionedCard);
+    return positionedCard;
+  });
+}
+
+function pushDashboardCardCollisions(cards, primaryId) {
+  const next = cards.map((card) => ({ ...card }));
+  const pending = [primaryId];
+
+  while (pending.length) {
+    const sourceId = pending.shift();
+    const source = next.find((card) => card.id === sourceId);
+    if (!source) continue;
+    const collisions = next.filter((card) => card.id !== source.id && card.visible && dashboardCardsOverlap(source, card)).sort((first, second) => first.y - second.y || first.x - second.x);
+
+    collisions.forEach((collidingCard) => {
+      let candidate = { ...collidingCard, y: Math.max(collidingCard.y, source.y + source.height) };
+      while (next.some((card) => card.id !== candidate.id && card.visible && dashboardCardsOverlap(candidate, card))) {
+        candidate = { ...candidate, y: candidate.y + 1 };
+      }
+      const index = next.findIndex((card) => card.id === candidate.id);
+      next[index] = candidate;
+      pending.push(candidate.id);
+    });
+  }
+
+  return next;
+}
+
+function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onOpenWebsites, onAddWebsite, onToggleScheduleTask }) {
+  const [dashboardCards, setDashboardCards] = React.useState(loadDashboardCards);
+  const [isLayoutEditing, setIsLayoutEditing] = React.useState(false);
+  const [draggedCardId, setDraggedCardId] = React.useState(null);
+  const [dragTarget, setDragTarget] = React.useState(null);
+  const [layoutNotice, setLayoutNotice] = React.useState('');
+  const [dashboardGridMode, setDashboardGridMode] = React.useState(() => window.innerWidth <= 600 ? 'mobile' : window.innerWidth <= 900 ? 'compact' : 'desktop');
+  const dashboardGridRef = React.useRef(null);
+  const dragStateRef = React.useRef(null);
+  const today = getToday();
+  const ordinaryTasks = tasks.filter((task) => !isLongTermTask(task));
+  const todayTasks = ordinaryTasks.filter((task) => task.task_date === today).sort(sortTasks);
+  const scheduleTasks = todayTasks.sort((first, second) => {
+    const firstCompleted = first.status === 'completed';
+    const secondCompleted = second.status === 'completed';
+    if (firstCompleted !== secondCompleted) return firstCompleted ? 1 : -1;
+    return (first.task_time || '99:99').localeCompare(second.task_time || '99:99');
+  });
+  const upcomingTasks = tasks.filter((task) => !isLongTermTask(task) && task.task_date > today && task.status !== 'completed').sort(sortTasks).slice(0, 3);
+  const recentNotes = notes.slice(0, 3);
+  const todayDate = new Date(`${today}T12:00:00`);
+  const weekStart = new Date(todayDate);
+  weekStart.setDate(todayDate.getDate() - ((todayDate.getDay() + 6) % 7));
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    return { label: ['一', '二', '三', '四', '五', '六', '日'][index], day: date.getDate(), isToday: date.getDate() === todayDate.getDate() && date.getMonth() === todayDate.getMonth() };
+  });
+  const weekday = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][todayDate.getDay()];
+
+  React.useEffect(() => { window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dashboardCards)); }, [dashboardCards]);
+  React.useEffect(() => {
+    const updateGridMode = () => setDashboardGridMode(window.innerWidth <= 600 ? 'mobile' : window.innerWidth <= 900 ? 'compact' : 'desktop');
+    window.addEventListener('resize', updateGridMode);
+    return () => window.removeEventListener('resize', updateGridMode);
+  }, []);
+
+  function updateDashboardCard(id, updates) {
+    setDashboardCards((current) => current.map((card) => card.id === id ? { ...card, ...updates } : card));
+  }
+
+  function resizeDashboardCard(id, width, height) {
+    setDashboardCards((current) => {
+      const resized = current.map((card) => card.id === id ? { ...card, width, height, x: Math.min(card.x, 6 - width) } : card);
+      return pushDashboardCardCollisions(resized, id);
+    });
+    setLayoutNotice('尺寸已更新；相撞的卡片已自动向下移动。');
+  }
+
+  function isDashboardPositionAvailable(cardId, position) {
+    const card = dashboardCards.find((item) => item.id === cardId);
+    if (!card) return false;
+    const candidate = { ...card, ...position };
+    return !dashboardCards.some((item) => item.id !== cardId && item.visible && dashboardCardsOverlap(candidate, item));
+  }
+
+  function getDashboardDragPosition(event) {
+    const grid = dashboardGridRef.current;
+    const state = dragStateRef.current;
+    const card = dashboardCards.find((item) => item.id === state?.cardId);
+    if (!grid || !state || !card) return null;
+    const rect = grid.getBoundingClientRect();
+    const logicalCellWidth = rect.width / 6;
+    const rowHeight = 124;
+    const column = Math.floor((event.clientX - rect.left) / logicalCellWidth) - state.offsetX;
+    const row = Math.floor((event.clientY - rect.top) / rowHeight) - state.offsetY;
+    return { x: Math.max(0, Math.min(6 - card.width, column)), y: Math.max(0, row) };
+  }
+
+  function startDashboardDrag(event, card) {
+    if (!isLayoutEditing || event.button !== 0) return;
+    event.preventDefault();
+    const grid = dashboardGridRef.current;
+    if (!grid) return;
+    const rect = grid.getBoundingClientRect();
+    dragStateRef.current = {
+      cardId: card.id,
+      offsetX: Math.max(0, Math.min(card.width - 1, Math.floor((event.clientX - rect.left) / (rect.width / 6)) - card.x)),
+      offsetY: Math.max(0, Math.floor((event.clientY - rect.top) / 124) - card.y),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setLayoutNotice('');
+    setDraggedCardId(card.id);
+    setDragTarget({ x: card.x, y: card.y });
+  }
+
+  function previewDashboardDrag(event) {
+    if (!dragStateRef.current) return;
+    const position = getDashboardDragPosition(event);
+    if (position) setDragTarget(position);
+  }
+
+  function finishDashboardDrag(event) {
+    const state = dragStateRef.current;
+    const position = getDashboardDragPosition(event);
+    if (state && position) {
+      if (isDashboardPositionAvailable(state.cardId, position)) {
+        updateDashboardCard(state.cardId, position);
+      } else {
+        setLayoutNotice('这里已经有其他卡片，请放到空白格子里。');
+      }
+    }
+    dragStateRef.current = null;
+    setDraggedCardId(null);
+    setDragTarget(null);
+  }
+
+  function getDashboardCardStyle(card) {
+    const size = { '--card-width': card.width, '--card-height': card.height };
+    if (dashboardGridMode === 'mobile') return size;
+    const position = draggedCardId === card.id && dragTarget ? dragTarget : card;
+    const scale = dashboardGridMode === 'compact' ? 1 : 2;
+    return {
+      ...size,
+      gridColumn: `${position.x * scale + 1} / span ${card.width * scale}`,
+      gridRow: `${position.y + 1} / span ${card.height}`,
+    };
+  }
+
+  const dashboardGridRows = Math.max(12, ...dashboardCards.filter((card) => card.visible).map((card) => card.y + card.height + 3));
+
+  function getDashboardDotStyle(index) {
+    const x = index % 6;
+    const y = Math.floor(index / 6);
+    const scale = dashboardGridMode === 'desktop' ? 2 : 1;
+    return { gridColumn: `${x * scale + 1} / span ${scale}`, gridRow: y + 1 };
+  }
+
+  const cards = {
+    schedule: <section className="dashboard-schedule-card" aria-label="今日日程，点击进入日历" role="button" tabIndex={0} onClick={onOpenSchedule} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSchedule(); } }}><div className="dashboard-schedule-date" aria-label={`${todayDate.getMonth() + 1}月${todayDate.getDate()}日，${weekday}`}><div className="dashboard-schedule-date-main"><div><span>{todayDate.getMonth() + 1}月</span><b>{weekday}</b></div><strong>{todayDate.getDate()}</strong></div><div className="dashboard-schedule-week" aria-label="本周日期">{weekDays.map((day) => <span className={day.isToday ? 'today' : ''} key={day.label}><small>{day.label}</small><b>{day.day}</b></span>)}</div></div><div className="dashboard-schedule-content">{scheduleTasks.length ? <div className="dashboard-schedule-list">{scheduleTasks.slice(0, 3).map((task) => <div className={`dashboard-schedule-item schedule-${task.matrix_category}${task.status === 'completed' ? ' completed' : ''}`} key={task.id}><button className="dashboard-schedule-complete" type="button" aria-label={task.status === 'completed' ? `恢复任务：${task.title}` : `完成任务：${task.title}`} title={task.status === 'completed' ? '恢复为进行中' : '标记已完成'} onClick={(event) => { event.stopPropagation(); onToggleScheduleTask(task); }}>{task.status === 'completed' && <Check size={14} strokeWidth={3} />}</button><div><strong>{task.title}</strong><small>{task.task_time ? formatTime(task.task_time) : '全天'}</small></div></div>)}{scheduleTasks.length > 3 && <span className="dashboard-schedule-more">还有 {scheduleTasks.length - 3} 项日程 <ArrowRight size={14} /></span>}</div> : <p className="dashboard-schedule-empty">今天暂无日程，安排一件最重要的事吧。</p>}</div></section>,
+    'quick-task': <button className="quick-entry-card quick-task" onClick={onOpenTasks}><span><Plus size={22} /></span><strong>新建任务</strong><small>安排今天或未来要做的事</small></button>,
+    'quick-note': <button className="quick-entry-card quick-note" onClick={onOpenNotes}><span><NotebookPen size={21} /></span><strong>写点东西</strong><small>记录此刻的想法与灵感</small></button>,
+    websites: <WebsiteQuickLinks onOpenWebsites={onOpenWebsites} onAddWebsite={onAddWebsite} />,
+    upcoming: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-purple"><Sparkles size={18} /></span><h2>未来任务</h2></div><button className="section-link" onClick={onOpenTasks}>管理任务 <ArrowRight size={15} /></button></div>{upcomingTasks.length === 0 ? <div className="dashboard-empty">暂时没有未来任务，可以在任务中心添加长期计划。</div> : <div className="long-term-grid">{upcomingTasks.map((task, index) => <article className={`long-term-card accent-${index + 1}`} key={task.id}><div className="long-term-card-top"><span className="long-term-icon"><Clock3 size={18} /></span><span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span></div><h3>{task.title}</h3><p>{task.description || '保持推进，一点点完成这个计划。'}</p><div className="long-term-meta"><strong>{getLabel(statusOptions, task.status)}</strong><span>{formatDate(task.task_date)}</span></div><div className="progress-track"><div style={{ width: task.status === 'in_progress' ? '60%' : task.status === 'stalled' ? '24%' : '12%' }} /></div></article>)}</div>}</section>,
+    notes: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-blue"><Clock3 size={18} /></span><h2>最近笔记</h2></div><button className="section-link" onClick={onOpenNotes}>全部笔记 <ArrowRight size={15} /></button></div>{recentNotes.length === 0 ? <div className="dashboard-empty">还没有笔记，点击“写点东西”记录第一条内容。</div> : <div className="recent-notes-grid">{recentNotes.map((note, index) => <button className={`recent-note-card note-color-${index + 1}`} key={note.id} onClick={onOpenNotes}><span className="note-color-block"><span className="note-cover-icon" aria-hidden="true">{['📝', '💡', '📚'][index % 3]}</span><span className={note.visibility === 'public' ? 'note-visibility-pill public' : 'note-visibility-pill'}>{note.visibility === 'public' ? '公开' : '私密'}</span></span><strong>{note.title}</strong><small>{new Date(note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small></button>)}</div>}</section>,
+  };
+
+  return (
+    <div className="dashboard-home dashboard-card-home">
+      <header className="dashboard-layout-heading"><div><p>我的首页</p><h1>{isLayoutEditing ? '正在编辑卡片布局' : '把常用内容放在顺手的位置'}</h1></div><button className={isLayoutEditing ? 'dashboard-layout-button active' : 'dashboard-layout-button'} type="button" onClick={() => setIsLayoutEditing((editing) => !editing)}>{isLayoutEditing ? <><Check size={17} />完成编辑</> : <><SlidersHorizontal size={17} />编辑首页</>}</button></header>
+      {isLayoutEditing && <section className="dashboard-layout-editor" aria-label="首页卡片设置"><div><strong>按住卡片右上角的手柄，自由拖到任何空白格子</strong><span>卡片会固定在放下的位置，空位不会自动补齐；变大时会自动下推相撞卡片。</span></div><button type="button" onClick={() => setDashboardCards(defaultDashboardCards)}>恢复默认布局</button>{layoutNotice && <p className="dashboard-layout-notice" role="status">{layoutNotice}</p>}<div className="dashboard-layout-editor-list">{dashboardCards.map((card) => <label key={card.id}><span>{card.label}</span><select value={`${card.width}x${card.height}`} onChange={(event) => { const [width, height] = event.target.value.split('x').map(Number); resizeDashboardCard(card.id, width, height); }}>{getDashboardSizeOptions(card).map((size) => <option value={`${size.width}x${size.height}`} key={size.label}>{size.label}</option>)}</select><button type="button" onClick={() => updateDashboardCard(card.id, { visible: !card.visible })}>{card.visible ? '显示中' : '已隐藏'}</button></label>)}</div></section>}
+      <div className={isLayoutEditing ? 'dashboard-card-grid is-editing' : 'dashboard-card-grid'} ref={dashboardGridRef}>{isLayoutEditing && <div className="dashboard-grid-dots" aria-hidden="true">{Array.from({ length: dashboardGridRows * 6 }, (_, index) => <span className="dashboard-grid-dot" style={getDashboardDotStyle(index)} key={index} />)}</div>}{dashboardCards.filter((card) => card.visible).map((card) => <article className={`${draggedCardId === card.id ? 'dashboard-card is-dragging' : 'dashboard-card'} dashboard-card-${card.id}${card.width === 1 && card.height === 1 ? ' dashboard-card-compact' : ''}`} key={card.id} style={getDashboardCardStyle(card)}>{isLayoutEditing && <button className="dashboard-card-drag-handle" type="button" aria-label={`拖动 ${card.label}`} title="按住并拖动卡片" onPointerDown={(event) => startDashboardDrag(event, card)} onPointerMove={previewDashboardDrag} onPointerUp={finishDashboardDrag} onPointerCancel={finishDashboardDrag}>⋮⋮</button>}{cards[card.id]}</article>)}</div>
     </div>
   );
 }
@@ -3231,7 +3470,7 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
           <section className="panel-card task-list-panel">
             <div className="task-list-heading">
               <div>
-                <h2>待办任务</h2>
+                <h2>待办事件</h2>
               </div>
               <button
                 className={isTaskFilterOpen ? 'task-filter-button active' : 'task-filter-button'}
