@@ -806,8 +806,20 @@ const scriptBreakdownNavItems = [
   { id: 'script-breakdown-compare', label: '颜色对照' },
 ];
 
+const breakdownStylePreviewOptions = [
+  { id: 'blueprint', label: '方案 A · 专注蓝图', summary: '更清晰的编辑层级与蓝色工作流提示' },
+  { id: 'paper', label: '方案 B · 轻纸研究', summary: '留白更多，阅读与思考更安静' },
+  { id: 'timeline', label: '方案 C · 剪辑轨道', summary: '用柔紫轨道强调叙事步骤与进度' },
+];
+
 function ScriptBreakdownPanel({ collectionVideo = null }) {
+  const breakdownStylePreview = import.meta.env.DEV && new URLSearchParams(window.location.search).has('style-preview');
+  const requestedBreakdownStyle = new URLSearchParams(window.location.search).get('breakdown-style');
+  const activeBreakdownStyle = breakdownStylePreview && breakdownStylePreviewOptions.some((option) => option.id === requestedBreakdownStyle)
+    ? requestedBreakdownStyle
+    : 'blueprint';
   const formRef = React.useRef(null);
+  const emotionCurveGraphRef = React.useRef(null);
   const draftSaveTimerRef = React.useRef(null);
   const [minimapState, setMinimapState] = React.useState({ visible: false, activeIndex: 0 });
   const [isExportOpen, setIsExportOpen] = React.useState(false);
@@ -830,6 +842,22 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [selectedVideoType, setSelectedVideoType] = React.useState('');
   const [videoTypeValues, setVideoTypeValues] = React.useState({});
   const [structureMode, setStructureMode] = React.useState('shots');
+  const createEmotionCurveNode = (id, level = 0) => ({
+    id,
+    phase: '',
+    range: '',
+    idea: '',
+    level,
+  });
+  const createDefaultEmotionCurveNodes = () => [
+    createEmotionCurveNode(1, 1),
+    createEmotionCurveNode(2, -1),
+    createEmotionCurveNode(3, 2),
+    createEmotionCurveNode(4, 0),
+  ];
+  const [emotionCurveNodes, setEmotionCurveNodes] = React.useState(createDefaultEmotionCurveNodes);
+  const [selectedEmotionCurveNodeId, setSelectedEmotionCurveNodeId] = React.useState(1);
+  const [hasEditedEmotionCurve, setHasEditedEmotionCurve] = React.useState(false);
   const createCoreEventChainRow = (id) => ({
     id,
     startName: `core-event-chain-${id}-start`,
@@ -849,6 +877,154 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [aiDistributionSummary, setAiDistributionSummary] = React.useState(null);
   const [draftRevision, setDraftRevision] = React.useState(0);
   const [isDraftReady, setIsDraftReady] = React.useState(false);
+
+  const getEmotionLabel = (level) => {
+    if (level >= 2) return '很开心';
+    if (level === 1) return '开心';
+    if (level === 0) return '平静';
+    if (level === -1) return '难过';
+    return '很伤心';
+  };
+
+  const getEmotionEmoji = (level) => ['😢', '😞', '😟', '😐', '🙂', '😄', '😁'][level + 3] || '😐';
+
+  const getEmotionCurveText = () => emotionCurveNodes.map((node, index) => (
+    `${node.phase.trim() || `节点 ${index + 1}`}${node.range.trim() ? `（${node.range.trim()}）` : ''}\n想法：${node.idea.trim() || '（未填写）'}\n情绪：${getEmotionLabel(node.level)}`
+  )).join('\n\n');
+
+  const updateEmotionCurveNode = (id, changes) => {
+    setHasEditedEmotionCurve(true);
+    setEmotionCurveNodes((nodes) => nodes.map((node) => (node.id === id ? { ...node, ...changes } : node)));
+  };
+
+  const addEmotionCurveNode = () => {
+    const nextId = Math.max(...emotionCurveNodes.map((node) => node.id), 0) + 1;
+    const selectedIndex = emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId);
+    const nextNode = createEmotionCurveNode(nextId, 0);
+    setHasEditedEmotionCurve(true);
+    setEmotionCurveNodes((nodes) => {
+      const insertionIndex = selectedIndex >= 0 ? selectedIndex + 1 : nodes.length;
+      return [...nodes.slice(0, insertionIndex), nextNode, ...nodes.slice(insertionIndex)];
+    });
+    setSelectedEmotionCurveNodeId(nextId);
+  };
+
+  const removeEmotionCurveNode = () => {
+    if (emotionCurveNodes.length <= 2) return;
+    const selectedIndex = emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId);
+    const fallbackNode = emotionCurveNodes[Math.max(0, selectedIndex - 1)] || emotionCurveNodes[0];
+    setHasEditedEmotionCurve(true);
+    setEmotionCurveNodes((nodes) => nodes.filter((node) => node.id !== selectedEmotionCurveNodeId));
+    setSelectedEmotionCurveNodeId(fallbackNode.id === selectedEmotionCurveNodeId
+      ? emotionCurveNodes[Math.min(emotionCurveNodes.length - 1, selectedIndex + 1)].id
+      : fallbackNode.id);
+  };
+
+  const moveEmotionCurveNode = (direction) => {
+    const selectedIndex = emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId);
+    const targetIndex = selectedIndex + direction;
+    if (selectedIndex < 0 || targetIndex < 0 || targetIndex >= emotionCurveNodes.length) return;
+    setHasEditedEmotionCurve(true);
+    setEmotionCurveNodes((nodes) => {
+      const nextNodes = [...nodes];
+      [nextNodes[selectedIndex], nextNodes[targetIndex]] = [nextNodes[targetIndex], nextNodes[selectedIndex]];
+      return nextNodes;
+    });
+  };
+
+  const renderEmotionCurveEditor = (position) => {
+    const activeNode = emotionCurveNodes.find((node) => node.id === selectedEmotionCurveNodeId) || emotionCurveNodes[0];
+    const chartWidth = Math.max(640, emotionCurveNodes.length * 164);
+    const getPoint = (node, index) => {
+      const x = ((index + 0.5) / emotionCurveNodes.length) * 1000;
+      const y = 150 - (node.level * 40);
+      return { x, y };
+    };
+    const curvePath = emotionCurveNodes.map(getPoint).reduce((path, point, index, points) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+      const previous = points[index - 1];
+      const distance = point.x - previous.x;
+      return `${path} C ${previous.x + (distance * 0.45)} ${previous.y}, ${point.x - (distance * 0.45)} ${point.y}, ${point.x} ${point.y}`;
+    }, '');
+    const updateLevelFromPointer = (id, clientY) => {
+      const rect = emotionCurveGraphRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const percent = Math.max(8, Math.min(92, ((clientY - rect.top) / rect.height) * 100));
+      const level = Math.max(-3, Math.min(3, Math.round((50 - percent) / 13.34)));
+      updateEmotionCurveNode(id, { level });
+    };
+    const startDrag = (event, id) => {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setSelectedEmotionCurveNodeId(id);
+      updateLevelFromPointer(id, event.clientY);
+    };
+
+    return (
+      <section className="emotion-curve-editor" aria-labelledby="emotion-curve-title">
+        <div className="emotion-curve-heading">
+          <div>
+            <strong id="emotion-curve-title">{position}. 观众情绪曲线 <span className="script-breakdown-priority-star" role="img" aria-label="重点维度">⭐</span></strong>
+            <span>用节点标记阶段、想法和观众情绪；拖动 Emoji 上下调整强弱。</span>
+          </div>
+          <span className="emotion-curve-current" aria-live="polite">当前：{activeNode?.phase.trim() || `节点 ${emotionCurveNodes.findIndex((node) => node.id === activeNode?.id) + 1}`} · {getEmotionLabel(activeNode?.level || 0)}</span>
+        </div>
+        <div className="emotion-curve-scroll">
+          <div className="emotion-curve-canvas" style={{ minWidth: `${chartWidth}px` }}>
+            <div className="emotion-curve-ideas" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(148px, 1fr))` }}>
+              {emotionCurveNodes.map((node, index) => (
+                <label className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-idea selected' : 'emotion-curve-idea'} key={node.id}>
+                  <span>想法 · 节点 {index + 1}</span>
+                  <input value={node.phase} placeholder="阶段名称" aria-label={`节点 ${index + 1} 的阶段名称`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { phase: event.target.value })} />
+                  <input value={node.range} placeholder="镜头范围（可选）" aria-label={`节点 ${index + 1} 的镜头范围`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { range: event.target.value })} />
+                  <textarea value={node.idea} rows={2} placeholder="这一步让观众感到什么？" aria-label={`节点 ${index + 1} 的想法`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { idea: event.target.value })} />
+                </label>
+              ))}
+            </div>
+            <div className="emotion-curve-graph" ref={emotionCurveGraphRef}>
+              <div className="emotion-curve-axis-label emotion-curve-axis-happy">开心</div>
+              <div className="emotion-curve-axis-label emotion-curve-axis-calm">平静</div>
+              <div className="emotion-curve-axis-label emotion-curve-axis-sad">伤心</div>
+              <svg className="emotion-curve-svg" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
+                <path className="emotion-curve-grid-line" d="M 0 30 H 1000 M 0 150 H 1000 M 0 270 H 1000" />
+                <path className="emotion-curve-path" d={curvePath} />
+              </svg>
+              {emotionCurveNodes.map((node, index) => {
+                const point = getPoint(node, index);
+                return (
+                  <button
+                    className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-node selected' : 'emotion-curve-node'}
+                    key={node.id}
+                    type="button"
+                    style={{ left: `${(point.x / 1000) * 100}%`, top: `${(point.y / 300) * 100}%` }}
+                    aria-label={`${node.phase.trim() || `节点 ${index + 1}`}，${getEmotionLabel(node.level)}。上下拖动调整情绪强弱。`}
+                    onPointerDown={(event) => startDrag(event, node.id)}
+                    onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) updateLevelFromPointer(node.id, event.clientY); }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        updateEmotionCurveNode(node.id, { level: Math.max(-3, Math.min(3, node.level + (event.key === 'ArrowUp' ? 1 : -1))) });
+                      }
+                    }}
+                  >
+                    <span aria-hidden="true">{getEmotionEmoji(node.level)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="emotion-curve-x-axis" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(148px, 1fr))` }}>
+              {emotionCurveNodes.map((node, index) => <button type="button" className={node.id === selectedEmotionCurveNodeId ? 'selected' : undefined} key={node.id} onClick={() => setSelectedEmotionCurveNodeId(node.id)}>{node.phase.trim() || `节点 ${index + 1}`}{node.range.trim() ? <small>{node.range}</small> : null}</button>)}
+            </div>
+          </div>
+        </div>
+        <div className="emotion-curve-actions" aria-label="情绪曲线节点操作">
+          <button type="button" className="emotion-curve-add" onClick={addEmotionCurveNode}>＋ 新增节点</button>
+          <button type="button" onClick={removeEmotionCurveNode} disabled={emotionCurveNodes.length <= 2}>删除节点</button>
+          <button type="button" onClick={() => moveEmotionCurveNode(-1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) <= 0}>← 左移</button>
+          <button type="button" onClick={() => moveEmotionCurveNode(1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) >= emotionCurveNodes.length - 1}>右移 →</button>
+        </div>
+      </section>
+    );
+  };
 
   React.useEffect(() => {
     const updateMinimap = () => {
@@ -1403,6 +1579,29 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         if (structureModeOptions.some((option) => option.value === draft['structure-mode'])) {
           setStructureMode(draft['structure-mode']);
         }
+        if (typeof draft['emotion-curve-nodes'] === 'string') {
+          try {
+            const restoredEmotionNodes = JSON.parse(draft['emotion-curve-nodes']);
+            if (Array.isArray(restoredEmotionNodes) && restoredEmotionNodes.length >= 2) {
+              const safeNodes = restoredEmotionNodes
+                .filter((node) => Number.isInteger(node?.id))
+                .map((node) => ({
+                  id: node.id,
+                  phase: typeof node.phase === 'string' ? node.phase : '',
+                  range: typeof node.range === 'string' ? node.range : '',
+                  idea: typeof node.idea === 'string' ? node.idea : '',
+                  level: Math.max(-3, Math.min(3, Number.isFinite(node.level) ? node.level : 0)),
+                }));
+              if (safeNodes.length >= 2) {
+                setEmotionCurveNodes(safeNodes);
+                setSelectedEmotionCurveNodeId(safeNodes[0].id);
+                setHasEditedEmotionCurve(true);
+              }
+            }
+          } catch {
+            // 情绪曲线草稿损坏时保留可编辑的默认节点。
+          }
+        }
         const restoredBenchmarkVideoUrl = typeof draft['benchmark-video'] === 'string' ? draft['benchmark-video'] : '';
         setBenchmarkVideoUrl(restoredBenchmarkVideoUrl);
         setBenchmarkPlatform(detectBenchmarkPlatform(restoredBenchmarkVideoUrl));
@@ -1482,6 +1681,10 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     formData.set('structure-mode', structureMode);
     Object.entries(videoTypeValues).forEach(([name, value]) => formData.set(name, value));
     Object.entries(aiBreakdownValues).forEach(([id, value]) => formData.set(`ai-breakdown-${id}`, value));
+    if (hasEditedEmotionCurve) {
+      formData.set('观众情绪曲线', getEmotionCurveText());
+      formData.set('emotion-curve-nodes', JSON.stringify(emotionCurveNodes));
+    }
     return formData;
   };
 
@@ -1579,6 +1782,8 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     benchmarkVideoUrl,
     coreEventChainRows,
     draftRevision,
+    emotionCurveNodes,
+    hasEditedEmotionCurve,
     isDraftReady,
     selectedVideoType,
     structureMode,
@@ -1591,7 +1796,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     const saveBeforeLeaving = () => persistDraft();
     window.addEventListener('pagehide', saveBeforeLeaving);
     return () => window.removeEventListener('pagehide', saveBeforeLeaving);
-  }, [aiBreakdownValues, benchmarkVideoUrl, coreEventChainRows, isDraftReady, selectedVideoType, structureMode, videoTypeValues]);
+  }, [aiBreakdownValues, benchmarkVideoUrl, coreEventChainRows, emotionCurveNodes, hasEditedEmotionCurve, isDraftReady, selectedVideoType, structureMode, videoTypeValues]);
 
   const fillBenchmarkMetadata = (pastedText) => {
     if (!formRef.current) return 0;
@@ -1766,6 +1971,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     setVideoTypeValues({});
     setStructureMode('shots');
     setCoreEventChainRows([1, 2, 3].map(createCoreEventChainRow));
+    setEmotionCurveNodes(createDefaultEmotionCurveNodes());
+    setSelectedEmotionCurveNodeId(1);
+    setHasEditedEmotionCurve(false);
     setAiBreakdownValues({});
     setAiDistributionSummary(null);
     setBenchmarkVideoUrl('');
@@ -1897,7 +2105,34 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   };
 
   return (
-    <section className="script-breakdown-panel" aria-label="脚本拆解">
+    <section className={`script-breakdown-panel${breakdownStylePreview ? ` breakdown-style-preview preview-${activeBreakdownStyle}` : ''}`} aria-label="脚本拆解">
+      {breakdownStylePreview && (
+        <section className="breakdown-style-switcher" aria-label="拆解学习局部风格预览">
+          <div>
+            <strong>局部风格预览</strong>
+            <span>仅本地开发环境可见；不影响字段、数据或正式页面。</span>
+          </div>
+          <div className="breakdown-style-options" role="group" aria-label="选择局部风格方案">
+            {breakdownStylePreviewOptions.map((option) => (
+              <button
+                className={activeBreakdownStyle === option.id ? 'active' : undefined}
+                type="button"
+                key={option.id}
+                aria-pressed={activeBreakdownStyle === option.id}
+                title={option.summary}
+                onClick={() => {
+                  const nextUrl = new URL(window.location.href);
+                  nextUrl.searchParams.set('style-preview', '1');
+                  nextUrl.searchParams.set('breakdown-style', option.id);
+                  window.location.assign(nextUrl.toString());
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <aside
         className={minimapState.visible ? 'script-breakdown-minimap is-visible' : 'script-breakdown-minimap'}
         aria-label="脚本拆解导航"
@@ -2122,7 +2357,12 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
           </div>
           {renderInlineAiBreakdown('story-structure', '3. 剧情结构')}
         </section>
-        {fields.map((field, index) => (
+        {fields.map((field, index) => field.title === '观众情绪曲线' ? (
+          <React.Fragment key={field.title}>
+            {renderEmotionCurveEditor(index + 4)}
+            {renderInlineAiBreakdown(`field-${index + 5}`, `${index + 4}. ${field.title}`)}
+          </React.Fragment>
+        ) : (
           <div className="script-breakdown-field" id={index === 0 ? 'script-breakdown-extra' : undefined} key={field.title}>
             <label>
               <span className="script-breakdown-label">
@@ -2672,6 +2912,7 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
   const [activeTaskView, setActiveTaskView] = React.useState(initialTaskView);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [isEndDateOpen, setIsEndDateOpen] = React.useState(false);
   const [categoryDefinitions, setCategoryDefinitions] = React.useState(DEFAULT_TASK_CATEGORIES);
   const [isTaskCategoryManagerOpen, setIsTaskCategoryManagerOpen] = React.useState(false);
   const [newTaskCategoryName, setNewTaskCategoryName] = React.useState('');
@@ -2738,6 +2979,7 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
       matrix_category: 'important_not_urgent',
       status: 'not_started',
     });
+    setIsEndDateOpen(false);
     setIsCreateOpen(false);
     setMessage('任务已保存到列表。');
   }
@@ -2932,30 +3174,53 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
         <form className="panel-card form-stack task-composer" onSubmit={handleCreateTask}>
           <div className="form-card-heading">
             <span className="section-icon section-icon-coral"><CheckCircle2 size={18} /></span>
-            <div><h2>新建任务</h2><p>设置日期、进展和重要紧急程度。</p></div>
+            <div><h2>新建任务</h2><p>先写下要做的事，再补充时间和优先级。</p></div>
+            <button className="task-composer-close" type="button" onClick={() => setIsCreateOpen(false)} aria-label="收起新建任务表单" title="收起"><X size={18} /></button>
           </div>
-          <div className="task-composer-grid">
-            <label className="wide-field">任务标题<input id="task-title" value={form.title} onChange={(event) => updateForm('title', event.target.value)} required /></label>
-            <label className="wide-field">备注<textarea id="task-description" rows={3} value={form.description} onChange={(event) => updateForm('description', event.target.value)} /></label>
-            <label>重要紧急程度<select id="task-matrix" value={form.matrix_category} onChange={(event) => updateForm('matrix_category', event.target.value)}>{matrixOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-            <label>进展状态<select id="task-status" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+
+          <section className="task-composer-section" aria-label="任务内容">
+            <label className="task-composer-title-field"><span>任务标题 <em aria-hidden="true">*</em></span><input id="task-title" value={form.title} onChange={(event) => updateForm('title', event.target.value)} placeholder="例如：整理 9 月视频选题" required /></label>
+            <label className="task-composer-note-field"><span>备注（选填）</span><input id="task-description" value={form.description} onChange={(event) => updateForm('description', event.target.value)} placeholder="补充背景、要求或链接…" /></label>
+          </section>
+
+          <section className="task-composer-section" aria-label="任务属性">
             <TaskCategoryPillPicker
-              className="wide-field"
+              compactManage
               categories={categoryDefinitions}
               value={form.category}
               onChange={(category) => updateForm('category', category)}
               onOpenSettings={() => setIsTaskCategoryManagerOpen((open) => !open)}
             />
-            <label>开始日期<input type="date" value={form.task_date} onChange={(event) => updateForm('task_date', event.target.value)} required /></label>
-            <label>结束日期（可选）<input type="date" value={form.end_date} min={form.task_date} onChange={(event) => updateForm('end_date', event.target.value)} /></label>
-            <label>时间<input type="time" value={form.task_time} onChange={(event) => updateForm('task_time', event.target.value)} /></label>
-          </div>
-          <div className="task-composer-actions">
-            <div className="quick-date-row" aria-label="快捷日期">
-              <button type="button" onClick={() => updateForm('task_date', getRelativeDate(0))}>今天</button>
-              <button type="button" onClick={() => updateForm('task_date', getRelativeDate(1))}>明天</button>
-              <button type="button" onClick={() => updateForm('task_date', getRelativeDate(2))}>后天</button>
+
+            <div className="task-property-grid">
+              <label>优先级（四象限）<select id="task-matrix" value={form.matrix_category} onChange={(event) => updateForm('matrix_category', event.target.value)}>{matrixOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+              <label>进展<select id="task-status" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             </div>
+          </section>
+
+          <section className="task-composer-section" aria-label="时间安排">
+            <div className="task-schedule-grid">
+              <div className="task-start-date-control">
+                <label>开始日期<input type="date" value={form.task_date} onChange={(event) => updateForm('task_date', event.target.value)} required /></label>
+                <div className="quick-date-row" aria-label="快捷日期">
+                  {[0, 1, 2].map((offset) => {
+                    const label = ['今天', '明天', '后天'][offset];
+                    const date = getRelativeDate(offset);
+                    return <button className={form.task_date === date ? 'selected' : undefined} type="button" aria-pressed={form.task_date === date} key={label} onClick={() => updateForm('task_date', date)}>{label}</button>;
+                  })}
+                </div>
+              </div>
+              <label>时间<input type="time" value={form.task_time} onChange={(event) => updateForm('task_time', event.target.value)} /></label>
+            </div>
+            {isEndDateOpen || form.end_date ? (
+              <div className="task-end-date-row">
+                <label>结束日期（可选）<input type="date" value={form.end_date} min={form.task_date} onChange={(event) => updateForm('end_date', event.target.value)} /></label>
+                <button type="button" onClick={() => { updateForm('end_date', ''); setIsEndDateOpen(false); }}>移除结束日期</button>
+              </div>
+            ) : <button className="task-add-end-date" type="button" onClick={() => setIsEndDateOpen(true)}>＋ 添加结束日期</button>}
+          </section>
+
+          <div className="task-composer-actions">
             <button className="primary-button large" disabled={isSaving}><Plus size={18} />{isSaving ? '保存中...' : '保存任务'}</button>
           </div>
         </form>
@@ -3047,32 +3312,19 @@ function TasksPanel({ initialTaskView = taskViews.list, session, tasks, setTasks
   );
 }
 
-function TaskCategoryPillPicker({ categories = DEFAULT_TASK_CATEGORIES, value, onChange, onOpenSettings, className = '' }) {
+function TaskCategoryPillPicker({ categories = DEFAULT_TASK_CATEGORIES, value, onChange, onOpenSettings, className = '', compactManage = false }) {
   const visibleCategories = categories.some((category) => category.name === value)
     ? categories
     : [...categories, { id: `legacy-${value}`, name: value, color: '#98a2b3' }];
 
   return (
-    <div className={`task-category-picker ${className}`.trim()}>
+    <div className={`task-category-picker${compactManage ? ' task-category-picker-inline' : ''} ${className}`.trim()}>
       <span className="task-category-picker-label">分类</span>
       <div className="task-category-pill-row" role="radiogroup" aria-label="任务分类">
-        {visibleCategories.map((category) => (
-          <button
-            className={value === category.name ? 'task-category-pill selected' : 'task-category-pill'}
-            type="button"
-            role="radio"
-            aria-checked={value === category.name}
-            key={category.id}
-            style={{ '--task-category-color': category.color }}
-            onClick={() => onChange?.(category.name)}
-          >
-            {category.name}
-          </button>
-        ))}
-        <button className="task-category-settings-pill" type="button" onClick={onOpenSettings}>
-          <Settings2 size={15} /> 设置分类
-        </button>
+        {visibleCategories.map((category) => <button className={value === category.name ? 'task-category-pill selected' : 'task-category-pill'} type="button" role="radio" aria-checked={value === category.name} key={category.id} style={{ '--task-category-color': category.color }} onClick={() => onChange?.(category.name)}>{category.name}</button>)}
+        {!compactManage && <button className="task-category-settings-pill" type="button" onClick={onOpenSettings}><Settings2 size={15} /> 设置分类</button>}
       </div>
+      {compactManage && <button className="task-category-manage-link" type="button" onClick={onOpenSettings}><Settings2 size={15} /> 管理分类</button>}
     </div>
   );
 }

@@ -3906,28 +3906,192 @@ button {
 }
 
 .task-composer {
+  width: min(100%, 860px);
   border-top: 1px solid rgba(255, 255, 255, 0.78);
+  gap: 0;
 }
 
-.task-composer-grid {
+.task-composer .form-card-heading {
+  margin-bottom: 0;
+  padding-bottom: 16px;
+}
+
+.task-composer .form-card-heading h2 {
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.task-composer-close {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  place-items: center;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  background: var(--ws-card);
+  color: var(--ws-muted);
+  cursor: pointer;
 }
 
-.task-composer-grid label {
+.task-composer-close:hover,
+.task-composer-close:focus-visible {
+  background: var(--ws-card-soft);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.task-composer-section {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+}
+
+.task-composer-section + .task-composer-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--ws-border);
+  padding-top: 16px;
+}
+
+.task-composer-section label {
+  display: grid;
+  gap: 6px;
+}
+
+.task-composer-section label,
+.task-composer-section label > span {
+  color: var(--ws-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-composer-title-field > span {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.task-composer-title-field em {
+  color: var(--ws-primary);
+  font-style: normal;
+}
+
+.task-composer .task-composer-section input,
+.task-composer .task-composer-section select {
+  min-height: 44px;
+  border: 1px solid rgba(52, 63, 84, 0.16);
+  border-radius: 12px;
+  background: var(--ws-card);
+  box-shadow: 0 1px 2px rgba(52, 63, 84, 0.025);
+}
+
+.task-composer .task-composer-section input:focus,
+.task-composer .task-composer-section select:focus {
+  border-color: var(--ws-primary);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.12);
+}
+
+.task-category-picker-inline {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-category-manage-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-category-manage-link:hover,
+.task-category-manage-link:focus-visible {
+  color: var(--ws-primary);
+  outline: none;
+}
+
+.task-property-grid,
+.task-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.task-start-date-control {
   display: grid;
   gap: 8px;
 }
 
-.task-composer-grid .wide-field {
-  grid-column: span 2;
+.task-composer .quick-date-row button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  background: var(--ws-card-soft);
+  color: var(--ws-text-soft);
+}
+
+.task-composer .quick-date-row button:hover,
+.task-composer .quick-date-row button:focus-visible,
+.task-composer .quick-date-row button.selected {
+  border-color: rgba(57, 118, 213, 0.28);
+  background: var(--ws-primary-soft);
+  color: var(--ws-primary);
+  outline: none;
+}
+
+.task-end-date-row {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.task-end-date-row label {
+  flex: 1;
+}
+
+.task-end-date-row > button,
+.task-add-end-date,
+.task-composer-collapse {
+  min-height: 40px;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: var(--ws-card);
+  color: var(--ws-text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-add-end-date {
+  justify-self: start;
+  border-style: dashed;
+}
+
+.task-end-date-row > button:hover,
+.task-add-end-date:hover,
+.task-add-end-date:focus-visible,
+.task-composer-collapse:hover,
+.task-composer-collapse:focus-visible {
+  border-color: rgba(57, 118, 213, 0.28);
+  background: var(--ws-card-soft);
+  color: var(--ws-primary);
+  outline: none;
 }
 
 .task-composer-actions {
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 4px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 0;
 }
 
 .task-list-layout {
@@ -6614,6 +6778,11 @@ button.calendar-range-event:focus-visible,
     grid-template-columns: 1fr;
   }
 
+  .task-property-grid,
+  .task-schedule-grid {
+    grid-template-columns: 1fr;
+  }
+
   .task-composer-grid .wide-field {
     grid-column: auto;
   }
@@ -9028,6 +9197,254 @@ button.calendar-range-event:focus-visible,
   transform: translateY(-1px);
 }
 
+.emotion-curve-editor {
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid var(--color-line-soft);
+  border-radius: 20px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(234, 243, 255, 0.6), rgba(244, 251, 250, 0.72));
+}
+
+.emotion-curve-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.emotion-curve-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.emotion-curve-heading strong {
+  color: var(--ws-text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.emotion-curve-heading span {
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.emotion-curve-heading .emotion-curve-current {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ws-text-soft);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.emotion-curve-scroll {
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.emotion-curve-canvas {
+  display: grid;
+  gap: 14px;
+}
+
+.emotion-curve-ideas,
+.emotion-curve-x-axis {
+  display: grid;
+  gap: 8px;
+}
+
+.emotion-curve-idea {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(17, 24, 39, 0.05);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.emotion-curve-idea.selected {
+  border-color: rgba(57, 118, 213, 0.34);
+  box-shadow: 0 3px 10px rgba(52, 63, 84, 0.06);
+}
+
+.emotion-curve-idea > span {
+  color: var(--ws-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.emotion-curve-idea input,
+.emotion-curve-idea textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 10px;
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ws-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  outline: none;
+  resize: vertical;
+}
+
+.emotion-curve-idea textarea {
+  min-height: 52px;
+  font-weight: 400;
+}
+
+.emotion-curve-idea input:focus,
+.emotion-curve-idea textarea:focus {
+  border-color: rgba(57, 118, 213, 0.55);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.1);
+}
+
+.emotion-curve-graph {
+  position: relative;
+  height: 268px;
+  overflow: hidden;
+  border: 1px solid rgba(57, 118, 213, 0.13);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.emotion-curve-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.emotion-curve-grid-line {
+  fill: none;
+  stroke: rgba(17, 24, 39, 0.08);
+  stroke-dasharray: 5 8;
+  stroke-width: 1;
+}
+
+.emotion-curve-path {
+  fill: none;
+  stroke: #e5b800;
+  stroke-linecap: round;
+  stroke-width: 5;
+}
+
+.emotion-curve-axis-label {
+  position: absolute;
+  z-index: 1;
+  left: 10px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 750;
+  pointer-events: none;
+}
+
+.emotion-curve-axis-happy { top: 8px; }
+.emotion-curve-axis-calm { top: calc(50% - 12px); }
+.emotion-curve-axis-sad { bottom: 8px; }
+
+.emotion-curve-node {
+  position: absolute;
+  z-index: 2;
+  width: 48px;
+  height: 48px;
+  margin: -24px;
+  border: 2px solid rgba(229, 184, 0, 0.82);
+  border-radius: 50%;
+  padding: 0;
+  background: #fff9c9;
+  box-shadow: 0 5px 13px rgba(183, 141, 0, 0.16);
+  cursor: ns-resize;
+  font-size: 28px;
+  line-height: 1;
+  touch-action: none;
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.emotion-curve-node:hover,
+.emotion-curve-node:focus-visible,
+.emotion-curve-node.selected {
+  box-shadow: 0 0 0 4px rgba(229, 184, 0, 0.18), 0 7px 16px rgba(183, 141, 0, 0.2);
+  outline: none;
+  transform: scale(1.06);
+}
+
+.emotion-curve-x-axis button {
+  min-height: 42px;
+  border: 0;
+  border-top: 2px solid rgba(17, 24, 39, 0.1);
+  padding: 8px 6px 0;
+  background: transparent;
+  color: var(--ws-text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.emotion-curve-x-axis button.selected {
+  border-top-color: #e5b800;
+  color: var(--ws-text);
+}
+
+.emotion-curve-x-axis small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.emotion-curve-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emotion-curve-actions button {
+  min-height: 36px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ws-text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.emotion-curve-actions .emotion-curve-add {
+  border-color: rgba(57, 118, 213, 0.2);
+  background: rgba(234, 243, 255, 0.75);
+  color: var(--ws-primary);
+}
+
+.emotion-curve-actions button:not(:disabled):hover,
+.emotion-curve-actions button:not(:disabled):focus-visible {
+  transform: translateY(-1px);
+}
+
+.emotion-curve-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .core-event-chain-range {
   display: flex;
   align-items: center;
@@ -9956,5 +10373,331 @@ button.calendar-range-event:focus-visible,
 
   .script-comparison-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 仅供本地 style-preview 参数比较的拆解学习局部风格，不会进入默认页面。 */
+.breakdown-style-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  border: 1px dashed rgba(57, 118, 213, 0.28);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.breakdown-style-switcher > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.breakdown-style-switcher strong {
+  color: var(--ws-text);
+  font-size: 13px;
+}
+
+.breakdown-style-switcher span {
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+
+.breakdown-style-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.breakdown-style-options button {
+  min-height: 32px;
+  border: 1px solid var(--ws-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ws-text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.breakdown-style-options button:hover,
+.breakdown-style-options button:focus-visible,
+.breakdown-style-options button.active {
+  border-color: rgba(57, 118, 213, 0.34);
+  background: var(--ws-primary-soft);
+  color: var(--ws-primary);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+/* A: 专注蓝图——给长表单更清晰的区块边界和流程感。 */
+.preview-blueprint .form-card-heading,
+.preview-blueprint .script-breakdown-form > .video-type-section,
+.preview-blueprint .script-breakdown-form > .core-event-chain-structure,
+.preview-blueprint .script-breakdown-form > .script-breakdown-field,
+.preview-blueprint .script-breakdown-form > .ai-breakdown-step,
+.preview-blueprint .script-breakdown-form > .script-comparison-action,
+.preview-blueprint .emotion-curve-editor {
+  border: 1px solid rgba(57, 118, 213, 0.14);
+  border-radius: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(234, 243, 255, 0.56), rgba(255, 255, 255, 0.82));
+  box-shadow: 0 8px 20px rgba(52, 63, 84, 0.045);
+}
+
+.preview-blueprint .script-breakdown-form {
+  gap: 16px;
+}
+
+.preview-blueprint .script-breakdown-title-field {
+  border-left: 3px solid #3976d5;
+  padding-left: 14px;
+}
+
+.preview-blueprint .script-breakdown-field textarea,
+.preview-blueprint .core-event-chain-table,
+.preview-blueprint .emotion-curve-graph {
+  border-color: rgba(57, 118, 213, 0.16);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.preview-blueprint .script-breakdown-save,
+.preview-blueprint .script-breakdown-export {
+  border-color: #344b69;
+  background: #344b69;
+  color: #fff;
+}
+
+.preview-blueprint .script-breakdown-save:hover,
+.preview-blueprint .script-breakdown-save:focus-visible,
+.preview-blueprint .script-breakdown-export:hover,
+.preview-blueprint .script-breakdown-export:focus-visible {
+  border-color: #233950;
+  background: #233950;
+  color: #fff;
+}
+
+/* B: 轻纸研究——以更大的留白和柔和分隔支持长时间阅读与记录。 */
+.preview-paper {
+  max-width: 1000px;
+}
+
+.preview-paper .form-card-heading {
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.1);
+}
+
+.preview-paper .form-card-heading h2,
+.preview-paper .video-type-heading strong,
+.preview-paper .core-event-chain-structure h3 {
+  letter-spacing: 0.02em;
+}
+
+.preview-paper .script-breakdown-form {
+  gap: 32px;
+}
+
+.preview-paper .script-breakdown-form > .video-type-section,
+.preview-paper .script-breakdown-form > .core-event-chain-structure,
+.preview-paper .script-breakdown-form > .script-breakdown-field,
+.preview-paper .script-breakdown-form > .ai-breakdown-step,
+.preview-paper .script-breakdown-form > .script-comparison-action,
+.preview-paper .emotion-curve-editor {
+  position: relative;
+  padding: 0 0 24px 20px;
+  border: 0;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.09);
+  border-radius: 0;
+  background: transparent;
+}
+
+.preview-paper .script-breakdown-form > .video-type-section::before,
+.preview-paper .script-breakdown-form > .core-event-chain-structure::before,
+.preview-paper .script-breakdown-form > .script-breakdown-field::before,
+.preview-paper .script-breakdown-form > .ai-breakdown-step::before,
+.preview-paper .script-breakdown-form > .script-comparison-action::before,
+.preview-paper .emotion-curve-editor::before {
+  position: absolute;
+  top: 3px;
+  bottom: 24px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: #d5ddea;
+  content: '';
+}
+
+.preview-paper .script-breakdown-field textarea,
+.preview-paper .core-event-chain-table,
+.preview-paper .emotion-curve-graph {
+  border-color: rgba(17, 24, 39, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: none;
+}
+
+.preview-paper .text-format-toolbar,
+.preview-paper .inline-ai-breakdown {
+  opacity: 0.84;
+}
+
+/* C: 剪辑轨道——以柔紫步骤轨道聚焦叙事节奏和 AI 协作。 */
+.preview-timeline .form-card-heading {
+  border: 1px solid rgba(118, 71, 200, 0.17);
+  border-radius: 24px;
+  padding: 22px;
+  background: linear-gradient(135deg, rgba(240, 234, 255, 0.76), rgba(255, 255, 255, 0.82));
+}
+
+.preview-timeline .script-breakdown-form {
+  gap: 18px;
+}
+
+.preview-timeline .script-breakdown-form > .video-type-section,
+.preview-timeline .script-breakdown-form > .core-event-chain-structure,
+.preview-timeline .script-breakdown-form > .script-breakdown-field,
+.preview-timeline .script-breakdown-form > .ai-breakdown-step,
+.preview-timeline .script-breakdown-form > .script-comparison-action,
+.preview-timeline .emotion-curve-editor {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(118, 71, 200, 0.13);
+  border-radius: 18px;
+  padding: 18px 18px 18px 28px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.preview-timeline .script-breakdown-form > .video-type-section::before,
+.preview-timeline .script-breakdown-form > .core-event-chain-structure::before,
+.preview-timeline .script-breakdown-form > .script-breakdown-field::before,
+.preview-timeline .script-breakdown-form > .ai-breakdown-step::before,
+.preview-timeline .script-breakdown-form > .script-comparison-action::before,
+.preview-timeline .emotion-curve-editor::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  background: linear-gradient(180deg, #d9cafb 0%, #f0eaff 100%);
+  content: '';
+}
+
+.preview-timeline .script-breakdown-step-number,
+.preview-timeline .core-event-chain-mode-switcher button.active,
+.preview-timeline .video-type-option.selected {
+  border-color: rgba(118, 71, 200, 0.3);
+  background: #f0eaff;
+  color: #6338ac;
+}
+
+.preview-timeline .script-breakdown-copy,
+.preview-timeline .script-breakdown-distribute {
+  border-color: rgba(118, 71, 200, 0.22);
+  background: #f0eaff;
+  color: #6338ac;
+}
+
+.preview-timeline .emotion-curve-editor {
+  background: linear-gradient(135deg, rgba(240, 234, 255, 0.48), rgba(255, 255, 255, 0.82));
+}
+
+@media (max-width: 720px) {
+  .breakdown-style-switcher {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preview-blueprint .form-card-heading,
+  .preview-blueprint .script-breakdown-form > .video-type-section,
+  .preview-blueprint .script-breakdown-form > .core-event-chain-structure,
+  .preview-blueprint .script-breakdown-form > .script-breakdown-field,
+  .preview-blueprint .script-breakdown-form > .ai-breakdown-step,
+  .preview-blueprint .script-breakdown-form > .script-comparison-action,
+  .preview-blueprint .emotion-curve-editor {
+    padding: 16px;
+  }
+}
+
+/* 任务页在侧栏展开时应依据内容区宽度重排，不能依赖浏览器总宽度。 */
+.tasks-page-layout {
+  container-type: inline-size;
+}
+
+.task-toolbar {
+  min-width: 0;
+}
+
+.task-toolbar .task-view-switcher {
+  min-width: 0;
+}
+
+.task-toolbar .task-view-switcher .tab-button,
+.task-toolbar .workspace-main-action {
+  white-space: nowrap;
+}
+
+.task-list-panel {
+  container-type: inline-size;
+}
+
+.task-list-panel .item-top {
+  grid-template-columns: 30px minmax(0, 1fr) auto 30px;
+}
+
+@container (max-width: 880px) {
+  .task-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .task-toolbar .task-view-switcher {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .task-toolbar .task-view-switcher .tab-button {
+    min-width: 0;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .task-toolbar .workspace-main-action {
+    align-self: flex-end;
+    margin-left: auto;
+  }
+}
+
+@container (max-width: 760px) {
+  .task-list-panel .item-top {
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    align-items: start;
+    gap: 10px 12px;
+  }
+
+  .task-list-panel .task-list-inline-meta {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    white-space: normal;
+  }
+
+  .task-list-panel .task-card-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+@container (max-width: 520px) {
+  .task-toolbar .task-view-switcher {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-toolbar .workspace-main-action {
+    width: 100%;
   }
 }
