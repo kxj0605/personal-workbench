@@ -2425,6 +2425,339 @@ button {
   gap: 9px;
 }
 
+.edit-note-inline-field {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-note-inline-field label {
+  color: var(--ws-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.edit-note-title-field {
+  display: block;
+  min-height: 44px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(52, 63, 84, 0.3);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.workspace-content .edit-note-form .edit-note-title-field input {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 14px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.edit-note-title-field input::placeholder {
+  color: var(--ws-muted);
+  opacity: 1;
+}
+
+.edit-note-title-field:focus-within {
+  border-color: rgba(57, 118, 213, 0.7);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.1);
+}
+
+.edit-note-title-field input:focus {
+  outline: none;
+}
+
+.edit-note-inline-field select {
+  width: min(100%, 116px);
+  justify-self: start;
+}
+
+.edit-note-visibility-row {
+  grid-template-columns: max-content 116px max-content;
+}
+
+.edit-note-visibility-row select {
+  width: 100%;
+}
+
+.edit-note-select-wrap {
+  position: relative;
+  width: 116px;
+}
+
+.edit-note-select-wrap select {
+  appearance: none;
+  padding-right: 44px;
+}
+
+.edit-note-select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 28px;
+  transform: translateY(-50%);
+  color: var(--ws-text-soft);
+  pointer-events: none;
+}
+
+.edit-note-meta-row {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+}
+
+.edit-note-meta-label {
+  margin-right: 12px;
+  color: var(--ws-text-soft);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.edit-note-visibility-menu {
+  position: relative;
+  margin-right: 24px;
+}
+
+.edit-note-visibility-trigger {
+  display: flex;
+  width: 96px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(52, 63, 84, 0.3);
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--ws-text);
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.edit-note-visibility-trigger:hover,
+.edit-note-visibility-trigger[aria-expanded="true"] {
+  border-color: rgba(57, 118, 213, 0.45);
+  background: var(--ws-primary-soft);
+}
+
+.edit-note-visibility-trigger:focus-visible {
+  border-color: rgba(57, 118, 213, 0.7);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.1);
+  outline: none;
+}
+
+.edit-note-visibility-options {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  width: 96px;
+  overflow: hidden;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--ws-card);
+  box-shadow: var(--shadow-md);
+}
+
+.edit-note-visibility-options button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--ws-text-soft);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.edit-note-visibility-options button:hover,
+.edit-note-visibility-options button[aria-selected="true"] {
+  color: var(--ws-primary);
+  background: var(--ws-primary-soft);
+}
+
+.workspace-content .edit-note-form .edit-note-inline-field input,
+.workspace-content .edit-note-form .edit-note-inline-field select,
+.workspace-content .edit-note-form .edit-note-content {
+  border-color: rgba(52, 63, 84, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.workspace-content .edit-note-form .edit-note-inline-field input:focus,
+.workspace-content .edit-note-form .edit-note-inline-field select:focus,
+.workspace-content .edit-note-form .edit-note-content:focus {
+  border-color: rgba(57, 118, 213, 0.7);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.1);
+  outline: none;
+}
+
+.edit-note-form .edit-note-content {
+  box-sizing: border-box;
+  min-height: 160px;
+  max-height: min(480px, 50vh);
+  overflow-y: auto;
+  resize: none;
+}
+
+.rich-text-editor {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  overflow: visible;
+  border: 1px solid rgba(52, 63, 84, 0.3);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.rich-text-toolbar {
+  order: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid rgba(52, 63, 84, 0.12);
+  padding: 7px 8px;
+  background: rgba(244, 247, 251, 0.78);
+}
+
+.rich-text-menu-wrap {
+  position: relative;
+}
+
+.rich-text-tool,
+.rich-text-color-option,
+.rich-text-emoji-option {
+  border: 0;
+  cursor: pointer;
+}
+
+.rich-text-tool {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--ws-text-soft);
+  background: transparent;
+}
+
+.rich-text-tool:hover,
+.rich-text-tool:focus-visible {
+  color: var(--ws-primary);
+  background: var(--ws-primary-soft);
+  outline: none;
+}
+
+.rich-text-menu {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 6px);
+  left: 0;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--ws-card);
+  box-shadow: var(--shadow-md);
+}
+
+.rich-text-color-menu {
+  display: flex;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rich-text-color-option {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  background: var(--rich-text-color);
+  box-shadow: 0 0 0 1px rgba(52, 63, 84, 0.16);
+}
+
+.rich-text-emoji-menu {
+  display: grid;
+  grid-template-columns: repeat(4, 30px);
+  gap: 4px;
+}
+
+.rich-text-emoji-option {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 16px;
+}
+
+.rich-text-emoji-option:hover,
+.rich-text-emoji-option:focus-visible {
+  background: var(--ws-primary-soft);
+  outline: none;
+}
+
+.rich-text-editor-content {
+  order: 1;
+  min-width: 0;
+  max-width: 100%;
+  border: 0 !important;
+  border-radius: 13px 13px 0 0;
+  padding: 12px;
+  color: var(--ws-text);
+  line-height: 1.65;
+  outline: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rich-text-editor-content:empty::before {
+  color: var(--ws-muted);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.rich-text-editor-content p,
+.rich-text-editor-content div {
+  margin: 0;
+}
+
+.rich-text-editor-content ul,
+.rich-text-editor-content ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.rich-text-editor:focus-within {
+  border-color: rgba(57, 118, 213, 0.7);
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.1);
+}
+
+.edit-note-form .form-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.workspace-content .note-library-card.is-editing,
+.workspace-content .note-library-card.is-editing .edit-note-form {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .item-card.completed h3 {
   color: #98a2b3;
   text-decoration: line-through;
@@ -3119,6 +3452,18 @@ button {
   color: #5f6878;
   line-height: 1.8;
   white-space: pre-wrap;
+}
+
+.public-note-content p,
+.public-note-content div,
+.public-note-content ul,
+.public-note-content ol {
+  margin: 0;
+}
+
+.public-note-content ul,
+.public-note-content ol {
+  padding-left: 1.4em;
 }
 
 .public-note-card .comments-box {
@@ -3843,6 +4188,12 @@ button {
   width: min(100%, 820px);
 }
 
+.note-composer .note-composer-content {
+  min-height: 360px;
+  overflow-y: hidden;
+  resize: vertical;
+}
+
 .notes-collection {
   min-width: 0;
 }
@@ -3850,6 +4201,7 @@ button {
 .notes-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
   gap: 18px;
 }
 
@@ -3860,6 +4212,16 @@ button {
   min-height: 260px;
   overflow: hidden;
   padding: 17px;
+}
+
+.workspace-content .note-library-card.without-card-cover {
+  min-height: 172px;
+}
+
+.workspace-content .note-library-card.is-editing {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 24px;
 }
 
 .note-card-cover {
@@ -3884,19 +4246,118 @@ button {
   background: linear-gradient(135deg, #eee2ff, #e2ebff 52%, #ffe5ee);
 }
 
+.note-cover-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--ws-card-soft);
+  cursor: pointer;
+}
+
+.note-cover-toggle input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ws-primary);
+}
+
+.note-cover-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.note-cover-toggle strong {
+  color: var(--ws-text);
+  font-size: 13px;
+}
+
+.note-cover-toggle small {
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.note-cover-toggle-inline {
+  position: relative;
+  min-height: 32px;
+  align-items: center;
+  align-self: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.note-cover-toggle-inline input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.note-cover-toggle-inline .note-cover-toggle-indicator {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid rgba(52, 63, 84, 0.32);
+  border-radius: 12px;
+  color: transparent;
+  background: rgba(255, 255, 255, 0.76);
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.note-cover-toggle-inline input:checked + .note-cover-toggle-indicator {
+  border-color: var(--ws-primary);
+  color: var(--ws-primary);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.note-cover-toggle-inline input:focus-visible + .note-cover-toggle-indicator {
+  box-shadow: 0 0 0 3px rgba(57, 118, 213, 0.14);
+}
+
+.note-cover-toggle-inline > span:last-child {
+  display: block;
+  color: var(--ws-text-soft);
+  font-size: 14px;
+  font-weight: 400;
+}
+
 .note-library-card .item-top h3 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.note-library-card > p {
-  display: -webkit-box;
+.note-library-card > .note-card-content {
+  display: block;
   overflow: hidden;
   min-height: 48px;
-  margin-bottom: 18px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  max-height: 52px;
+  margin: 10px 0 18px;
+  color: var(--ws-text-soft);
+  line-height: 1.65;
+}
+
+.note-card-content p,
+.note-card-content div,
+.note-card-content ul,
+.note-card-content ol {
+  margin: 0;
+}
+
+.note-card-content ul,
+.note-card-content ol {
+  padding-left: 1.35em;
 }
 
 .note-library-card .tag-row {
@@ -9694,28 +10155,59 @@ button.calendar-range-event:focus-visible,
 .emotion-curve-axis-calm { top: calc(50% - 12px); }
 .emotion-curve-axis-sad { bottom: 8px; }
 
+.emotion-curve-crosshair,
+.emotion-curve-crosshair span {
+  position: absolute;
+  pointer-events: none;
+}
+
+.emotion-curve-crosshair {
+  z-index: 1;
+  inset: 0;
+}
+
+.emotion-curve-crosshair span {
+  border-color: rgba(102, 125, 157, 0.22);
+  border-style: dashed;
+}
+
+.emotion-curve-crosshair-vertical {
+  top: 0;
+  bottom: 0;
+  border-left-width: 0.5px;
+}
+
+.emotion-curve-crosshair-horizontal {
+  right: 0;
+  left: 0;
+  border-top-width: 0.5px;
+}
+
 .emotion-curve-node {
   position: absolute;
-  z-index: 2;
-  width: 48px;
-  height: 48px;
-  margin: -24px;
-  border: 2px solid rgba(229, 184, 0, 0.82);
-  border-radius: 50%;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  margin: -22px;
+  border: 0;
+  border-radius: 0;
   padding: 0;
-  background: #fff9c9;
-  box-shadow: 0 5px 13px rgba(183, 141, 0, 0.16);
-  cursor: ns-resize;
+  background: transparent;
+  box-shadow: none;
+  cursor: grab;
   font-size: 28px;
   line-height: 1;
   touch-action: none;
-  transition: box-shadow 160ms ease, transform 160ms ease;
+  transition: transform 160ms ease;
+}
+
+.emotion-curve-node:active {
+  cursor: grabbing;
 }
 
 .emotion-curve-node:hover,
 .emotion-curve-node:focus-visible,
 .emotion-curve-node.selected {
-  box-shadow: 0 0 0 4px rgba(229, 184, 0, 0.18), 0 7px 16px rgba(183, 141, 0, 0.2);
   outline: none;
   transform: scale(1.06);
 }

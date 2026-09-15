@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   ArrowRight,
   ArrowUp,
+  Bold,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -22,6 +23,8 @@ import {
   House,
   ListTodo,
   LibraryBig,
+  List,
+  ListOrdered,
   LayoutDashboard,
   Link2,
   LogIn,
@@ -37,6 +40,7 @@ import {
   Scissors,
   Save,
   Settings2,
+  Smile,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -443,7 +447,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
 
     setIsLoading(true);
     const [{ data: noteData, error: noteError }, { data: taskData, error: taskError }] = await Promise.all([
-      supabase.from('notes').select('id, user_id, title, content, visibility, created_at').order('created_at', {
+      supabase.from('notes').select('*').order('created_at', {
         ascending: false,
       }),
       supabase.from('tasks').select('*').order('task_date', { ascending: true }).order('created_at', { ascending: true }),
@@ -858,6 +862,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [emotionCurveNodes, setEmotionCurveNodes] = React.useState(createDefaultEmotionCurveNodes);
   const [selectedEmotionCurveNodeId, setSelectedEmotionCurveNodeId] = React.useState(1);
   const [hasEditedEmotionCurve, setHasEditedEmotionCurve] = React.useState(false);
+  const [emotionCurvePointer, setEmotionCurvePointer] = React.useState(null);
   const createCoreEventChainRow = (id) => ({
     id,
     startName: `core-event-chain-${id}-start`,
@@ -934,7 +939,8 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
 
   const renderEmotionCurveEditor = (position) => {
     const activeNode = emotionCurveNodes.find((node) => node.id === selectedEmotionCurveNodeId) || emotionCurveNodes[0];
-    const chartWidth = Math.max(640, emotionCurveNodes.length * 164);
+    const emotionCurveColumnWidth = emotionCurveNodes.length <= 5 ? 164 : emotionCurveNodes.length <= 8 ? 120 : 104;
+    const chartWidth = Math.max(640, emotionCurveNodes.length * emotionCurveColumnWidth);
     const getPoint = (node, index) => {
       const x = ((index + 0.5) / emotionCurveNodes.length) * 1000;
       const y = 150 - (node.level * 40);
@@ -956,7 +962,20 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     const startDrag = (event, id) => {
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setSelectedEmotionCurveNodeId(id);
+      setEmotionCurvePointer(null);
       updateLevelFromPointer(id, event.clientY);
+    };
+    const updateEmotionCurvePointer = (event) => {
+      if (event.target.closest('.emotion-curve-node')) {
+        setEmotionCurvePointer(null);
+        return;
+      }
+      const rect = emotionCurveGraphRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setEmotionCurvePointer({
+        x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
+        y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
+      });
     };
 
     return (
@@ -970,7 +989,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         </div>
         <div className="emotion-curve-scroll">
           <div className="emotion-curve-canvas" style={{ minWidth: `${chartWidth}px` }}>
-            <div className="emotion-curve-ideas" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(148px, 1fr))` }}>
+            <div className="emotion-curve-ideas" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(${emotionCurveColumnWidth}px, 1fr))` }}>
               {emotionCurveNodes.map((node, index) => (
                 <label className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-idea selected' : 'emotion-curve-idea'} key={node.id}>
                   <span>想法 · 节点 {index + 1}</span>
@@ -980,10 +999,21 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                 </label>
               ))}
             </div>
-            <div className="emotion-curve-graph" ref={emotionCurveGraphRef}>
+            <div
+              className="emotion-curve-graph"
+              ref={emotionCurveGraphRef}
+              onPointerMove={updateEmotionCurvePointer}
+              onPointerLeave={() => setEmotionCurvePointer(null)}
+            >
               <div className="emotion-curve-axis-label emotion-curve-axis-happy">开心</div>
               <div className="emotion-curve-axis-label emotion-curve-axis-calm">平静</div>
               <div className="emotion-curve-axis-label emotion-curve-axis-sad">伤心</div>
+              {emotionCurvePointer ? (
+                <div className="emotion-curve-crosshair" aria-hidden="true">
+                  <span className="emotion-curve-crosshair-vertical" style={{ left: `${emotionCurvePointer.x}%` }} />
+                  <span className="emotion-curve-crosshair-horizontal" style={{ top: `${emotionCurvePointer.y}%` }} />
+                </div>
+              ) : null}
               <svg className="emotion-curve-svg" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
                 <path className="emotion-curve-grid-line" d="M 0 30 H 1000 M 0 150 H 1000 M 0 270 H 1000" />
                 <path className="emotion-curve-path" d={curvePath} />
@@ -997,6 +1027,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                     type="button"
                     style={{ left: `${(point.x / 1000) * 100}%`, top: `${(point.y / 300) * 100}%` }}
                     aria-label={`${node.phase.trim() || `节点 ${index + 1}`}，${getEmotionLabel(node.level)}。上下拖动调整情绪强弱。`}
+                    onPointerEnter={() => setEmotionCurvePointer(null)}
                     onPointerDown={(event) => startDrag(event, node.id)}
                     onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) updateLevelFromPointer(node.id, event.clientY); }}
                     onKeyDown={(event) => {
@@ -1011,7 +1042,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                 );
               })}
             </div>
-            <div className="emotion-curve-x-axis" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(148px, 1fr))` }}>
+            <div className="emotion-curve-x-axis" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(${emotionCurveColumnWidth}px, 1fr))` }}>
               {emotionCurveNodes.map((node, index) => <button type="button" className={node.id === selectedEmotionCurveNodeId ? 'selected' : undefined} key={node.id} onClick={() => setSelectedEmotionCurveNodeId(node.id)}>{node.phase.trim() || `节点 ${index + 1}`}{node.range.trim() ? <small>{node.range}</small> : null}</button>)}
             </div>
           </div>
@@ -2904,42 +2935,234 @@ function ProgressRow({ label, value, total }) {
   );
 }
 
+const richNoteColorOptions = [
+  { value: '#172033', label: '深色文字' },
+  { value: '#3976D5', label: '信息蓝' },
+  { value: '#7647C8', label: '创意紫' },
+  { value: '#C97808', label: '提醒橙' },
+  { value: '#D93655', label: '强调红' },
+  { value: '#247B55', label: '成功绿' },
+];
+
+const richNoteEmojiOptions = ['💡', '📝', '✅', '📌', '⭐', '🧠', '🔥', '📚', '🎬', '✨', '🎯', '🔗'];
+
+function escapeNoteHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function isRichNoteHtml(value) {
+  return /<(?:p|div|br|strong|b|em|i|ul|ol|li|span|font)\b/i.test(String(value ?? ''));
+}
+
+function sanitizeRichNoteHtml(value) {
+  const rawValue = String(value ?? '');
+  if (!rawValue) return '';
+
+  if (!isRichNoteHtml(rawValue)) {
+    return escapeNoteHtml(rawValue).replace(/\r?\n/g, '<br>');
+  }
+
+  const documentFragment = new DOMParser().parseFromString(rawValue, 'text/html');
+  const container = document.createElement('div');
+  const permittedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'SPAN', 'FONT']);
+  const permittedColors = new Set(richNoteColorOptions.map((option) => option.value.toLowerCase()));
+
+  function appendSafeNodes(source, target) {
+    [...source.childNodes].forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        target.append(document.createTextNode(node.textContent ?? ''));
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const tagName = node.tagName.toUpperCase();
+      if (!permittedTags.has(tagName)) {
+        appendSafeNodes(node, target);
+        return;
+      }
+
+      const safeTagName = tagName === 'FONT' ? 'span' : tagName.toLowerCase();
+      const safeElement = document.createElement(safeTagName);
+      if (tagName === 'SPAN' || tagName === 'FONT') {
+        const color = (node.getAttribute('color') || node.style.color || '').toLowerCase();
+        if (permittedColors.has(color)) safeElement.style.color = color;
+      }
+      appendSafeNodes(node, safeElement);
+      target.append(safeElement);
+    });
+  }
+
+  appendSafeNodes(documentFragment.body, container);
+  return container.innerHTML;
+}
+
+function getRichNotePlainText(value) {
+  const rawValue = String(value ?? '');
+  if (!isRichNoteHtml(rawValue)) return rawValue;
+  return new DOMParser().parseFromString(sanitizeRichNoteHtml(rawValue), 'text/html').body.textContent ?? '';
+}
+
+function RichNotePreview({ className, content }) {
+  return <div className={className} dangerouslySetInnerHTML={{ __html: sanitizeRichNoteHtml(content) }} />;
+}
+
+function RichTextEditor({ id, value, onChange, onResize }) {
+  const editorRef = React.useRef(null);
+  const [openMenu, setOpenMenu] = React.useState(null);
+  const initialContent = React.useMemo(() => sanitizeRichNoteHtml(value), [id]);
+
+  React.useLayoutEffect(() => {
+    if (!editorRef.current) return;
+    editorRef.current.innerHTML = initialContent;
+    onResize(editorRef.current);
+  }, [id, initialContent]);
+
+  function syncContent() {
+    if (!editorRef.current) return;
+    onChange(editorRef.current.innerHTML);
+    onResize(editorRef.current);
+  }
+
+  function runCommand(command, commandValue, shouldCloseMenu = true) {
+    editorRef.current?.focus({ preventScroll: true });
+    document.execCommand(command, false, commandValue);
+    syncContent();
+    if (shouldCloseMenu) setOpenMenu(null);
+  }
+
+  function insertEmoji(emoji) {
+    runCommand('insertText', emoji);
+  }
+
+  return (
+    <div className="rich-text-editor">
+      <div className="rich-text-toolbar" role="toolbar" aria-label="正文快捷编辑">
+        <button type="button" className="rich-text-tool" title="加粗" aria-label="加粗" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand('bold')}>
+          <Bold size={16} />
+        </button>
+        <button type="button" className="rich-text-tool" title="无序列表" aria-label="无序列表" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand('insertUnorderedList')}>
+          <List size={17} />
+        </button>
+        <button type="button" className="rich-text-tool" title="有序列表" aria-label="有序列表" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand('insertOrderedList')}>
+          <ListOrdered size={17} />
+        </button>
+        <div className="rich-text-menu-wrap">
+          <button type="button" className="rich-text-tool" title="插入 Emoji" aria-label="插入 Emoji" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenMenu((menu) => menu === 'emoji' ? null : 'emoji')}>
+            <Smile size={16} />
+          </button>
+          {openMenu === 'emoji' && <div className="rich-text-menu rich-text-emoji-menu" role="menu" aria-label="选择 Emoji">
+            {richNoteEmojiOptions.map((emoji) => <button key={emoji} type="button" className="rich-text-emoji-option" onMouseDown={(event) => event.preventDefault()} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
+          </div>}
+        </div>
+        <div className="rich-text-menu-wrap">
+          <button type="button" className="rich-text-tool" title="文字颜色" aria-label="文字颜色" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenMenu((menu) => menu === 'color' ? null : 'color')}>
+            <Palette size={16} />
+          </button>
+          {openMenu === 'color' && <div className="rich-text-menu rich-text-color-menu" role="menu" aria-label="选择文字颜色">
+            {richNoteColorOptions.map((option) => <button key={option.value} type="button" className="rich-text-color-option" style={{ '--rich-text-color': option.value }} title={option.label} aria-label={option.label} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand('foreColor', option.value, false)} />)}
+          </div>}
+        </div>
+      </div>
+      <div
+        id={id}
+        ref={editorRef}
+        className="edit-note-content rich-text-editor-content"
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        aria-label="笔记内容"
+        data-placeholder="写下这篇笔记的内容…"
+        suppressContentEditableWarning
+        onInput={syncContent}
+      />
+    </div>
+  );
+}
+
 function NotesPanel({ session, notes, setNotes, setMessage }) {
   const [title, setTitle] = React.useState('');
   const [content, setContent] = React.useState('');
   const [visibility, setVisibility] = React.useState('private');
+  const [cardCoverVisible, setCardCoverVisible] = React.useState(false);
   const [editingNoteId, setEditingNoteId] = React.useState(null);
   const [confirmingDeleteNoteId, setConfirmingDeleteNoteId] = React.useState(null);
-  const [editForm, setEditForm] = React.useState({ title: '', content: '', visibility: 'private' });
+  const [editForm, setEditForm] = React.useState({ title: '', content: '', visibility: 'private', card_cover_visible: false });
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [isComposerOpen, setIsComposerOpen] = React.useState(false);
+  const [isComposerVisibilityMenuOpen, setIsComposerVisibilityMenuOpen] = React.useState(false);
+  const [isVisibilityMenuOpen, setIsVisibilityMenuOpen] = React.useState(false);
+  const composerVisibilityMenuRef = React.useRef(null);
+  const visibilityMenuRef = React.useRef(null);
 
   function startEditNote(note) {
     setEditingNoteId(note.id);
+    setIsVisibilityMenuOpen(false);
     setConfirmingDeleteNoteId(null);
     setEditForm({
       title: note.title,
       content: note.content ?? '',
       visibility: note.visibility,
+      card_cover_visible: note.card_cover_visible === true,
     });
     setMessage('');
   }
 
   function cancelEditNote() {
     setEditingNoteId(null);
-    setEditForm({ title: '', content: '', visibility: 'private' });
+    setIsVisibilityMenuOpen(false);
+    setEditForm({ title: '', content: '', visibility: 'private', card_cover_visible: false });
   }
 
   function updateEditForm(key, value) {
     setEditForm((currentForm) => ({ ...currentForm, [key]: value }));
   }
 
+  React.useEffect(() => {
+    if (!isVisibilityMenuOpen) return undefined;
+    function closeVisibilityMenu(event) {
+      if (!visibilityMenuRef.current?.contains(event.target)) setIsVisibilityMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeVisibilityMenu);
+    return () => document.removeEventListener('pointerdown', closeVisibilityMenu);
+  }, [isVisibilityMenuOpen]);
+
+  React.useEffect(() => {
+    if (!isComposerVisibilityMenuOpen) return undefined;
+    function closeComposerVisibilityMenu(event) {
+      if (!composerVisibilityMenuRef.current?.contains(event.target)) setIsComposerVisibilityMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeComposerVisibilityMenu);
+    return () => document.removeEventListener('pointerdown', closeComposerVisibilityMenu);
+  }, [isComposerVisibilityMenuOpen]);
+
+  function cancelNoteComposer() {
+    setTitle('');
+    setContent('');
+    setVisibility('private');
+    setCardCoverVisible(false);
+    setIsComposerVisibilityMenuOpen(false);
+    setIsComposerOpen(false);
+  }
+
+  function resizeEditNoteContent(textarea) {
+    const maxHeight = Math.min(480, window.innerHeight * 0.5);
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }
+
   async function handleCreateNote(event) {
     event.preventDefault();
     setMessage('');
 
-    if (!title.trim() && !content.trim()) {
+    const safeContent = sanitizeRichNoteHtml(content);
+    if (!title.trim() && !getRichNotePlainText(safeContent).trim()) {
       setMessage('标题和正文不能同时为空。');
       return;
     }
@@ -2950,10 +3173,11 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
       .insert({
         user_id: session.user.id,
         title: title.trim() || '未命名笔记',
-        content,
+        content: safeContent,
         visibility,
+        card_cover_visible: cardCoverVisible,
       })
-      .select('id, user_id, title, content, visibility, created_at')
+      .select('id, user_id, title, content, visibility, card_cover_visible, created_at')
       .single();
     setIsSaving(false);
 
@@ -2963,10 +3187,7 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
     }
 
     setNotes((currentNotes) => [data, ...currentNotes]);
-    setTitle('');
-    setContent('');
-    setVisibility('private');
-    setIsComposerOpen(false);
+    cancelNoteComposer();
     setMessage('笔记已保存。');
   }
 
@@ -2985,7 +3206,8 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
     event.preventDefault();
     setMessage('');
 
-    if (!editForm.title.trim() && !editForm.content.trim()) {
+    const safeContent = sanitizeRichNoteHtml(editForm.content);
+    if (!editForm.title.trim() && !getRichNotePlainText(safeContent).trim()) {
       setMessage('标题和正文不能同时为空。');
       return;
     }
@@ -2995,11 +3217,12 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
       .from('notes')
       .update({
         title: editForm.title.trim() || '未命名笔记',
-        content: editForm.content,
+        content: safeContent,
         visibility: editForm.visibility,
+        card_cover_visible: editForm.card_cover_visible,
       })
       .eq('id', note.id)
-      .select('id, user_id, title, content, visibility, created_at')
+      .select('id, user_id, title, content, visibility, card_cover_visible, created_at')
       .single();
     setIsUpdating(false);
 
@@ -3027,27 +3250,39 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
         </button>
       </div>
 
-      {isComposerOpen && <form className="panel-card form-stack note-composer" onSubmit={handleCreateNote}>
+      {isComposerOpen && <form className="panel-card form-stack note-composer edit-note-form" onSubmit={handleCreateNote}>
         <div className="form-card-heading">
           <span className="section-icon section-icon-blue"><NotebookPen size={18} /></span>
-          <div><h2>写新笔记</h2><p>随手记录，之后也可以继续编辑。</p></div>
+          <div><h2>写新笔记</h2></div>
         </div>
-        <label htmlFor="note-title">标题</label>
-        <input id="note-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-        <label htmlFor="note-content">正文</label>
-        <textarea id="note-content" rows={7} value={content} onChange={(event) => setContent(event.target.value)} />
-        <label htmlFor="note-visibility">可见性</label>
-        <select id="note-visibility" value={visibility} onChange={(event) => setVisibility(event.target.value)}>
-          <option value="private">私密</option>
-          <option value="public">公开</option>
-        </select>
-        <p className="field-help">
-          私密笔记只在你的工作台显示；公开笔记会显示在公开笔记页，别人也能看到。
-        </p>
-        <button className="primary-button large" disabled={isSaving}>
-          <Plus size={18} />
-          {isSaving ? '保存中...' : '保存笔记'}
-        </button>
+        <div className="edit-note-title-field">
+          <input id="note-title" value={title} placeholder="标题" aria-label="标题" onChange={(event) => setTitle(event.target.value)} />
+        </div>
+        <RichTextEditor id="note-content" value={content} onChange={setContent} onResize={resizeEditNoteContent} />
+        <div className="edit-note-meta-row">
+          <span className="edit-note-meta-label">可见性</span>
+          <div className="edit-note-visibility-menu" ref={composerVisibilityMenuRef}>
+            <button id="note-visibility" type="button" className="edit-note-visibility-trigger" aria-haspopup="listbox" aria-expanded={isComposerVisibilityMenuOpen} onClick={() => setIsComposerVisibilityMenuOpen((open) => !open)}>
+              {visibility === 'public' ? '公开' : '私密'}
+              <ChevronDown size={16} aria-hidden="true" />
+            </button>
+            {isComposerVisibilityMenuOpen && <div className="edit-note-visibility-options" role="listbox" aria-labelledby="note-visibility">
+              {[['private', '私密'], ['public', '公开']].map(([value, label]) => <button key={value} type="button" role="option" aria-selected={visibility === value} onClick={() => { setVisibility(value); setIsComposerVisibilityMenuOpen(false); }}>{label}</button>)}
+            </div>}
+          </div>
+          <label className="note-cover-toggle note-cover-toggle-inline" htmlFor="note-card-cover-visible">
+            <input id="note-card-cover-visible" type="checkbox" checked={cardCoverVisible} onChange={(event) => setCardCoverVisible(event.target.checked)} />
+            <span className="note-cover-toggle-indicator" aria-hidden="true"><Check size={13} /></span>
+            <span>卡片显示封面</span>
+          </label>
+        </div>
+        <div className="form-actions">
+          <button className="primary-button" type="submit" disabled={isSaving}>
+            <Plus size={16} />
+            {isSaving ? '保存中...' : '保存笔记'}
+          </button>
+          <button className="text-button" type="button" onClick={cancelNoteComposer} disabled={isSaving}>取消</button>
+        </div>
       </form>}
 
       <section className="notes-collection">
@@ -3056,31 +3291,53 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
         ) : (
           <div className="notes-card-grid">
             {notes.map((note, index) => (
-              <article className={`item-card note-library-card note-accent-${(index % 4) + 1}`} key={note.id}>
+              <article className={`item-card note-library-card ${editingNoteId === note.id ? 'is-editing' : ''} ${note.card_cover_visible ? 'has-card-cover' : 'without-card-cover'} note-accent-${(index % 4) + 1}`} key={note.id}>
                 {editingNoteId === note.id ? (
                   <form className="form-stack edit-note-form" onSubmit={(event) => handleUpdateNote(event, note)}>
-                    <label htmlFor={`edit-note-title-${note.id}`}>标题</label>
-                    <input
-                      id={`edit-note-title-${note.id}`}
-                      value={editForm.title}
-                      onChange={(event) => updateEditForm('title', event.target.value)}
-                    />
-                    <label htmlFor={`edit-note-content-${note.id}`}>正文</label>
-                    <textarea
+                    <div className="edit-note-title-field">
+                      <input
+                        id={`edit-note-title-${note.id}`}
+                        value={editForm.title}
+                        placeholder="标题"
+                        aria-label="标题"
+                        onChange={(event) => updateEditForm('title', event.target.value)}
+                      />
+                    </div>
+                    <RichTextEditor
                       id={`edit-note-content-${note.id}`}
-                      rows={5}
                       value={editForm.content}
-                      onChange={(event) => updateEditForm('content', event.target.value)}
+                      onChange={(value) => updateEditForm('content', value)}
+                      onResize={resizeEditNoteContent}
                     />
-                    <label htmlFor={`edit-note-visibility-${note.id}`}>可见性</label>
-                    <select
-                      id={`edit-note-visibility-${note.id}`}
-                      value={editForm.visibility}
-                      onChange={(event) => updateEditForm('visibility', event.target.value)}
-                    >
-                      <option value="private">私密</option>
-                      <option value="public">公开</option>
-                    </select>
+                    <div className="edit-note-meta-row">
+                      <span className="edit-note-meta-label">可见性</span>
+                      <div className="edit-note-visibility-menu" ref={visibilityMenuRef}>
+                        <button
+                          id={`edit-note-visibility-${note.id}`}
+                          type="button"
+                          className="edit-note-visibility-trigger"
+                          aria-haspopup="listbox"
+                          aria-expanded={isVisibilityMenuOpen}
+                          onClick={() => setIsVisibilityMenuOpen((open) => !open)}
+                        >
+                          {editForm.visibility === 'public' ? '公开' : '私密'}
+                          <ChevronDown size={16} aria-hidden="true" />
+                        </button>
+                        {isVisibilityMenuOpen && <div className="edit-note-visibility-options" role="listbox" aria-labelledby={`edit-note-visibility-${note.id}`}>
+                          {[['private', '私密'], ['public', '公开']].map(([value, label]) => <button key={value} type="button" role="option" aria-selected={editForm.visibility === value} onClick={() => { updateEditForm('visibility', value); setIsVisibilityMenuOpen(false); }}>{label}</button>)}
+                        </div>}
+                      </div>
+                      <label className="note-cover-toggle note-cover-toggle-inline" htmlFor={`edit-note-card-cover-visible-${note.id}`}>
+                        <input
+                          id={`edit-note-card-cover-visible-${note.id}`}
+                          type="checkbox"
+                          checked={editForm.card_cover_visible}
+                          onChange={(event) => updateEditForm('card_cover_visible', event.target.checked)}
+                        />
+                        <span className="note-cover-toggle-indicator" aria-hidden="true"><Check size={13} /></span>
+                        <span>卡片显示封面</span>
+                      </label>
+                    </div>
                     <div className="form-actions">
                       <button className="primary-button" type="submit" disabled={isUpdating}>
                         <Pencil size={16} />
@@ -3093,7 +3350,7 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
                   </form>
                 ) : (
                   <>
-                    <span className="note-card-cover" />
+                    {note.card_cover_visible ? <span className="note-card-cover" /> : null}
                     <div className="item-top">
                       <h3>{note.title}</h3>
                       {confirmingDeleteNoteId === note.id ? (
@@ -3117,7 +3374,7 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
                         </div>
                       )}
                     </div>
-                    {note.content && <p>{note.content}</p>}
+                    {note.content && <RichNotePreview className="note-card-content" content={note.content} />}
                     <div className="tag-row">
                       <span className={note.visibility === 'public' ? 'tag public' : 'tag'}>{note.visibility === 'public' ? '公开' : '私密'}</span>
                       <span>{new Date(note.created_at).toLocaleString('zh-CN')}</span>
@@ -4873,7 +5130,7 @@ function PublicNotesPage({ session, profile, onLogin, embedded = false }) {
                   <span>{new Date(note.created_at).toLocaleDateString('zh-CN')}</span>
                 </div>
                 <h3>{note.title}</h3>
-                {note.content && <p className="public-note-content">{note.content}</p>}
+                {note.content && <RichNotePreview className="public-note-content" content={note.content} />}
               <CommentsSection
                 comments={commentsByNote[note.id] ?? []}
                 commentsEnabled={commentsEnabled}
