@@ -77,7 +77,7 @@ function WebsiteIcon({ website, size = 'regular' }) {
   );
 }
 
-export function WebsiteQuickLinks({ onOpenWebsites, onAddWebsite }) {
+export function WebsiteQuickLinks({ onAddWebsite }) {
   const [websites, setWebsites] = React.useState(() => loadData().websites);
   const pinned = websites.filter((website) => website.showOnHome).slice(0, 8);
 
@@ -90,13 +90,6 @@ export function WebsiteQuickLinks({ onOpenWebsites, onAddWebsite }) {
 
   return (
     <section className="dashboard-website-section" aria-label="常用网址">
-      <div className="dashboard-section-heading outside-card">
-        <div>
-          <span className="section-icon section-icon-blue"><Link2 size={18} /></span>
-          <h2>常用网址</h2>
-        </div>
-        <button className="section-link" onClick={onOpenWebsites}>管理网址 <ExternalLink size={15} /></button>
-      </div>
       {pinned.length ? (
         <div className="dashboard-website-grid">
           {pinned.map((website) => (

@@ -4332,20 +4332,39 @@ button {
   font-weight: 400;
 }
 
+.note-library-card .item-top {
+  min-width: 0;
+}
+
 .note-library-card .item-top h3 {
+  display: -webkit-box;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.note-library-card .item-actions,
+.note-library-card .confirm-delete {
+  position: relative;
+  z-index: 1;
+  flex: none;
 }
 
 .note-library-card > .note-card-content {
-  display: block;
+  display: -webkit-box;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  min-height: 48px;
-  max-height: 52px;
   margin: 10px 0 18px;
   color: var(--ws-text-soft);
   line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .note-card-content p,
@@ -5272,7 +5291,7 @@ button {
 .long-term-category-label {
   display: inline-flex;
   align-items: center;
-  margin-right: 8px;
+  margin-right: 6px;
   border-radius: 999px;
   padding: 2px 7px;
   background: var(--color-info-bg);
@@ -6329,13 +6348,21 @@ button.calendar-range-event:focus-visible,
 }
 
 .dashboard-card-home {
-  gap: 24px;
+  gap: 16px;
+}
+
+.workspace-content:has(.dashboard-card-home) {
+  padding-top: 24px;
+}
+
+.workspace-content .dashboard-heading {
+  margin-bottom: 18px;
 }
 
 .dashboard-layout-heading {
   display: flex;
   align-items: end;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 24px;
 }
 
@@ -6428,7 +6455,7 @@ button.calendar-range-event:focus-visible,
 
 .dashboard-layout-editor-list label {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px auto;
+  grid-template-columns: minmax(64px, 1fr) 78px 38px;
   align-items: center;
   gap: 8px;
   min-height: 48px;
@@ -6450,19 +6477,34 @@ button.calendar-range-event:focus-visible,
 .dashboard-layout-editor-list select {
   width: 100%;
   min-height: 32px;
-  border: 1px solid var(--ws-border);
+  border: 1px solid #8f9caf;
   border-radius: 9px;
-  padding: 0 7px;
+  padding: 0 5px 0 8px;
   background: #fff;
   color: var(--ws-text-soft);
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.03);
   font: inherit;
   font-size: 12px;
+}
+
+.dashboard-layout-editor-list select:focus {
+  border-color: #3976d5;
+  outline: 2px solid rgba(57, 118, 213, 0.16);
+  outline-offset: 1px;
 }
 
 .dashboard-layout-editor-list button {
   min-height: 32px;
   padding: 0 9px;
   font-size: 12px;
+}
+
+.dashboard-layout-editor-list .dashboard-card-visibility-toggle {
+  width: 32px;
+  justify-self: end;
+  margin-left: 4px;
+  margin-right: 4px;
+  padding: 0;
 }
 
 .dashboard-card-grid {
@@ -6489,6 +6531,27 @@ button.calendar-range-event:focus-visible,
   background: var(--ws-card);
   box-shadow: var(--shadow-md);
   transition: transform 180ms ease, box-shadow 180ms ease, outline-color 180ms ease;
+}
+
+.dashboard-card-notes.dashboard-card-auto-size {
+  align-self: start;
+}
+
+.dashboard-card-notes {
+  background: linear-gradient(135deg, #eef5ff 0%, #f8fbff 100%);
+}
+
+.dashboard-card-notes .recent-note-card {
+  border-color: rgba(57, 118, 213, 0.14);
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(52, 63, 84, 0.08);
+}
+
+.dashboard-card-websites {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: 0 10px 28px rgba(52, 63, 84, 0.04);
+  backdrop-filter: blur(20px);
 }
 
 .dashboard-grid-dots {
@@ -6550,6 +6613,7 @@ button.calendar-range-event:focus-visible,
 
 .dashboard-card .dashboard-section,
 .dashboard-card .dashboard-website-section {
+  align-content: start;
   min-height: 0;
 }
 
@@ -6598,19 +6662,22 @@ button.calendar-range-event:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 30px;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 999px;
-  padding: 5px 8px;
+  padding: 0;
   background: rgba(45, 60, 84, 0.88);
   color: #fff;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: -1px;
   cursor: grab;
   touch-action: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.dashboard-card-drag-handle:hover,
+.dashboard-card-drag-handle:focus-visible {
+  background: rgba(30, 44, 67, 0.96);
+  transform: scale(1.06);
 }
 
 .dashboard-card-drag-handle:active {
@@ -6678,6 +6745,7 @@ button.calendar-range-event:focus-visible,
 .dashboard-schedule-card {
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 252px;
   overflow: hidden;
   padding: 0;
@@ -7202,6 +7270,10 @@ button.calendar-range-event:focus-visible,
   color: var(--ws-text);
   cursor: pointer;
   text-align: left;
+}
+
+.recent-note-card.without-note-cover {
+  align-content: start;
 }
 
 .recent-note-card:hover {

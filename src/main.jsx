@@ -15,11 +15,14 @@ import {
   Copy,
   Database,
   Download,
+  Eye,
+  EyeOff,
   FileText,
   Film,
   Flag,
   Flame,
   Github,
+  GripVertical,
   House,
   ListTodo,
   LibraryBig,
@@ -2631,7 +2634,7 @@ function LegacyDashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNote
                   </span>
                 </span>
                 <strong>{note.title}</strong>
-                <small>{new Date(note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small>
+                <small>{new Date(note.updated_at ?? note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small>
               </button>
             ))}
           </div>
@@ -2658,8 +2661,19 @@ const defaultDashboardCards = [
   { id: 'quick-note', label: '写点东西', width: 1, height: 1, x: 1, y: 3, visible: true },
   { id: 'websites', label: '常用网址', width: 6, height: 2, x: 0, y: 4, visible: true },
   { id: 'upcoming', label: '未来任务', width: 6, height: 3, x: 0, y: 6, visible: true },
-  { id: 'notes', label: '最近笔记', width: 6, height: 3, x: 0, y: 9, visible: true },
+  { id: 'notes', label: '最近笔记', width: 6, height: 3, x: 0, y: 9, visible: true, sizeMode: 'auto' },
 ];
+
+function getRecentNotesAutoHeight(notes) {
+  if (notes.length === 0) return 2;
+  if (notes.length <= 3) return 3;
+  return notes.some((note) => note.card_cover_visible) ? 4 : 3;
+}
+
+function getNoteRecentTimestamp(note) {
+  const timestamp = new Date(note.updated_at ?? note.created_at).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
 
 function loadDashboardCards() {
   try {
@@ -2667,7 +2681,15 @@ function loadDashboardCards() {
     if (!Array.isArray(savedCards)) return defaultDashboardCards;
     const savedById = new Map(savedCards.map((card) => [card.id, card]));
     const savedOrder = savedCards.map((card) => card.id);
-    const restoredCards = defaultDashboardCards.map((card) => ({ ...card, ...savedById.get(card.id) })).sort((left, right) => (savedOrder.indexOf(left.id) === -1 ? 999 : savedOrder.indexOf(left.id)) - (savedOrder.indexOf(right.id) === -1 ? 999 : savedOrder.indexOf(right.id)));
+    const restoredCards = defaultDashboardCards.map((card) => {
+      const savedCard = savedById.get(card.id);
+      const restoredCard = { ...card, ...savedCard };
+      if (card.id !== 'notes' || savedCard?.sizeMode) return restoredCard;
+      return {
+        ...restoredCard,
+        sizeMode: savedCard && (savedCard.width !== card.width || savedCard.height !== card.height) ? 'custom' : 'auto',
+      };
+    }).sort((left, right) => (savedOrder.indexOf(left.id) === -1 ? 999 : savedOrder.indexOf(left.id)) - (savedOrder.indexOf(right.id) === -1 ? 999 : savedOrder.indexOf(right.id)));
     return assignDashboardPositions(restoredCards);
   } catch {
     return defaultDashboardCards;
@@ -2753,7 +2775,8 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
     return (first.task_time || '99:99').localeCompare(second.task_time || '99:99');
   });
   const upcomingTasks = tasks.filter((task) => !isLongTermTask(task) && task.task_date > today && task.status !== 'completed').sort(sortTasks).slice(0, 3);
-  const recentNotes = notes.slice(0, 3);
+  const recentNotes = [...notes].sort((first, second) => getNoteRecentTimestamp(second) - getNoteRecentTimestamp(first)).slice(0, 6);
+  const recentNotesAutoHeight = getRecentNotesAutoHeight(recentNotes);
   const todayDate = new Date(`${today}T12:00:00`);
   const weekStart = new Date(todayDate);
   weekStart.setDate(todayDate.getDate() - ((todayDate.getDay() + 6) % 7));
@@ -2771,16 +2794,33 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
     return () => window.removeEventListener('resize', updateGridMode);
   }, []);
 
+  React.useEffect(() => {
+    setDashboardCards((current) => {
+      const notesCard = current.find((card) => card.id === 'notes');
+      if (!notesCard || notesCard.sizeMode === 'custom' || notesCard.height === recentNotesAutoHeight) return current;
+      const resized = current.map((card) => card.id === 'notes' ? { ...card, width: 6, height: recentNotesAutoHeight, x: 0, sizeMode: 'auto' } : card);
+      return pushDashboardCardCollisions(resized, 'notes');
+    });
+  }, [recentNotesAutoHeight]);
+
   function updateDashboardCard(id, updates) {
     setDashboardCards((current) => current.map((card) => card.id === id ? { ...card, ...updates } : card));
   }
 
   function resizeDashboardCard(id, width, height) {
     setDashboardCards((current) => {
-      const resized = current.map((card) => card.id === id ? { ...card, width, height, x: Math.min(card.x, 6 - width) } : card);
+      const resized = current.map((card) => card.id === id ? { ...card, width, height, x: Math.min(card.x, 6 - width), ...(id === 'notes' ? { sizeMode: 'custom' } : {}) } : card);
       return pushDashboardCardCollisions(resized, id);
     });
     setLayoutNotice('尺寸已更新；相撞的卡片已自动向下移动。');
+  }
+
+  function restoreNotesAutoSize() {
+    setDashboardCards((current) => {
+      const resized = current.map((card) => card.id === 'notes' ? { ...card, width: 6, height: recentNotesAutoHeight, x: 0, sizeMode: 'auto' } : card);
+      return pushDashboardCardCollisions(resized, 'notes');
+    });
+    setLayoutNotice('最近笔记已恢复自动高度。');
   }
 
   function isDashboardPositionAvailable(cardId, position) {
@@ -2868,14 +2908,47 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
     'quick-note': <button className="quick-entry-card quick-note" onClick={onOpenNotes}><span><NotebookPen size={21} /></span><strong>写点东西</strong><small>记录此刻的想法与灵感</small></button>,
     websites: <WebsiteQuickLinks onOpenWebsites={onOpenWebsites} onAddWebsite={onAddWebsite} />,
     upcoming: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-purple"><Sparkles size={18} /></span><h2>未来任务</h2></div><button className="section-link" onClick={onOpenTasks}>管理任务 <ArrowRight size={15} /></button></div>{upcomingTasks.length === 0 ? <div className="dashboard-empty">暂时没有未来任务，可以在任务中心添加长期计划。</div> : <div className="long-term-grid">{upcomingTasks.map((task, index) => <article className={`long-term-card accent-${index + 1}`} key={task.id}><div className="long-term-card-top"><span className="long-term-icon"><Clock3 size={18} /></span><span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span></div><h3>{task.title}</h3><p>{task.description || '保持推进，一点点完成这个计划。'}</p><div className="long-term-meta"><strong>{getLabel(statusOptions, task.status)}</strong><span>{formatDate(task.task_date)}</span></div><div className="progress-track"><div style={{ width: task.status === 'in_progress' ? '60%' : task.status === 'stalled' ? '24%' : '12%' }} /></div></article>)}</div>}</section>,
-    notes: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-blue"><Clock3 size={18} /></span><h2>最近笔记</h2></div><button className="section-link" onClick={onOpenNotes}>全部笔记 <ArrowRight size={15} /></button></div>{recentNotes.length === 0 ? <div className="dashboard-empty">还没有笔记，点击“写点东西”记录第一条内容。</div> : <div className="recent-notes-grid">{recentNotes.map((note, index) => <button className={`recent-note-card note-color-${index + 1}`} key={note.id} onClick={onOpenNotes}><span className="note-color-block"><span className="note-cover-icon" aria-hidden="true">{['📝', '💡', '📚'][index % 3]}</span><span className={note.visibility === 'public' ? 'note-visibility-pill public' : 'note-visibility-pill'}>{note.visibility === 'public' ? '公开' : '私密'}</span></span><strong>{note.title}</strong><small>{new Date(note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small></button>)}</div>}</section>,
+    notes: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-blue"><Clock3 size={18} /></span><h2>最近笔记</h2></div><button className="section-link" onClick={onOpenNotes}>全部笔记 <ArrowRight size={15} /></button></div>{recentNotes.length === 0 ? <div className="dashboard-empty">还没有笔记，点击“写点东西”记录第一条内容。</div> : <div className="recent-notes-grid">{recentNotes.map((note, index) => <button className={`recent-note-card ${note.card_cover_visible ? 'has-note-cover' : 'without-note-cover'} note-color-${index + 1}`} key={note.id} onClick={onOpenNotes}>{note.card_cover_visible ? <span className="note-color-block"><span className="note-cover-icon" aria-hidden="true">{['📝', '💡', '📚'][index % 3]}</span><span className={note.visibility === 'public' ? 'note-visibility-pill public' : 'note-visibility-pill'}>{note.visibility === 'public' ? '公开' : '私密'}</span></span> : null}<strong>{note.title}</strong><small>{new Date(note.updated_at ?? note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small></button>)}</div>}</section>,
   };
 
   return (
     <div className="dashboard-home dashboard-card-home">
-      <header className="dashboard-layout-heading"><div><p>我的首页</p><h1>{isLayoutEditing ? '正在编辑卡片布局' : '把常用内容放在顺手的位置'}</h1></div><button className={isLayoutEditing ? 'dashboard-layout-button active' : 'dashboard-layout-button'} type="button" onClick={() => setIsLayoutEditing((editing) => !editing)}>{isLayoutEditing ? <><Check size={17} />完成编辑</> : <><SlidersHorizontal size={17} />编辑首页</>}</button></header>
-      {isLayoutEditing && <section className="dashboard-layout-editor" aria-label="首页卡片设置"><div><strong>按住卡片右上角的手柄，自由拖到任何空白格子</strong><span>卡片会固定在放下的位置，空位不会自动补齐；变大时会自动下推相撞卡片。</span></div><button type="button" onClick={() => setDashboardCards(defaultDashboardCards)}>恢复默认布局</button>{layoutNotice && <p className="dashboard-layout-notice" role="status">{layoutNotice}</p>}<div className="dashboard-layout-editor-list">{dashboardCards.map((card) => <label key={card.id}><span>{card.label}</span><select value={`${card.width}x${card.height}`} onChange={(event) => { const [width, height] = event.target.value.split('x').map(Number); resizeDashboardCard(card.id, width, height); }}>{getDashboardSizeOptions(card).map((size) => <option value={`${size.width}x${size.height}`} key={size.label}>{size.label}</option>)}</select><button type="button" onClick={() => updateDashboardCard(card.id, { visible: !card.visible })}>{card.visible ? '显示中' : '已隐藏'}</button></label>)}</div></section>}
-      <div className={isLayoutEditing ? 'dashboard-card-grid is-editing' : 'dashboard-card-grid'} ref={dashboardGridRef}>{isLayoutEditing && <div className="dashboard-grid-dots" aria-hidden="true">{Array.from({ length: dashboardGridRows * 6 }, (_, index) => <span className="dashboard-grid-dot" style={getDashboardDotStyle(index)} key={index} />)}</div>}{dashboardCards.filter((card) => card.visible).map((card) => <article className={`${draggedCardId === card.id ? 'dashboard-card is-dragging' : 'dashboard-card'} dashboard-card-${card.id}${card.width === 1 && card.height === 1 ? ' dashboard-card-compact' : ''}`} key={card.id} style={getDashboardCardStyle(card)}>{isLayoutEditing && <button className="dashboard-card-drag-handle" type="button" aria-label={`拖动 ${card.label}`} title="按住并拖动卡片" onPointerDown={(event) => startDashboardDrag(event, card)} onPointerMove={previewDashboardDrag} onPointerUp={finishDashboardDrag} onPointerCancel={finishDashboardDrag}>⋮⋮</button>}{cards[card.id]}</article>)}</div>
+      <header className="dashboard-layout-heading"><button className={isLayoutEditing ? 'dashboard-layout-button active' : 'dashboard-layout-button'} type="button" onClick={() => setIsLayoutEditing((editing) => !editing)}>{isLayoutEditing ? <><Check size={17} />完成编辑</> : <><SlidersHorizontal size={17} />编辑首页</>}</button></header>
+      {isLayoutEditing && (
+        <section className="dashboard-layout-editor" aria-label="首页卡片设置">
+          <div><strong>按住卡片右上角的手柄，自由拖到任何空白格子</strong><span>卡片会固定在放下的位置，空位不会自动补齐；变大时会自动下推相撞卡片。</span></div>
+          <button type="button" onClick={() => setDashboardCards(defaultDashboardCards)}>恢复默认布局</button>
+          {layoutNotice && <p className="dashboard-layout-notice" role="status">{layoutNotice}</p>}
+          <div className="dashboard-layout-editor-list">
+            {dashboardCards.map((card) => {
+              const usesAutoNoteSize = card.id === 'notes' && card.sizeMode !== 'custom';
+              return (
+                <label key={card.id}>
+                  <span>{card.label}</span>
+                  <select
+                    value={usesAutoNoteSize ? 'auto' : `${card.width}x${card.height}`}
+                    aria-label={`${card.label}的尺寸`}
+                    title={`卡片尺寸：${card.width} 列 × ${card.height} 行`}
+                    onChange={(event) => {
+                      if (card.id === 'notes' && event.target.value === 'auto') {
+                        restoreNotesAutoSize();
+                        return;
+                      }
+                      const [width, height] = event.target.value.split('x').map(Number);
+                      resizeDashboardCard(card.id, width, height);
+                    }}
+                  >
+                    {card.id === 'notes' && <option value="auto">自动</option>}
+                    {getDashboardSizeOptions(card).map((size) => <option value={`${size.width}x${size.height}`} key={size.label}>{size.label}</option>)}
+                  </select>
+                  <button className="dashboard-card-visibility-toggle" type="button" onClick={() => updateDashboardCard(card.id, { visible: !card.visible })} aria-label={card.visible ? `隐藏${card.label}` : `显示${card.label}`} title={card.visible ? '隐藏卡片' : '显示卡片'}>{card.visible ? <Eye size={17} /> : <EyeOff size={17} />}</button>
+                </label>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      <div className={isLayoutEditing ? 'dashboard-card-grid is-editing' : 'dashboard-card-grid'} ref={dashboardGridRef}>{isLayoutEditing && <div className="dashboard-grid-dots" aria-hidden="true">{Array.from({ length: dashboardGridRows * 6 }, (_, index) => <span className="dashboard-grid-dot" style={getDashboardDotStyle(index)} key={index} />)}</div>}{dashboardCards.filter((card) => card.visible).map((card) => <article className={`${draggedCardId === card.id ? 'dashboard-card is-dragging' : 'dashboard-card'} dashboard-card-${card.id}${card.id === 'notes' && card.sizeMode !== 'custom' ? ' dashboard-card-auto-size' : ''}${card.width === 1 && card.height === 1 ? ' dashboard-card-compact' : ''}`} key={card.id} style={getDashboardCardStyle(card)}>{isLayoutEditing && <button className="dashboard-card-drag-handle" type="button" aria-label={`拖动 ${card.label}`} title="按住并拖动卡片" onPointerDown={(event) => startDashboardDrag(event, card)} onPointerMove={previewDashboardDrag} onPointerUp={finishDashboardDrag} onPointerCancel={finishDashboardDrag}><GripVertical size={18} strokeWidth={2.5} aria-hidden="true" /></button>}{cards[card.id]}</article>)}</div>
     </div>
   );
 }
@@ -3231,7 +3304,8 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
       return;
     }
 
-    setNotes((currentNotes) => currentNotes.map((item) => (item.id === note.id ? data : item)));
+    const updatedAt = new Date().toISOString();
+    setNotes((currentNotes) => currentNotes.map((item) => (item.id === note.id ? { ...data, updated_at: updatedAt } : item)));
     cancelEditNote();
     setMessage('笔记已更新。');
   }
@@ -3374,7 +3448,7 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
                         </div>
                       )}
                     </div>
-                    {note.content && <RichNotePreview className="note-card-content" content={note.content} />}
+                    {note.content && <p className="note-card-content">{getRichNotePlainText(note.content)}</p>}
                     <div className="tag-row">
                       <span className={note.visibility === 'public' ? 'tag public' : 'tag'}>{note.visibility === 'public' ? '公开' : '私密'}</span>
                       <span>{new Date(note.created_at).toLocaleString('zh-CN')}</span>
