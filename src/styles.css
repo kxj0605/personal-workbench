@@ -6269,12 +6269,69 @@ button.calendar-range-event:focus-visible,
 }
 
 .workspace-content .matrix-grid {
+  position: relative;
   gap: 20px;
 }
 
 .workspace-content .matrix-cell {
+  position: relative;
+  z-index: 1;
   min-height: 390px;
   padding: 28px;
+}
+
+.matrix-coordinate-axes {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  color: rgba(17, 24, 39, 0.68);
+  pointer-events: none;
+}
+
+.matrix-coordinate-axis {
+  position: absolute;
+  display: block;
+  background: currentColor;
+}
+
+.matrix-coordinate-axis.horizontal {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.matrix-coordinate-axis.vertical {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.matrix-coordinate-axis.horizontal::after,
+.matrix-coordinate-axis.vertical::after {
+  position: absolute;
+  content: '';
+}
+
+.matrix-coordinate-axis.horizontal::after {
+  top: 50%;
+  right: -1px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid currentColor;
+  transform: translateY(-50%);
+}
+
+.matrix-coordinate-axis.vertical::after {
+  top: -1px;
+  left: 50%;
+  border-right: 6px solid transparent;
+  border-bottom: 9px solid currentColor;
+  border-left: 6px solid transparent;
+  transform: translateX(-50%);
 }
 
 .workspace-content .matrix-heading {
@@ -10151,6 +10208,31 @@ button.calendar-range-event:focus-visible,
   font-weight: 800;
 }
 
+.emotion-curve-time-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+}
+
+.emotion-curve-time-range > span {
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.emotion-curve-idea .emotion-curve-time-range input {
+  padding-right: 4px;
+  padding-left: 4px;
+  text-align: center;
+}
+
+.emotion-curve-time-range input[readonly] {
+  background: rgba(234, 243, 255, 0.56);
+  color: var(--ws-text-soft);
+  cursor: default;
+}
+
 .emotion-curve-idea input,
 .emotion-curve-idea textarea {
   width: 100%;
@@ -10201,6 +10283,18 @@ button.calendar-range-event:focus-visible,
   stroke: rgba(17, 24, 39, 0.08);
   stroke-dasharray: 5 8;
   stroke-width: 1;
+  transition: stroke 160ms ease, stroke-width 160ms ease;
+}
+
+.emotion-curve-grid-line.zero {
+  stroke: rgba(57, 118, 213, 0.3);
+  stroke-dasharray: none;
+  stroke-width: 1.25;
+}
+
+.emotion-curve-grid-line.active {
+  stroke: #e5b800;
+  stroke-width: 1.75;
 }
 
 .emotion-curve-path {
@@ -10223,9 +10317,20 @@ button.calendar-range-event:focus-visible,
   pointer-events: none;
 }
 
-.emotion-curve-axis-happy { top: 8px; }
-.emotion-curve-axis-calm { top: calc(50% - 12px); }
-.emotion-curve-axis-sad { bottom: 8px; }
+.emotion-curve-axis-tick {
+  min-width: 26px;
+  box-sizing: border-box;
+  padding: 2px 5px;
+  transform: translateY(-50%);
+  text-align: center;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.emotion-curve-axis-tick.active {
+  background: rgba(255, 242, 222, 0.96);
+  color: #a96a00;
+  box-shadow: 0 3px 10px rgba(201, 120, 8, 0.16);
+}
 
 .emotion-curve-crosshair,
 .emotion-curve-crosshair span {
@@ -10282,6 +10387,37 @@ button.calendar-range-event:focus-visible,
 .emotion-curve-node.selected {
   outline: none;
   transform: scale(1.06);
+}
+
+.emotion-curve-node.is-dragging {
+  z-index: 4;
+  transform: scale(1.14);
+}
+
+.emotion-curve-node-value {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 4px);
+  min-width: 24px;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 3px 10px rgba(52, 63, 84, 0.14);
+  color: #a96a00;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  transform: translateY(-50%) scale(0.88);
+  animation: emotion-curve-value-in 160ms ease forwards;
+}
+
+.emotion-curve-node.value-left .emotion-curve-node-value {
+  right: calc(100% + 4px);
+  left: auto;
+}
+
+@keyframes emotion-curve-value-in {
+  to { transform: translateY(-50%) scale(1); }
 }
 
 .emotion-curve-x-axis button {
@@ -11600,5 +11736,11 @@ button.calendar-range-event:focus-visible,
 
   .task-toolbar .workspace-main-action {
     width: 100%;
+  }
+}
+
+@media (max-width: 920px) {
+  .matrix-coordinate-axes {
+    display: none;
   }
 }

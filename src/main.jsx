@@ -851,21 +851,25 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [structureMode, setStructureMode] = React.useState('shots');
   const createEmotionCurveNode = (id, level = 0) => ({
     id,
+    startTime: id === 1 ? '00:00' : '',
+    endTime: '',
     phase: '',
     range: '',
     idea: '',
     level,
   });
   const createDefaultEmotionCurveNodes = () => [
-    createEmotionCurveNode(1, 1),
-    createEmotionCurveNode(2, -1),
-    createEmotionCurveNode(3, 2),
+    createEmotionCurveNode(1, 2),
+    createEmotionCurveNode(2, -2),
+    createEmotionCurveNode(3, 3),
     createEmotionCurveNode(4, 0),
   ];
   const [emotionCurveNodes, setEmotionCurveNodes] = React.useState(createDefaultEmotionCurveNodes);
   const [selectedEmotionCurveNodeId, setSelectedEmotionCurveNodeId] = React.useState(1);
   const [hasEditedEmotionCurve, setHasEditedEmotionCurve] = React.useState(false);
   const [emotionCurvePointer, setEmotionCurvePointer] = React.useState(null);
+  const [draggingEmotionCurveNodeId, setDraggingEmotionCurveNodeId] = React.useState(null);
+  const emotionCurveLevelLimit = 5;
   const createCoreEventChainRow = (id) => ({
     id,
     startName: `core-event-chain-${id}-start`,
@@ -887,18 +891,31 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [isDraftReady, setIsDraftReady] = React.useState(false);
 
   const getEmotionLabel = (level) => {
-    if (level >= 2) return '很开心';
-    if (level === 1) return '开心';
-    if (level === 0) return '平静';
-    if (level === -1) return '难过';
-    return '很伤心';
+    if (level >= 5) return '兴奋';
+    if (level >= 3) return '喜悦';
+    if (level >= 1) return '紧张';
+    if (level === 0) return '平淡';
+    if (level >= -2) return '压抑';
+    if (level >= -4) return '悲伤';
+    return '恐惧';
   };
 
-  const getEmotionEmoji = (level) => ['😢', '😞', '😟', '😐', '🙂', '😄', '😁'][level + 3] || '😐';
+  const getEmotionEmoji = (level) => ['😭', '😨', '😢', '😞', '😔', '😐', '😬', '🙂', '😄', '😆', '🤩'][level + emotionCurveLevelLimit] || '😐';
 
-  const getEmotionCurveText = () => emotionCurveNodes.map((node, index) => (
-    `${node.phase.trim() || `节点 ${index + 1}`}${node.range.trim() ? `（${node.range.trim()}）` : ''}\n想法：${node.idea.trim() || '（未填写）'}\n情绪：${getEmotionLabel(node.level)}`
-  )).join('\n\n');
+  const getEmotionTimeRange = (node, index) => ({
+    start: index === 0 ? (node.startTime || '00:00') : (emotionCurveNodes[index - 1]?.endTime || ''),
+    end: node.endTime || '',
+  });
+
+  const formatEmotionTimeInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+  };
+
+  const getEmotionCurveText = () => emotionCurveNodes.map((node, index) => {
+    const timeRange = getEmotionTimeRange(node, index);
+    return `时间段：${timeRange.start || '未填写'} ~ ${timeRange.end || '未填写'}${node.range.trim() ? `（${node.range.trim()}）` : ''}\n想法：${node.idea.trim() || '（未填写）'}\n情绪：${getEmotionLabel(node.level)}`;
+  }).join('\n\n');
 
   const updateEmotionCurveNode = (id, changes) => {
     setHasEditedEmotionCurve(true);
@@ -942,11 +959,17 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
 
   const renderEmotionCurveEditor = (position) => {
     const activeNode = emotionCurveNodes.find((node) => node.id === selectedEmotionCurveNodeId) || emotionCurveNodes[0];
+    const activeNodeIndex = emotionCurveNodes.findIndex((node) => node.id === activeNode?.id);
+    const activeNodeTimeRange = getEmotionTimeRange(activeNode, activeNodeIndex);
+    const draggedEmotionCurveNode = emotionCurveNodes.find((node) => node.id === draggingEmotionCurveNodeId);
+    const draggedEmotionLevel = draggedEmotionCurveNode?.level;
+    const emotionCurveLevels = Array.from({ length: (emotionCurveLevelLimit * 2) + 1 }, (_, index) => emotionCurveLevelLimit - index);
     const emotionCurveColumnWidth = emotionCurveNodes.length <= 5 ? 164 : emotionCurveNodes.length <= 8 ? 120 : 104;
     const chartWidth = Math.max(640, emotionCurveNodes.length * emotionCurveColumnWidth);
+    const getLevelY = (level) => 150 - (level * 24);
     const getPoint = (node, index) => {
       const x = ((index + 0.5) / emotionCurveNodes.length) * 1000;
-      const y = 150 - (node.level * 40);
+      const y = getLevelY(node.level);
       return { x, y };
     };
     const curvePath = emotionCurveNodes.map(getPoint).reduce((path, point, index, points) => {
@@ -958,16 +981,19 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     const updateLevelFromPointer = (id, clientY) => {
       const rect = emotionCurveGraphRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const percent = Math.max(8, Math.min(92, ((clientY - rect.top) / rect.height) * 100));
-      const level = Math.max(-3, Math.min(3, Math.round((50 - percent) / 13.34)));
+      const percent = Math.max(10, Math.min(90, ((clientY - rect.top) / rect.height) * 100));
+      const level = Math.max(-emotionCurveLevelLimit, Math.min(emotionCurveLevelLimit, Math.round((50 - percent) / 8)));
       updateEmotionCurveNode(id, { level });
     };
     const startDrag = (event, id) => {
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setSelectedEmotionCurveNodeId(id);
+      setDraggingEmotionCurveNodeId(id);
       setEmotionCurvePointer(null);
       updateLevelFromPointer(id, event.clientY);
     };
+
+    const stopDrag = () => setDraggingEmotionCurveNodeId(null);
     const updateEmotionCurvePointer = (event) => {
       if (event.target.closest('.emotion-curve-node')) {
         setEmotionCurvePointer(null);
@@ -986,31 +1012,28 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         <div className="emotion-curve-heading">
           <div>
             <strong id="emotion-curve-title">{position}. 观众情绪曲线 <span className="script-breakdown-priority-star" role="img" aria-label="重点维度">⭐</span></strong>
-            <span>用节点标记阶段、想法和观众情绪；拖动 Emoji 上下调整强弱。</span>
+            <span>用节点标记时间戳、想法和观众情绪；拖动 Emoji 上下调整强弱。</span>
+            <span className="emotion-curve-axis-key">纵轴：+5 正向（兴奋、喜悦、紧张） · 0 平淡 · -5 负向（压抑、悲伤、恐惧）</span>
           </div>
-          <span className="emotion-curve-current" aria-live="polite">当前：{activeNode?.phase.trim() || `节点 ${emotionCurveNodes.findIndex((node) => node.id === activeNode?.id) + 1}`} · {getEmotionLabel(activeNode?.level || 0)}</span>
+          <span className="emotion-curve-current" aria-live="polite">当前：{activeNodeTimeRange.start || activeNodeTimeRange.end ? `${activeNodeTimeRange.start || '--:--'} ~ ${activeNodeTimeRange.end || '--:--'}` : `节点 ${activeNodeIndex + 1}`} · {getEmotionLabel(activeNode?.level || 0)}</span>
+        </div>
+        <div className="emotion-curve-actions" aria-label="情绪曲线节点操作">
+          <button type="button" className="emotion-curve-add" onClick={addEmotionCurveNode}>＋ 新增节点</button>
+          <button type="button" onClick={removeEmotionCurveNode} disabled={emotionCurveNodes.length <= 2}>删除节点</button>
+          <button type="button" onClick={() => moveEmotionCurveNode(-1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) <= 0}>← 左移</button>
+          <button type="button" onClick={() => moveEmotionCurveNode(1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) >= emotionCurveNodes.length - 1}>右移 →</button>
         </div>
         <div className="emotion-curve-scroll">
           <div className="emotion-curve-canvas" style={{ minWidth: `${chartWidth}px` }}>
-            <div className="emotion-curve-ideas" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(${emotionCurveColumnWidth}px, 1fr))` }}>
-              {emotionCurveNodes.map((node, index) => (
-                <label className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-idea selected' : 'emotion-curve-idea'} key={node.id}>
-                  <span>想法 · 节点 {index + 1}</span>
-                  <input value={node.phase} placeholder="阶段名称" aria-label={`节点 ${index + 1} 的阶段名称`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { phase: event.target.value })} />
-                  <input value={node.range} placeholder="镜头范围（可选）" aria-label={`节点 ${index + 1} 的镜头范围`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { range: event.target.value })} />
-                  <textarea value={node.idea} rows={2} placeholder="这一步让观众感到什么？" aria-label={`节点 ${index + 1} 的想法`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { idea: event.target.value })} />
-                </label>
-              ))}
-            </div>
             <div
               className="emotion-curve-graph"
               ref={emotionCurveGraphRef}
               onPointerMove={updateEmotionCurvePointer}
               onPointerLeave={() => setEmotionCurvePointer(null)}
             >
-              <div className="emotion-curve-axis-label emotion-curve-axis-happy">开心</div>
-              <div className="emotion-curve-axis-label emotion-curve-axis-calm">平静</div>
-              <div className="emotion-curve-axis-label emotion-curve-axis-sad">伤心</div>
+              {emotionCurveLevels.map((level) => (
+                <div className={`emotion-curve-axis-label emotion-curve-axis-tick${draggingEmotionCurveNodeId && draggedEmotionLevel === level ? ' active' : ''}`} style={{ top: `${(getLevelY(level) / 300) * 100}%` }} key={level}>{level > 0 ? `+${level}` : level}</div>
+              ))}
               {emotionCurvePointer ? (
                 <div className="emotion-curve-crosshair" aria-hidden="true">
                   <span className="emotion-curve-crosshair-vertical" style={{ left: `${emotionCurvePointer.x}%` }} />
@@ -1018,43 +1041,60 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                 </div>
               ) : null}
               <svg className="emotion-curve-svg" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
-                <path className="emotion-curve-grid-line" d="M 0 30 H 1000 M 0 150 H 1000 M 0 270 H 1000" />
+                {emotionCurveLevels.map((level) => <path className={`emotion-curve-grid-line${level === 0 ? ' zero' : ''}${draggingEmotionCurveNodeId && draggedEmotionLevel === level ? ' active' : ''}`} d={`M 0 ${getLevelY(level)} H 1000`} key={level} />)}
                 <path className="emotion-curve-path" d={curvePath} />
               </svg>
               {emotionCurveNodes.map((node, index) => {
                 const point = getPoint(node, index);
+                const timeRange = getEmotionTimeRange(node, index);
+                const isDragging = node.id === draggingEmotionCurveNodeId;
                 return (
                   <button
-                    className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-node selected' : 'emotion-curve-node'}
+                    className={`emotion-curve-node${node.id === selectedEmotionCurveNodeId ? ' selected' : ''}${isDragging ? ' is-dragging' : ''}${index / emotionCurveNodes.length > 0.72 ? ' value-left' : ''}`}
                     key={node.id}
                     type="button"
                     style={{ left: `${(point.x / 1000) * 100}%`, top: `${(point.y / 300) * 100}%` }}
-                    aria-label={`${node.phase.trim() || `节点 ${index + 1}`}，${getEmotionLabel(node.level)}。上下拖动调整情绪强弱。`}
+                    aria-label={`${timeRange.start || timeRange.end ? `${timeRange.start || '--:--'} 到 ${timeRange.end || '--:--'}` : `节点 ${index + 1}`}，${getEmotionLabel(node.level)}。上下拖动调整情绪强弱。`}
                     onPointerEnter={() => setEmotionCurvePointer(null)}
                     onPointerDown={(event) => startDrag(event, node.id)}
                     onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) updateLevelFromPointer(node.id, event.clientY); }}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    onLostPointerCapture={stopDrag}
                     onKeyDown={(event) => {
                       if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                         event.preventDefault();
-                        updateEmotionCurveNode(node.id, { level: Math.max(-3, Math.min(3, node.level + (event.key === 'ArrowUp' ? 1 : -1))) });
+                        updateEmotionCurveNode(node.id, { level: Math.max(-emotionCurveLevelLimit, Math.min(emotionCurveLevelLimit, node.level + (event.key === 'ArrowUp' ? 1 : -1))) });
                       }
                     }}
                   >
                     <span aria-hidden="true">{getEmotionEmoji(node.level)}</span>
+                    {isDragging ? <span className="emotion-curve-node-value" aria-live="polite">{node.level > 0 ? `+${node.level}` : node.level}</span> : null}
                   </button>
                 );
               })}
             </div>
             <div className="emotion-curve-x-axis" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(${emotionCurveColumnWidth}px, 1fr))` }}>
-              {emotionCurveNodes.map((node, index) => <button type="button" className={node.id === selectedEmotionCurveNodeId ? 'selected' : undefined} key={node.id} onClick={() => setSelectedEmotionCurveNodeId(node.id)}>{node.phase.trim() || `节点 ${index + 1}`}{node.range.trim() ? <small>{node.range}</small> : null}</button>)}
+              {emotionCurveNodes.map((node, index) => {
+                const timeRange = getEmotionTimeRange(node, index);
+                return <button type="button" className={node.id === selectedEmotionCurveNodeId ? 'selected' : undefined} key={node.id} onClick={() => setSelectedEmotionCurveNodeId(node.id)}>{timeRange.start || timeRange.end ? `${timeRange.start || '--:--'} ~ ${timeRange.end || '--:--'}` : `节点 ${index + 1}`}{node.range.trim() ? <small>{node.range}</small> : null}</button>;
+              })}
+            </div>
+            <div className="emotion-curve-ideas" style={{ gridTemplateColumns: `repeat(${emotionCurveNodes.length}, minmax(${emotionCurveColumnWidth}px, 1fr))` }}>
+              {emotionCurveNodes.map((node, index) => (
+                <label className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-idea selected' : 'emotion-curve-idea'} key={node.id}>
+                  <span>想法 · 节点 {index + 1}</span>
+                  <div className="emotion-curve-time-range" aria-label={`节点 ${index + 1} 的时间段`}>
+                    <input value={index === 0 ? node.startTime : (emotionCurveNodes[index - 1]?.endTime || '')} placeholder={index === 0 ? '00:00' : '承接'} inputMode="numeric" maxLength={5} aria-label={`节点 ${index + 1} 的开始时间${index === 0 ? '' : '，自动承接上一节点的结束时间'}`} title={index === 0 ? '只输入数字，例如 0000 会显示为 00:00' : '自动承接上一节点的结束时间'} readOnly={index > 0} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={index === 0 ? (event) => updateEmotionCurveNode(node.id, { startTime: formatEmotionTimeInput(event.target.value) }) : undefined} />
+                    <span aria-hidden="true">~</span>
+                    <input value={node.endTime} placeholder="0330" inputMode="numeric" maxLength={5} aria-label={`节点 ${index + 1} 的结束时间`} title="只输入数字，例如 0330 会自动显示为 03:30" onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { endTime: formatEmotionTimeInput(event.target.value) })} />
+                  </div>
+                  <input value={node.range} placeholder="镜头范围（可选）" aria-label={`节点 ${index + 1} 的镜头范围`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { range: event.target.value })} />
+                  <textarea value={node.idea} rows={2} placeholder="这一步让观众感到什么？" aria-label={`节点 ${index + 1} 的想法`} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { idea: event.target.value })} />
+                </label>
+              ))}
             </div>
           </div>
-        </div>
-        <div className="emotion-curve-actions" aria-label="情绪曲线节点操作">
-          <button type="button" className="emotion-curve-add" onClick={addEmotionCurveNode}>＋ 新增节点</button>
-          <button type="button" onClick={removeEmotionCurveNode} disabled={emotionCurveNodes.length <= 2}>删除节点</button>
-          <button type="button" onClick={() => moveEmotionCurveNode(-1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) <= 0}>← 左移</button>
-          <button type="button" onClick={() => moveEmotionCurveNode(1)} disabled={emotionCurveNodes.findIndex((node) => node.id === selectedEmotionCurveNodeId) >= emotionCurveNodes.length - 1}>右移 →</button>
         </div>
       </section>
     );
@@ -1619,12 +1659,14 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
             if (Array.isArray(restoredEmotionNodes) && restoredEmotionNodes.length >= 2) {
               const safeNodes = restoredEmotionNodes
                 .filter((node) => Number.isInteger(node?.id))
-                .map((node) => ({
+                .map((node, index) => ({
                   id: node.id,
+                  startTime: typeof node.startTime === 'string' ? node.startTime : (index === 0 ? '00:00' : ''),
+                  endTime: typeof node.endTime === 'string' ? node.endTime : (typeof node.phase === 'string' ? node.phase : ''),
                   phase: typeof node.phase === 'string' ? node.phase : '',
                   range: typeof node.range === 'string' ? node.range : '',
                   idea: typeof node.idea === 'string' ? node.idea : '',
-                  level: Math.max(-3, Math.min(3, Number.isFinite(node.level) ? node.level : 0)),
+                  level: Math.max(-emotionCurveLevelLimit, Math.min(emotionCurveLevelLimit, Number.isFinite(node.level) ? node.level : 0)),
                 }));
               if (safeNodes.length >= 2) {
                 setEmotionCurveNodes(safeNodes);
@@ -4869,6 +4911,10 @@ function parseCalendarDateInput(value) {
 function MatrixPanel({ tasks, setTasks, setMessage, categoryOptions, categoryDefinitions, onOpenCategorySettings }) {
   return (
     <div className="matrix-grid">
+      <div className="matrix-coordinate-axes" aria-hidden="true">
+        <span className="matrix-coordinate-axis horizontal" />
+        <span className="matrix-coordinate-axis vertical" />
+      </div>
       {matrixOptions.map((matrix) => {
         const matrixTasks = tasks.filter((task) => task.matrix_category === matrix.value && task.status !== 'completed');
         return (
