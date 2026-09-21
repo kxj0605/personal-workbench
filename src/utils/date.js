@@ -40,15 +40,18 @@ export function formatFullDate() {
   return `${monthDay}，${weekday}`;
 }
 
-export function getMonthDays(currentDate) {
+export function getMonthDays(currentDate, { fixedWeeks = true } = {}) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1);
   const start = new Date(firstDay);
   const weekday = firstDay.getDay() || 7;
   start.setDate(firstDay.getDate() - weekday + 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadingDays = weekday - 1;
+  const totalDays = fixedWeeks ? 42 : Math.ceil((leadingDays + daysInMonth) / 7) * 7;
 
-  return Array.from({ length: 42 }, (_, index) => {
+  return Array.from({ length: totalDays }, (_, index) => {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
     return {

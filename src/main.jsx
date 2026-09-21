@@ -62,6 +62,7 @@ import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
 import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
+import { FocusTimerCard } from './components/FocusTimerCard';
 import { getBenchmarkMetadataFields } from './components/BenchmarkVideoDetails';
 import {
   formatDate,
@@ -805,6 +806,7 @@ function parseDouyinAuthorProfile(value) {
 }
 
 const scriptBreakdownNavItems = [
+  { id: 'script-breakdown-timeline', label: '视频拆解时间轴' },
   { id: 'script-breakdown-video-type', label: '视频类型' },
   { id: 'script-breakdown-universal', label: '通用传播维度' },
   { id: 'script-breakdown-structure', label: '剧情结构' },
@@ -818,6 +820,55 @@ const breakdownStylePreviewOptions = [
   { id: 'paper', label: '方案 B · 轻纸研究', summary: '留白更多，阅读与思考更安静' },
   { id: 'timeline', label: '方案 C · 剪辑轨道', summary: '用柔紫轨道强调叙事步骤与进度' },
 ];
+
+const VIDEO_TIMELINE_DEFAULT_TYPES = [
+  { id: 'camera-wide', group: '镜头类', label: '全景', color: '#3976d5' },
+  { id: 'camera-close', group: '镜头类', label: '特写', color: '#3976d5' },
+  { id: 'camera-medium', group: '镜头类', label: '中景', color: '#3976d5' },
+  { id: 'camera-push', group: '镜头类', label: '推镜', color: '#3976d5' },
+  { id: 'camera-pull', group: '镜头类', label: '拉镜', color: '#3976d5' },
+  { id: 'camera-transition', group: '镜头类', label: '转场', color: '#3976d5' },
+  { id: 'camera-turn', group: '镜头类', label: '转折镜头', color: '#3976d5' },
+  { id: 'story-hook', group: '叙事类', label: '钩子', color: '#7647c8' },
+  { id: 'story-setup', group: '叙事类', label: '铺垫', color: '#7647c8' },
+  { id: 'story-reversal', group: '叙事类', label: '反转', color: '#7647c8' },
+  { id: 'story-climax', group: '叙事类', label: '高潮', color: '#7647c8' },
+  { id: 'story-ending', group: '叙事类', label: '收尾', color: '#7647c8' },
+  { id: 'story-foreshadowing', group: '叙事类', label: '伏笔', color: '#7647c8' },
+  { id: 'sound-dialogue', group: '声音类', label: '台词点', color: '#c97808' },
+  { id: 'sound-bgm', group: '声音类', label: 'BGM 切入', color: '#c97808' },
+  { id: 'sound-effect', group: '声音类', label: '音效', color: '#c97808' },
+  { id: 'sound-silence', group: '声音类', label: '静音点', color: '#c97808' },
+  { id: 'text-subtitle', group: '文本类', label: '字幕', color: '#247b55' },
+  { id: 'text-styled', group: '文本类', label: '花字', color: '#247b55' },
+  { id: 'text-card', group: '文本类', label: '信息卡片', color: '#247b55' },
+];
+
+const createVideoTimelineId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const VIDEO_TIMELINE_DRAG_STEP_SECONDS = 1;
+const VIDEO_TIMELINE_RULER_INTERVAL_SECONDS = 30;
+const VIDEO_TIMELINE_MIN_VISIBLE_SECONDS = 60;
+const clampVideoTimelineTime = (value, duration) => Math.max(0, Math.min(duration, value));
+const snapVideoTimelineTime = (value) => Math.round(value / VIDEO_TIMELINE_DRAG_STEP_SECONDS) * VIDEO_TIMELINE_DRAG_STEP_SECONDS;
+const formatVideoTimelineTime = (value = 0) => {
+  const seconds = Math.max(0, snapVideoTimelineTime(Number(value) || 0));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds - (minutes * 60);
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+};
+const formatVideoTimelineRange = (start, end) => end !== null && end > start
+  ? `${formatVideoTimelineTime(start)} ~ ${formatVideoTimelineTime(end)}`
+  : formatVideoTimelineTime(start);
+const parseVideoTimelineTime = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, value);
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const timecodeMatch = normalized.match(/^(\d+):(\d{1,2})$/);
+  if (timecodeMatch) return (Number(timecodeMatch[1]) * 60) + Number(timecodeMatch[2]);
+  const decimalMinutes = Number(normalized);
+  return Number.isFinite(decimalMinutes) && decimalMinutes >= 0 ? decimalMinutes * 60 : null;
+};
 
 function ScriptBreakdownPanel({ collectionVideo = null }) {
   const breakdownStylePreview = import.meta.env.DEV && new URLSearchParams(window.location.search).has('style-preview');
@@ -870,6 +921,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [emotionCurvePointer, setEmotionCurvePointer] = React.useState(null);
   const [draggingEmotionCurveNodeId, setDraggingEmotionCurveNodeId] = React.useState(null);
   const emotionCurveLevelLimit = 5;
+  const [videoTimelineEntries, setVideoTimelineEntries] = React.useState([]);
+  const [videoTimelineTypes, setVideoTimelineTypes] = React.useState(VIDEO_TIMELINE_DEFAULT_TYPES);
+  const [videoTimelineDuration, setVideoTimelineDuration] = React.useState(60);
   const createCoreEventChainRow = (id) => ({
     id,
     startName: `core-event-chain-${id}-start`,
@@ -903,7 +957,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const getEmotionEmoji = (level) => ['😭', '😨', '😢', '😞', '😔', '😐', '😬', '🙂', '😄', '😆', '🤩'][level + emotionCurveLevelLimit] || '😐';
 
   const getEmotionTimeRange = (node, index) => ({
-    start: index === 0 ? (node.startTime || '00:00') : (emotionCurveNodes[index - 1]?.endTime || ''),
+    start: node.startTime || (index === 0 ? '00:00' : (emotionCurveNodes[index - 1]?.endTime || '')),
     end: node.endTime || '',
   });
 
@@ -1085,7 +1139,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                 <label className={node.id === selectedEmotionCurveNodeId ? 'emotion-curve-idea selected' : 'emotion-curve-idea'} key={node.id}>
                   <span>想法 · 节点 {index + 1}</span>
                   <div className="emotion-curve-time-range" aria-label={`节点 ${index + 1} 的时间段`}>
-                    <input value={index === 0 ? node.startTime : (emotionCurveNodes[index - 1]?.endTime || '')} placeholder={index === 0 ? '00:00' : '承接'} inputMode="numeric" maxLength={5} aria-label={`节点 ${index + 1} 的开始时间${index === 0 ? '' : '，自动承接上一节点的结束时间'}`} title={index === 0 ? '只输入数字，例如 0000 会显示为 00:00' : '自动承接上一节点的结束时间'} readOnly={index > 0} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={index === 0 ? (event) => updateEmotionCurveNode(node.id, { startTime: formatEmotionTimeInput(event.target.value) }) : undefined} />
+                    <input value={node.startTime || (index === 0 ? '00:00' : (emotionCurveNodes[index - 1]?.endTime || ''))} placeholder={index === 0 ? '00:00' : '承接'} inputMode="numeric" maxLength={5} aria-label={`节点 ${index + 1} 的开始时间${index === 0 ? '' : '，默认承接上一节点的结束时间'}`} title={node.startTime || index === 0 ? '只输入数字，例如 0000 会显示为 00:00' : '默认承接上一节点的结束时间'} readOnly={index > 0 && !node.startTime} onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { startTime: formatEmotionTimeInput(event.target.value) })} />
                     <span aria-hidden="true">~</span>
                     <input value={node.endTime} placeholder="0330" inputMode="numeric" maxLength={5} aria-label={`节点 ${index + 1} 的结束时间`} title="只输入数字，例如 0330 会自动显示为 03:30" onFocus={() => setSelectedEmotionCurveNodeId(node.id)} onChange={(event) => updateEmotionCurveNode(node.id, { endTime: formatEmotionTimeInput(event.target.value) })} />
                   </div>
@@ -1678,6 +1732,50 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
             // 情绪曲线草稿损坏时保留可编辑的默认节点。
           }
         }
+        if (typeof draft['video-timeline-entries'] === 'string') {
+          try {
+            const restoredTimelineEntries = JSON.parse(draft['video-timeline-entries']);
+            if (Array.isArray(restoredTimelineEntries)) {
+              setVideoTimelineEntries(restoredTimelineEntries
+                .filter((entry) => typeof entry?.id === 'string' || Number.isInteger(entry?.id))
+                .map((entry) => ({
+                  id: String(entry.id),
+                  typeId: typeof entry.typeId === 'string' ? entry.typeId : 'story-hook',
+                  start: Math.max(0, snapVideoTimelineTime(Number(entry.start) || 0)),
+                  end: Number.isFinite(entry.end) ? Math.max(0, snapVideoTimelineTime(entry.end)) : null,
+                  title: typeof entry.title === 'string' ? entry.title : '',
+                  description: typeof entry.description === 'string' ? entry.description : '',
+                  tags: typeof entry.tags === 'string' ? entry.tags : '',
+                  takeaway: typeof entry.takeaway === 'string' ? entry.takeaway : '',
+                  color: typeof entry.color === 'string' ? entry.color : '',
+                })));
+            }
+          } catch {
+            // 时间轴草稿损坏时保留空白时间轴。
+          }
+        }
+        if (typeof draft['video-timeline-types'] === 'string') {
+          try {
+            const restoredTimelineTypes = JSON.parse(draft['video-timeline-types']);
+            if (Array.isArray(restoredTimelineTypes) && restoredTimelineTypes.length) {
+              const safeTypes = restoredTimelineTypes
+                .filter((item) => typeof item?.id === 'string' && typeof item?.label === 'string')
+                .map((item) => ({
+                  id: item.id,
+                  group: typeof item.group === 'string' ? item.group : '自定义类型',
+                  label: item.label,
+                  color: typeof item.color === 'string' ? item.color : '#3976d5',
+                }));
+              if (safeTypes.length) setVideoTimelineTypes(safeTypes);
+            }
+          } catch {
+            // 类型草稿损坏时使用默认类型。
+          }
+        }
+        if (typeof draft['video-timeline-duration'] === 'string') {
+          const restoredDuration = Number(draft['video-timeline-duration']);
+          if (Number.isFinite(restoredDuration) && restoredDuration > 0) setVideoTimelineDuration(restoredDuration);
+        }
         const restoredBenchmarkVideoUrl = typeof draft['benchmark-video'] === 'string' ? draft['benchmark-video'] : '';
         setBenchmarkVideoUrl(restoredBenchmarkVideoUrl);
         setBenchmarkPlatform(detectBenchmarkPlatform(restoredBenchmarkVideoUrl));
@@ -1761,6 +1859,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
       formData.set('观众情绪曲线', getEmotionCurveText());
       formData.set('emotion-curve-nodes', JSON.stringify(emotionCurveNodes));
     }
+    formData.set('video-timeline-entries', JSON.stringify(videoTimelineEntries));
+    formData.set('video-timeline-types', JSON.stringify(videoTimelineTypes));
+    formData.set('video-timeline-duration', String(videoTimelineDuration));
     return formData;
   };
 
@@ -1787,6 +1888,24 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         formData.get(row.psychologyName)?.trim() || '（未填写）',
       ].map((value) => String(value).replaceAll('|', '\\|')).join(' | ')),
     ].map((row) => `| ${row} |`).join('\n');
+    const timelineTypeById = new Map(videoTimelineTypes.map((type) => [type.id, type]));
+    const videoTimelineTable = videoTimelineEntries.length ? [
+      '时间 | 类型 | 事件 | 说明 | 可借鉴做法',
+      '--- | --- | --- | --- | ---',
+      ...[...videoTimelineEntries].sort((first, second) => first.start - second.start).map((entry) => {
+        const type = timelineTypeById.get(entry.typeId);
+        const timeRange = entry.end !== null && entry.end > entry.start
+          ? formatVideoTimelineRange(entry.start, entry.end)
+          : formatVideoTimelineTime(entry.start);
+        return [
+          timeRange,
+          type?.label || '未分类',
+          entry.title || '（未命名事件）',
+          entry.description || '（未填写）',
+          entry.takeaway || '（未填写）',
+        ].map((value) => String(value).replaceAll('|', '\\|').replaceAll('\n', '<br>')).join(' | ');
+      }),
+    ].map((row) => `| ${row} |`).join('\n') : '（暂无时间轴事件）';
     const sections = fields.map((field, index) => `## ${index + 4}. ${field.title}\n\n${formData.get(field.title)?.trim() || '（未填写）'}`);
     const markdown = [
       `# ${title}`,
@@ -1798,6 +1917,10 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
       '### 视频资料',
       '',
       benchmarkDetails || '（未填写）',
+      '',
+      '## 视频拆解时间轴',
+      '',
+      videoTimelineTable,
       '',
       '## 1. 视频类型',
       '',
@@ -1826,10 +1949,13 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const persistDraft = (showNotice = false) => {
     try {
       const formValues = getFormValues();
-      const hasDraftContent = selectedVideoType || Object.entries(formValues).some(([name, value]) => (
+      const hasDraftContent = selectedVideoType || videoTimelineEntries.length > 0 || Object.entries(formValues).some(([name, value]) => (
         name !== 'video-type'
         && name !== 'structure-mode'
         && name !== 'core-event-chain-row-ids'
+        && name !== 'video-timeline-entries'
+        && name !== 'video-timeline-types'
+        && name !== 'video-timeline-duration'
         && typeof value === 'string'
         && value.trim()
       ));
@@ -1861,6 +1987,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     emotionCurveNodes,
     hasEditedEmotionCurve,
     isDraftReady,
+    videoTimelineDuration,
+    videoTimelineEntries,
+    videoTimelineTypes,
     selectedVideoType,
     structureMode,
     videoTypeValues,
@@ -1872,7 +2001,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     const saveBeforeLeaving = () => persistDraft();
     window.addEventListener('pagehide', saveBeforeLeaving);
     return () => window.removeEventListener('pagehide', saveBeforeLeaving);
-  }, [aiBreakdownValues, benchmarkVideoUrl, coreEventChainRows, emotionCurveNodes, hasEditedEmotionCurve, isDraftReady, selectedVideoType, structureMode, videoTypeValues]);
+  }, [aiBreakdownValues, benchmarkVideoUrl, coreEventChainRows, emotionCurveNodes, hasEditedEmotionCurve, isDraftReady, selectedVideoType, structureMode, videoTimelineDuration, videoTimelineEntries, videoTimelineTypes, videoTypeValues]);
 
   const fillBenchmarkMetadata = (pastedText) => {
     if (!formRef.current) return 0;
@@ -1996,10 +2125,13 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const archiveBreakdown = () => {
     const formValues = getFormValues();
     const title = formValues.title?.trim() || '未命名脚本拆解';
-    const hasContent = selectedVideoType || Object.entries(formValues).some(([name, value]) => (
+    const hasContent = selectedVideoType || videoTimelineEntries.length > 0 || Object.entries(formValues).some(([name, value]) => (
       name !== 'video-type'
       && name !== 'structure-mode'
       && name !== 'core-event-chain-row-ids'
+      && name !== 'video-timeline-entries'
+      && name !== 'video-timeline-types'
+      && name !== 'video-timeline-duration'
       && typeof value === 'string'
       && value.trim()
     ));
@@ -2050,6 +2182,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     setEmotionCurveNodes(createDefaultEmotionCurveNodes());
     setSelectedEmotionCurveNodeId(1);
     setHasEditedEmotionCurve(false);
+    setVideoTimelineEntries([]);
+    setVideoTimelineTypes(VIDEO_TIMELINE_DEFAULT_TYPES);
+    setVideoTimelineDuration(60);
     setAiBreakdownValues({});
     setAiDistributionSummary(null);
     setBenchmarkVideoUrl('');
@@ -2180,6 +2315,49 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     setIsExportOpen(false);
   };
 
+  const getTimelineSourceEntries = () => {
+    const formData = formRef.current ? new FormData(formRef.current) : null;
+    const emotionEntries = emotionCurveNodes.map((node, index) => {
+      const range = getEmotionTimeRange(node, index);
+      const start = parseVideoTimelineTime(range.start);
+      const end = parseVideoTimelineTime(range.end);
+      return start === null ? null : {
+        id: `emotion-${node.id}`,
+        kind: 'emotion',
+        start,
+        end: end !== null && end > start ? end : null,
+        label: node.idea?.trim() || `情绪节点 ${index + 1}`,
+      };
+    }).filter(Boolean);
+    const coreEntries = coreEventChainRows.map((row, index) => {
+      const start = parseVideoTimelineTime(formData?.get(row.timeStartName));
+      const end = parseVideoTimelineTime(formData?.get(row.timeEndName));
+      const label = formData?.get(row.contentName)?.trim() || `核心事件 ${index + 1}`;
+      return start === null ? null : {
+        id: `core-${row.id}`,
+        kind: 'core',
+        start,
+        end: end !== null && end > start ? end : null,
+        label,
+      };
+    }).filter(Boolean);
+    return [...emotionEntries, ...coreEntries];
+  };
+
+  const importTimelineEntryToEmotionCurve = (entry) => {
+    const nextId = Math.max(...emotionCurveNodes.map((node) => node.id), 0) + 1;
+    setHasEditedEmotionCurve(true);
+    setEmotionCurveNodes((nodes) => [...nodes, {
+      ...createEmotionCurveNode(nextId, 0),
+      startTime: formatVideoTimelineTime(entry.start),
+      endTime: entry.end !== null ? formatVideoTimelineTime(entry.end) : '',
+      range: '来自视频拆解时间轴',
+      idea: entry.title?.trim() || '时间轴事件',
+    }]);
+    setSelectedEmotionCurveNodeId(nextId);
+    setNotice(`已将「${entry.title?.trim() || '时间轴事件'}」导入情绪曲线`);
+  };
+
   return (
     <section className={`script-breakdown-panel${breakdownStylePreview ? ` breakdown-style-preview preview-${activeBreakdownStyle}` : ''}`} aria-label="脚本拆解">
       {breakdownStylePreview && (
@@ -2286,6 +2464,17 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
           <span>标题</span>
           <input name="title" placeholder="x月x日 脚本拆解v1" />
         </label>
+        <VideoBreakdownTimeline
+          entries={videoTimelineEntries}
+          types={videoTimelineTypes}
+          duration={videoTimelineDuration}
+          sourceEntries={getTimelineSourceEntries()}
+          onEntriesChange={setVideoTimelineEntries}
+          onTypesChange={setVideoTimelineTypes}
+          onDurationChange={setVideoTimelineDuration}
+          onImportToEmotionCurve={importTimelineEntryToEmotionCurve}
+          onOpenSource={(kind) => scrollToBreakdownSection(kind === 'emotion' ? 'emotion-curve-title' : 'script-breakdown-structure')}
+        />
         <section className="video-type-section" id="script-breakdown-video-type" aria-labelledby="video-type-title">
           <div className="video-type-heading">
             <div>
@@ -2536,6 +2725,284 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   );
 }
 
+function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEntriesChange, onTypesChange, onDurationChange, onImportToEmotionCurve, onOpenSource }) {
+  const railRef = React.useRef(null);
+  const dragRef = React.useRef(null);
+  const [selectedEntryId, setSelectedEntryId] = React.useState(null);
+  const [draggingEntryId, setDraggingEntryId] = React.useState(null);
+  const [timelinePointer, setTimelinePointer] = React.useState(null);
+  const [customTypeName, setCustomTypeName] = React.useState('');
+  const [customTypeColor, setCustomTypeColor] = React.useState('#3976d5');
+  const safeDuration = Math.max(1, Number(duration) || 60);
+  const typeById = new Map(types.map((type) => [type.id, type]));
+  const selectedEntry = entries.find((entry) => entry.id === selectedEntryId) || null;
+  const typeGroups = types.reduce((groups, type) => {
+    groups[type.group] = groups[type.group] || [];
+    groups[type.group].push(type);
+    return groups;
+  }, {});
+  const sortedEntries = [...entries].sort((first, second) => first.start - second.start);
+  const latestContentTime = [...entries, ...sourceEntries].reduce((latest, entry) => Math.max(latest, entry.end ?? entry.start ?? 0), 0);
+  const minimumVisibleDuration = Math.min(safeDuration, VIDEO_TIMELINE_MIN_VISIBLE_SECONDS);
+  const visibleDuration = Math.min(
+    safeDuration,
+    Math.max(minimumVisibleDuration, Math.ceil((latestContentTime + 1) / VIDEO_TIMELINE_RULER_INTERVAL_SECONDS) * VIDEO_TIMELINE_RULER_INTERVAL_SECONDS),
+  );
+  const rulerInterval = visibleDuration <= 5 * 60
+    ? VIDEO_TIMELINE_RULER_INTERVAL_SECONDS
+    : visibleDuration <= 15 * 60
+      ? 60
+      : 5 * 60;
+  const rulerMarks = Array.from(
+    { length: Math.floor(visibleDuration / rulerInterval) + 1 },
+    (_, index) => index * rulerInterval,
+  );
+  if (rulerMarks[rulerMarks.length - 1] !== visibleDuration) rulerMarks.push(visibleDuration);
+
+  React.useEffect(() => {
+    if (selectedEntryId && entries.some((entry) => entry.id === selectedEntryId)) return;
+    setSelectedEntryId(entries[0]?.id || null);
+  }, [entries, selectedEntryId]);
+
+  const updateEntry = (id, changes) => onEntriesChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry));
+
+  const updateTimeFromInput = (entry, field, rawValue, input) => {
+    const parsed = parseVideoTimelineTime(rawValue);
+    if (parsed === null) {
+      input.value = field === 'start' ? formatVideoTimelineTime(entry.start) : formatVideoTimelineTime(entry.end);
+      return;
+    }
+    const snappedValue = snapVideoTimelineTime(parsed);
+    const nextValue = clampVideoTimelineTime(snappedValue, safeDuration);
+    if (field === 'start') {
+      updateEntry(entry.id, { start: entry.end !== null ? Math.min(nextValue, entry.end - VIDEO_TIMELINE_DRAG_STEP_SECONDS) : nextValue });
+      return;
+    }
+    updateEntry(entry.id, { end: Math.max(nextValue, entry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS) });
+  };
+
+  const createEntry = () => {
+    const defaultType = typeById.get('story-hook') || types[0];
+    const latestStart = entries.length ? Math.max(...entries.map((entry) => entry.end ?? entry.start)) : 0;
+    const start = snapVideoTimelineTime(Math.min(safeDuration, latestStart));
+    const nextEntry = {
+      id: createVideoTimelineId(),
+      typeId: defaultType?.id || '',
+      start,
+      end: null,
+      title: '',
+      description: '',
+      tags: '',
+      takeaway: '',
+      color: defaultType?.color || '#7647c8',
+    };
+    onEntriesChange([...entries, nextEntry]);
+    setSelectedEntryId(nextEntry.id);
+  };
+
+  const removeEntry = () => {
+    if (!selectedEntry) return;
+    onEntriesChange(entries.filter((entry) => entry.id !== selectedEntry.id));
+  };
+
+  const addCustomType = () => {
+    const label = customTypeName.trim();
+    if (!label || types.some((type) => type.label === label)) return;
+    const nextType = { id: `custom-${createVideoTimelineId()}`, group: '自定义类型', label, color: customTypeColor };
+    onTypesChange([...types, nextType]);
+    setCustomTypeName('');
+    if (selectedEntry) updateEntry(selectedEntry.id, { typeId: nextType.id, color: nextType.color });
+  };
+
+  const updateDuration = (value) => {
+    const nextDuration = Math.max(VIDEO_TIMELINE_DRAG_STEP_SECONDS, snapVideoTimelineTime((Number(value) || 0.5) * 60));
+    onDurationChange(nextDuration);
+    onEntriesChange(entries.map((entry) => ({
+      ...entry,
+      start: clampVideoTimelineTime(entry.start, nextDuration),
+      end: entry.end === null ? null : Math.max(clampVideoTimelineTime(entry.end, nextDuration), Math.min(nextDuration, entry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS)),
+    })));
+  };
+
+  const moveEntryWithKeyboard = (event, entry) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' ? VIDEO_TIMELINE_DRAG_STEP_SECONDS : -VIDEO_TIMELINE_DRAG_STEP_SECONDS;
+    const span = entry.end !== null ? entry.end - entry.start : 0;
+    const nextStart = clampVideoTimelineTime(snapVideoTimelineTime(entry.start + delta), safeDuration - span);
+    updateEntry(entry.id, { start: nextStart, end: entry.end === null ? null : nextStart + span });
+  };
+
+  const startDrag = (event, entry, mode) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = { id: entry.id, mode, clientX: event.clientX, start: entry.start, end: entry.end, visibleDuration };
+    setSelectedEntryId(entry.id);
+    setDraggingEntryId(entry.id);
+  };
+
+  const dragEntry = (event) => {
+    const drag = dragRef.current;
+    const railRect = railRef.current?.getBoundingClientRect();
+    if (!drag || !railRect) return;
+    const entry = entries.find((item) => item.id === drag.id);
+    if (!entry) return;
+    const delta = snapVideoTimelineTime(((event.clientX - drag.clientX) / railRect.width) * drag.visibleDuration);
+    const originalEnd = drag.end === null ? null : drag.end;
+    if (drag.mode === 'move') {
+      const span = originalEnd === null ? 0 : originalEnd - drag.start;
+      const start = clampVideoTimelineTime(snapVideoTimelineTime(drag.start + delta), safeDuration - span);
+      updateEntry(entry.id, { start, end: originalEnd === null ? null : start + span });
+      return;
+    }
+    if (originalEnd === null) return;
+    if (drag.mode === 'start') {
+      updateEntry(entry.id, { start: Math.min(Math.max(0, snapVideoTimelineTime(drag.start + delta)), originalEnd - VIDEO_TIMELINE_DRAG_STEP_SECONDS) });
+      return;
+    }
+    updateEntry(entry.id, { end: Math.max(Math.min(safeDuration, snapVideoTimelineTime(originalEnd + delta)), drag.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS) });
+  };
+
+  const stopDrag = (event) => {
+    if (event?.currentTarget?.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    dragRef.current = null;
+    setDraggingEntryId(null);
+  };
+
+  const updateTimelinePointer = (event) => {
+    const railRect = railRef.current?.getBoundingClientRect();
+    if (!railRect?.width) return;
+    const position = Math.max(0, Math.min(100, ((event.clientX - railRect.left) / railRect.width) * 100));
+    const time = clampVideoTimelineTime(snapVideoTimelineTime((position / 100) * visibleDuration), safeDuration);
+    setTimelinePointer({ position, time });
+  };
+
+  return (
+    <section className="video-breakdown-timeline" id="script-breakdown-timeline" aria-labelledby="video-breakdown-timeline-title">
+      <div className="video-timeline-heading">
+        <div>
+          <span className="video-timeline-kicker">视频拆解时间轴</span>
+          <h3 id="video-breakdown-timeline-title">用时码记录关键事件</h3>
+          <p>拖动节点、区间条或两端把手直接调整时间，每次按 1 秒更新。</p>
+        </div>
+        <label className="video-timeline-duration">
+          视频时长
+          <span><input type="number" min="0.5" step="0.5" value={safeDuration / 60} onChange={(event) => updateDuration(event.target.value)} aria-label="视频总时长，单位分钟，可填0.5表示00:30" /> 分钟</span>
+        </label>
+      </div>
+      <div className="video-timeline-toolbar">
+        <span>时间点显示为节点；时间段显示为区间条。拖动节点、区间条或两端把手即可调整时码。</span>
+      </div>
+      <div className="video-timeline-workbench">
+      <div className="video-timeline-canvas">
+      <div className="video-timeline-rail-scroll">
+        <div className="video-timeline-rail" ref={railRef} style={{ '--video-timeline-rows': 2, '--video-timeline-sources': sourceEntries.length }} onMouseMove={updateTimelinePointer} onMouseLeave={() => setTimelinePointer(null)}>
+          <div className="video-timeline-ruler" aria-hidden="true">
+            {rulerMarks.map((mark) => <span key={mark} style={{ left: `${(mark / visibleDuration) * 100}%` }}>{formatVideoTimelineTime(mark)}</span>)}
+          </div>
+          <div className="video-timeline-grid" aria-hidden="true">
+            {rulerMarks.map((mark) => <i key={mark} style={{ left: `${(mark / visibleDuration) * 100}%` }} />)}
+          </div>
+          {timelinePointer && <div className={`video-timeline-hover-guide${timelinePointer.position < 8 ? ' edge-start' : ''}${timelinePointer.position > 92 ? ' edge-end' : ''}`} style={{ '--timeline-hover-left': `${timelinePointer.position}%` }} aria-hidden="true"><span>{formatVideoTimelineTime(timelinePointer.time)}</span></div>}
+          {sortedEntries.map((entry, index) => {
+            const type = typeById.get(entry.typeId);
+            const isInterval = entry.end !== null && entry.end > entry.start;
+            const color = entry.color || type?.color || '#3976d5';
+            const left = (clampVideoTimelineTime(entry.start, visibleDuration) / visibleDuration) * 100;
+            const width = isInterval ? Math.max(1.2, ((Math.min(entry.end, visibleDuration) - entry.start) / visibleDuration) * 100) : 1.2;
+            return (
+              <div className={`video-timeline-entry${isInterval ? ' is-interval' : ' is-point'}${selectedEntryId === entry.id ? ' is-selected' : ''}${draggingEntryId === entry.id ? ' is-dragging' : ''}`} key={entry.id} style={{ '--timeline-left': `${left}%`, '--timeline-width': `${width}%`, '--timeline-row': isInterval ? 1 : 0, '--timeline-color': color }}>
+                <button
+                  type="button"
+                  className="video-timeline-entry-body"
+                  onClick={() => setSelectedEntryId(entry.id)}
+                  onPointerDown={(event) => startDrag(event, entry, 'move')}
+                  onPointerMove={dragEntry}
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  onLostPointerCapture={stopDrag}
+                  onKeyDown={(event) => moveEntryWithKeyboard(event, entry)}
+                  aria-label={`${type?.label || '未分类'}：${entry.title || '未命名事件'}，${isInterval ? `${formatVideoTimelineTime(entry.start)} 到 ${formatVideoTimelineTime(entry.end)}` : formatVideoTimelineTime(entry.start)}。使用左右方向键以1秒移动。`}
+                  title={`${type?.label || '未分类'} · ${entry.title || '未命名事件'} · ${formatVideoTimelineRange(entry.start, entry.end)}`}
+                >
+                  <span>{entry.title || type?.label || '事件'}</span>
+                </button>
+                {draggingEntryId === entry.id && <span className="video-timeline-drag-time" aria-live="polite">{formatVideoTimelineRange(entry.start, entry.end)}</span>}
+                {isInterval && <>
+                  <button type="button" className="video-timeline-resize start" aria-label={`调整${entry.title || '事件'}的开始时间`} onPointerDown={(event) => startDrag(event, entry, 'start')} onPointerMove={dragEntry} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} />
+                  <button type="button" className="video-timeline-resize end" aria-label={`调整${entry.title || '事件'}的结束时间`} onPointerDown={(event) => startDrag(event, entry, 'end')} onPointerMove={dragEntry} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} />
+                </>}
+              </div>
+            );
+          })}
+          {sourceEntries.map((entry, index) => {
+            const left = (clampVideoTimelineTime(entry.start, visibleDuration) / visibleDuration) * 100;
+            const isInterval = entry.end !== null && entry.end > entry.start;
+            const width = isInterval ? Math.max(0.8, ((Math.min(entry.end, visibleDuration) - entry.start) / visibleDuration) * 100) : 0.8;
+            return <button type="button" className={`video-timeline-source source-${entry.kind}`} key={entry.id} style={{ '--timeline-left': `${left}%`, '--timeline-width': `${width}%`, '--timeline-source-row': index }} onClick={() => onOpenSource(entry.kind)} title={`来自${entry.kind === 'emotion' ? '情绪曲线' : '核心事件链'}：${entry.label}`}><span>{entry.kind === 'emotion' ? '情绪' : '事件链'} · {entry.label}</span></button>;
+          })}
+        </div>
+      </div>
+      <div className="video-timeline-source-key" aria-label="时间轴来源标记说明"><span className="emotion">情绪曲线来源</span><span className="core">核心事件链来源</span></div>
+      </div>
+      {selectedEntry ? (
+        <section className="video-timeline-editor" aria-label="编辑时间轴事件">
+          <div className="video-timeline-editor-heading">
+            <div><strong>编辑事件</strong><span>{formatVideoTimelineRange(selectedEntry.start, selectedEntry.end)}</span></div>
+            <div className="video-timeline-editor-actions"><button type="button" className="video-timeline-add" onClick={createEntry}><Plus size={15} /> 新增事件</button><button type="button" className="video-timeline-delete" onClick={removeEntry}><Trash2 size={15} /> 删除</button></div>
+          </div>
+          <div className="video-timeline-editor-grid">
+            <div className="video-timeline-editor-half video-timeline-editor-left">
+              <label className="video-timeline-color-field">颜色<span className="video-timeline-color-control"><input type="color" value={selectedEntry.color || typeById.get(selectedEntry.typeId)?.color || '#3976d5'} onChange={(event) => updateEntry(selectedEntry.id, { color: event.target.value })} aria-label="事件颜色" /></span></label>
+              <label className="video-timeline-type-field">事件类型
+                <select className="video-timeline-type-select" value={selectedEntry.typeId} onChange={(event) => { const nextType = typeById.get(event.target.value); updateEntry(selectedEntry.id, { typeId: event.target.value, color: nextType?.color || selectedEntry.color }); }}>
+                  {Object.entries(typeGroups).map(([group, groupTypes]) => <optgroup label={group} key={group}>{groupTypes.map((type) => <option value={type.id} key={type.id}>{type.label}</option>)}</optgroup>)}
+                </select>
+              </label>
+            </div>
+            <div className="video-timeline-editor-half video-timeline-editor-right">
+              <div className="video-timeline-shape-choice" role="group" aria-label="时间形态">
+                <span>时间形态</span>
+                <button
+                  type="button"
+                  className={`video-timeline-shape-switch${selectedEntry.end === null ? ' is-point' : ' is-range'}`}
+                  role="switch"
+                  aria-checked={selectedEntry.end !== null}
+                  aria-label={`时间形态：${selectedEntry.end === null ? '时间点' : '时间段'}`}
+                  onClick={() => updateEntry(selectedEntry.id, { end: selectedEntry.end === null ? Math.min(safeDuration, selectedEntry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS) : null })}
+                >
+                  <i aria-hidden="true" />
+                  <b>时间点</b>
+                  <b>时间段</b>
+                </button>
+              </div>
+              <label className="video-timeline-timecode-field">开始时码<input key={`${selectedEntry.id}-${selectedEntry.start}`} defaultValue={formatVideoTimelineTime(selectedEntry.start)} onBlur={(event) => updateTimeFromInput(selectedEntry, 'start', event.currentTarget.value, event.currentTarget)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} inputMode="decimal" aria-label="自定义开始时码，格式为0:00或输入十进制分钟，如1.5表示1:30" /></label>
+              {selectedEntry.end !== null && <label className="video-timeline-timecode-field is-end">结束时码<input key={`${selectedEntry.id}-${selectedEntry.end}`} defaultValue={formatVideoTimelineTime(selectedEntry.end)} onBlur={(event) => updateTimeFromInput(selectedEntry, 'end', event.currentTarget.value, event.currentTarget)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} inputMode="decimal" aria-label="自定义结束时码，格式为0:00或输入十进制分钟，如1.5表示1:30" /></label>}
+            </div>
+            <label className="video-timeline-title-field">标题<input value={selectedEntry.title} onChange={(event) => updateEntry(selectedEntry.id, { title: event.target.value })} placeholder="例如：主角身份暴露" maxLength="60" /></label>
+          </div>
+          <label className="video-timeline-editor-field">说明<textarea value={selectedEntry.description} onChange={(event) => updateEntry(selectedEntry.id, { description: event.target.value })} placeholder="这一段发生了什么？" rows={2} /></label>
+          <div className="video-timeline-editor-grid secondary">
+            <label>标签<input value={selectedEntry.tags} onChange={(event) => updateEntry(selectedEntry.id, { tags: event.target.value })} placeholder="多个标签用逗号分隔" /></label>
+            <label>可借鉴做法<input value={selectedEntry.takeaway} onChange={(event) => updateEntry(selectedEntry.id, { takeaway: event.target.value })} placeholder="我能怎样借鉴？" /></label>
+          </div>
+          <button type="button" className="video-timeline-import" onClick={() => onImportToEmotionCurve(selectedEntry)}><Sparkles size={16} /> 导入情绪曲线</button>
+          <small className="video-timeline-autosave">可输入 1.5 表示 1:30；输入后会自动保存到当前拆解草稿。</small>
+        </section>
+      ) : <div className="video-timeline-empty"><Clock3 size={20} /><span>还没有事件。新增一个时间点或时间段开始拆解。</span><button type="button" className="video-timeline-add" onClick={createEntry}><Plus size={16} /> 新增事件</button></div>}
+      </div>
+      <section className="video-timeline-custom-type" aria-label="新增自定义事件类型">
+        <strong>自定义类型</strong><span>添加后可用于此条拆解时间轴。</span>
+        <input value={customTypeName} onChange={(event) => setCustomTypeName(event.target.value)} placeholder="例如：表演细节" maxLength="20" />
+        <input type="color" value={customTypeColor} onChange={(event) => setCustomTypeColor(event.target.value)} aria-label="自定义类型颜色" />
+        <button type="button" onClick={addCustomType} disabled={!customTypeName.trim()}>添加类型</button>
+      </section>
+    </section>
+  );
+}
+
 function Metric({ label, value }) {
   return (
     <div className="metric-card">
@@ -2583,7 +3050,7 @@ function LegacyDashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNote
   return (
     <div className="dashboard-home">
       <div className="dashboard-top-grid">
-        <section className="panel-card dashboard-schedule-card" aria-label="今日日程，点击进入日历" role="button" tabIndex={0} onClick={onOpenSchedule} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSchedule(); } }}>
+        <section className="panel-card dashboard-schedule-card" aria-label="今日日程">
           <div className="dashboard-schedule-date" aria-label={`${todayDate.getMonth() + 1}月${todayDate.getDate()}日，${weekday}`}>
             <div className="dashboard-schedule-date-main">
               <div><span>{todayDate.getMonth() + 1}月</span><b>{weekday}</b></div>
@@ -2594,6 +3061,9 @@ function LegacyDashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNote
             </div>
           </div>
           <div className="dashboard-schedule-content">
+            <div className="dashboard-schedule-heading">
+              <button className="dashboard-schedule-open-button" type="button" onClick={onOpenSchedule}>查看日历 <ArrowRight size={14} /></button>
+            </div>
             {scheduleTasks.length ? (
               <div className="dashboard-schedule-list">
                 {scheduleTasks.slice(0, 3).map((task) => (
@@ -2704,6 +3174,7 @@ const defaultDashboardCards = [
   { id: 'websites', label: '常用网址', width: 6, height: 2, x: 0, y: 4, visible: true },
   { id: 'upcoming', label: '未来任务', width: 6, height: 3, x: 0, y: 6, visible: true },
   { id: 'notes', label: '最近笔记', width: 6, height: 3, x: 0, y: 9, visible: true, sizeMode: 'auto' },
+  { id: 'focus', label: '专注计时', width: 6, height: 4, x: 0, y: 13, visible: true },
 ];
 
 function getRecentNotesAutoHeight(notes) {
@@ -2732,7 +3203,12 @@ function loadDashboardCards() {
         sizeMode: savedCard && (savedCard.width !== card.width || savedCard.height !== card.height) ? 'custom' : 'auto',
       };
     }).sort((left, right) => (savedOrder.indexOf(left.id) === -1 ? 999 : savedOrder.indexOf(left.id)) - (savedOrder.indexOf(right.id) === -1 ? 999 : savedOrder.indexOf(right.id)));
-    return assignDashboardPositions(restoredCards);
+    const cardsWithFocusPlaced = savedById.has('focus') ? restoredCards : restoredCards.map((card) => {
+      if (card.id !== 'focus') return card;
+      const lastOccupiedRow = Math.max(0, ...restoredCards.filter((item) => item.id !== 'focus' && item.visible).map((item) => item.y + item.height));
+      return { ...card, y: lastOccupiedRow };
+    });
+    return assignDashboardPositions(cardsWithFocusPlaced);
   } catch {
     return defaultDashboardCards;
   }
@@ -2945,12 +3421,13 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
   }
 
   const cards = {
-    schedule: <section className="dashboard-schedule-card" aria-label="今日日程，点击进入日历" role="button" tabIndex={0} onClick={onOpenSchedule} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenSchedule(); } }}><div className="dashboard-schedule-date" aria-label={`${todayDate.getMonth() + 1}月${todayDate.getDate()}日，${weekday}`}><div className="dashboard-schedule-date-main"><div><span>{todayDate.getMonth() + 1}月</span><b>{weekday}</b></div><strong>{todayDate.getDate()}</strong></div><div className="dashboard-schedule-week" aria-label="本周日期">{weekDays.map((day) => <span className={day.isToday ? 'today' : ''} key={day.label}><small>{day.label}</small><b>{day.day}</b></span>)}</div></div><div className="dashboard-schedule-content">{scheduleTasks.length ? <div className="dashboard-schedule-list">{scheduleTasks.slice(0, 3).map((task) => <div className={`dashboard-schedule-item schedule-${task.matrix_category}${task.status === 'completed' ? ' completed' : ''}`} key={task.id}><button className="dashboard-schedule-complete" type="button" aria-label={task.status === 'completed' ? `恢复任务：${task.title}` : `完成任务：${task.title}`} title={task.status === 'completed' ? '恢复为进行中' : '标记已完成'} onClick={(event) => { event.stopPropagation(); onToggleScheduleTask(task); }}>{task.status === 'completed' && <Check size={14} strokeWidth={3} />}</button><div><strong>{task.title}</strong><small>{task.task_time ? formatTime(task.task_time) : '全天'}</small></div></div>)}{scheduleTasks.length > 3 && <span className="dashboard-schedule-more">还有 {scheduleTasks.length - 3} 项日程 <ArrowRight size={14} /></span>}</div> : <p className="dashboard-schedule-empty">今天暂无日程，安排一件最重要的事吧。</p>}</div></section>,
+    schedule: <section className="dashboard-schedule-card" aria-label="今日日程"><div className="dashboard-schedule-date" aria-label={`${todayDate.getMonth() + 1}月${todayDate.getDate()}日，${weekday}`}><div className="dashboard-schedule-date-main"><div><span>{todayDate.getMonth() + 1}月</span><b>{weekday}</b></div><strong>{todayDate.getDate()}</strong></div><div className="dashboard-schedule-week" aria-label="本周日期">{weekDays.map((day) => <span className={day.isToday ? 'today' : ''} key={day.label}><small>{day.label}</small><b>{day.day}</b></span>)}</div></div><div className="dashboard-schedule-content"><div className="dashboard-schedule-heading"><button className="dashboard-schedule-open-button" type="button" onClick={onOpenSchedule}>查看日历 <ArrowRight size={14} /></button></div>{scheduleTasks.length ? <div className="dashboard-schedule-list">{scheduleTasks.slice(0, 3).map((task) => <div className={`dashboard-schedule-item schedule-${task.matrix_category}${task.status === 'completed' ? ' completed' : ''}`} key={task.id}><button className="dashboard-schedule-complete" type="button" aria-label={task.status === 'completed' ? `恢复任务：${task.title}` : `完成任务：${task.title}`} title={task.status === 'completed' ? '恢复为进行中' : '标记已完成'} onClick={(event) => { event.stopPropagation(); onToggleScheduleTask(task); }}>{task.status === 'completed' && <Check size={14} strokeWidth={3} />}</button><div><strong>{task.title}</strong><small>{task.task_time ? formatTime(task.task_time) : '全天'}</small></div></div>)}{scheduleTasks.length > 3 && <span className="dashboard-schedule-more">还有 {scheduleTasks.length - 3} 项日程 <ArrowRight size={14} /></span>}</div> : <p className="dashboard-schedule-empty">今天暂无日程，安排一件最重要的事吧。</p>}</div></section>,
     'quick-task': <button className="quick-entry-card quick-task" onClick={onOpenTasks}><span><Plus size={22} /></span><strong>新建任务</strong><small>安排今天或未来要做的事</small></button>,
     'quick-note': <button className="quick-entry-card quick-note" onClick={onOpenNotes}><span><NotebookPen size={21} /></span><strong>写点东西</strong><small>记录此刻的想法与灵感</small></button>,
     websites: <WebsiteQuickLinks onOpenWebsites={onOpenWebsites} onAddWebsite={onAddWebsite} />,
     upcoming: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-purple"><Sparkles size={18} /></span><h2>未来任务</h2></div><button className="section-link" onClick={onOpenTasks}>管理任务 <ArrowRight size={15} /></button></div>{upcomingTasks.length === 0 ? <div className="dashboard-empty">暂时没有未来任务，可以在任务中心添加长期计划。</div> : <div className="long-term-grid">{upcomingTasks.map((task, index) => <article className={`long-term-card accent-${index + 1}`} key={task.id}><div className="long-term-card-top"><span className="long-term-icon"><Clock3 size={18} /></span><span className={`tag matrix-${task.matrix_category}`}>{getLabel(matrixOptions, task.matrix_category)}</span></div><h3>{task.title}</h3><p>{task.description || '保持推进，一点点完成这个计划。'}</p><div className="long-term-meta"><strong>{getLabel(statusOptions, task.status)}</strong><span>{formatDate(task.task_date)}</span></div><div className="progress-track"><div style={{ width: task.status === 'in_progress' ? '60%' : task.status === 'stalled' ? '24%' : '12%' }} /></div></article>)}</div>}</section>,
     notes: <section className="dashboard-section"><div className="dashboard-section-heading"><div><span className="section-icon section-icon-blue"><Clock3 size={18} /></span><h2>最近笔记</h2></div><button className="section-link" onClick={onOpenNotes}>全部笔记 <ArrowRight size={15} /></button></div>{recentNotes.length === 0 ? <div className="dashboard-empty">还没有笔记，点击“写点东西”记录第一条内容。</div> : <div className="recent-notes-grid">{recentNotes.map((note, index) => <button className={`recent-note-card ${note.card_cover_visible ? 'has-note-cover' : 'without-note-cover'} note-color-${index + 1}`} key={note.id} onClick={onOpenNotes}>{note.card_cover_visible ? <span className="note-color-block"><span className="note-cover-icon" aria-hidden="true">{['📝', '💡', '📚'][index % 3]}</span><span className={note.visibility === 'public' ? 'note-visibility-pill public' : 'note-visibility-pill'}>{note.visibility === 'public' ? '公开' : '私密'}</span></span> : null}<strong>{note.title}</strong><small>{new Date(note.updated_at ?? note.created_at).toLocaleDateString('zh-CN')} · 最近编辑</small></button>)}</div>}</section>,
+    focus: <FocusTimerCard tasks={todayTasks} onCompleteTask={onToggleScheduleTask} />,
   };
 
   return (
@@ -4455,7 +4932,7 @@ function CalendarPanel({ tasks, longTermTasks = [], categories = DEFAULT_TASK_CA
     ...category,
     name: category.name?.trim() || DEFAULT_TASK_CATEGORIES[index]?.name || '',
   }));
-  const monthDays = getMonthDays(currentDate);
+  const monthDays = getMonthDays(currentDate, { fixedWeeks: false });
   const monthWeeks = Array.from({ length: Math.ceil(monthDays.length / 7) }, (_, index) => monthDays.slice(index * 7, index * 7 + 7));
   const matchesSelectedCategories = (task) => selectedCategories.includes(task.category || '生活');
   const visibleTasks = tasks.filter(matchesSelectedCategories);

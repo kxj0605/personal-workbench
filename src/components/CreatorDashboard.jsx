@@ -1,13 +1,22 @@
 import React from 'react';
 import { BarChart3, CalendarDays, Check, ChevronRight, Copy, Film, Flame, LibraryBig, Plus, Sparkles, Target, Trash2 } from 'lucide-react';
+import { FOCUS_TIMER_RECORDS_KEY } from '../utils/focusTimerRecords';
 import './CreatorDashboard.css';
 
-const STORAGE_KEY = 'creator-growth-dashboard-v1';
+export const CREATOR_DASHBOARD_STORAGE_KEY = 'creator-growth-dashboard-v1';
 const BREAKDOWN_ARCHIVE_KEY = 'script-breakdown-archives-v1';
 const TYPES = [
   { id: 'script', label: '写脚本', short: '脚本', color: 'var(--creator-script)' },
   { id: 'storyboard', label: '做分镜', short: '分镜', color: 'var(--creator-storyboard)' },
   { id: 'video', label: '出成片', short: '成片', color: 'var(--creator-video)' },
+];
+export const PROJECT_STAGES = [
+  { id: 'topic', label: '找选题' },
+  { id: 'script', label: '脚本' },
+  { id: 'image', label: '图片' },
+  { id: 'video', label: '视频' },
+  { id: 'edit', label: '剪辑' },
+  { id: 'publish', label: '发布' },
 ];
 const DEFAULT_TASKS = [
   { title: '完成选题', type: 'general' },
@@ -43,7 +52,7 @@ const emptyData = () => ({ goals: blankGoals(), projects: [], prompts: [], event
 
 function loadData() {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null');
+    const saved = JSON.parse(window.localStorage.getItem(CREATOR_DASHBOARD_STORAGE_KEY) || 'null');
     return { ...emptyData(), ...saved, goals: { ...blankGoals(), ...(saved?.goals || {}) }, projects: Array.isArray(saved?.projects) ? saved.projects : [], prompts: Array.isArray(saved?.prompts) ? saved.prompts : [], events: Array.isArray(saved?.events) ? saved.events : [], milestones: Array.isArray(saved?.milestones) ? saved.milestones : [] };
   } catch {
     return emptyData();
@@ -52,6 +61,27 @@ function loadData() {
 
 function loadArchives() {
   try { return JSON.parse(window.localStorage.getItem(BREAKDOWN_ARCHIVE_KEY) || '[]'); } catch { return []; }
+}
+
+function loadTimerRecords() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(FOCUS_TIMER_RECORDS_KEY) || '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatTimerDuration(totalSeconds = 0) {
+  const minutes = Math.max(0, Math.round(totalSeconds / 60));
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours} 小时${minutes % 60 ? ` ${minutes % 60} 分钟` : ''}` : `${minutes} 分钟`;
+}
+
+function formatTimerRecordDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '时间未知';
+  return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function getCounts(events, period) {
@@ -85,21 +115,42 @@ function copyText(text) {
   return navigator.clipboard?.writeText(text);
 }
 
+function getProjectStage(project) {
+  if (PROJECT_STAGES.some((stage) => stage.id === project.stage)) return project.stage;
+  const unfinishedTasks = project.tasks.filter((task) => !task.done).map((task) => task.title);
+  const stageMatchers = {
+    topic: /选题/,
+    script: /脚本/,
+    image: /图片|画面/,
+    video: /视频|分镜|素材/,
+    edit: /剪辑|成片|导出/,
+    publish: /发布/,
+  };
+  return PROJECT_STAGES.find((stage) => unfinishedTasks.some((title) => stageMatchers[stage.id].test(title)))?.id || 'publish';
+}
+
 export function CreatorDashboard({ view = 'overview' }) {
   const [data, setData] = React.useState(loadData);
   const [archives, setArchives] = React.useState(loadArchives);
+  const [timerRecords, setTimerRecords] = React.useState(loadTimerRecords);
   const [notice, setNotice] = React.useState('');
   const [projectDraft, setProjectDraft] = React.useState('');
   const [promptDraft, setPromptDraft] = React.useState({ category: '未分类', tags: '', body: '', reference: '', projectId: '' });
   const [customMilestone, setCustomMilestone] = React.useState('');
   const [goalPeriod, setGoalPeriod] = React.useState('month');
 
-  React.useEffect(() => { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }, [data]);
+  React.useEffect(() => { window.localStorage.setItem(CREATOR_DASHBOARD_STORAGE_KEY, JSON.stringify(data)); }, [data]);
   React.useEffect(() => {
     const refreshArchives = () => setArchives(loadArchives());
     window.addEventListener('storage', refreshArchives);
     window.addEventListener('focus', refreshArchives);
     return () => { window.removeEventListener('storage', refreshArchives); window.removeEventListener('focus', refreshArchives); };
+  }, []);
+  React.useEffect(() => {
+    const refreshTimerRecords = () => setTimerRecords(loadTimerRecords());
+    window.addEventListener('storage', refreshTimerRecords);
+    window.addEventListener('focus', refreshTimerRecords);
+    return () => { window.removeEventListener('storage', refreshTimerRecords); window.removeEventListener('focus', refreshTimerRecords); };
   }, []);
   React.useEffect(() => {
     if (!notice) return undefined;
@@ -117,7 +168,7 @@ export function CreatorDashboard({ view = 'overview' }) {
     event.preventDefault();
     const title = projectDraft.trim();
     if (!title) return;
-    updateData((current) => ({ ...current, projects: [{ id: uid(), title, status: '构思中', tasks: DEFAULT_TASKS.map((task) => ({ id: uid(), ...task, done: false })), createdAt: new Date().toISOString() }, ...current.projects] }));
+    updateData((current) => ({ ...current, projects: [{ id: uid(), title, status: '构思中', stage: 'topic', tasks: DEFAULT_TASKS.map((task) => ({ id: uid(), ...task, done: false })), createdAt: new Date().toISOString() }, ...current.projects] }));
     setProjectDraft('');
     setNotice('视频已录入。完成项目待办后，数据会自动统计。');
   };
@@ -172,6 +223,20 @@ export function CreatorDashboard({ view = 'overview' }) {
     ...current,
     projects: current.projects.map((project) => project.id === projectId ? { ...project, record: { ...project.record, ...record } } : project),
   }));
+  const updateProjectStage = (projectId, stage) => updateData((current) => ({
+    ...current,
+    projects: current.projects.map((project) => project.id === projectId ? { ...project, stage } : project),
+  }));
+  const updateTimerRecord = (recordId, changes) => {
+    const nextRecords = timerRecords.map((record) => record.id === recordId ? { ...record, ...changes } : record);
+    setTimerRecords(nextRecords);
+    try {
+      window.localStorage.setItem(FOCUS_TIMER_RECORDS_KEY, JSON.stringify(nextRecords));
+      setNotice('项目计时已更新。');
+    } catch {
+      setNotice('项目计时未能保存到本地。');
+    }
+  };
 
   const addPrompt = (event) => {
     event.preventDefault();
@@ -199,13 +264,16 @@ export function CreatorDashboard({ view = 'overview' }) {
   const toggleMilestone = (id) => updateData((current) => ({ ...current, milestones: current.milestones.map((item) => item.id === id ? { ...item, done: !item.done } : item) }));
   const copyProjectMarkdown = async (project) => {
     const linkedPrompts = data.prompts.filter((prompt) => prompt.projectId === project.id);
+    const linkedTimerRecords = timerRecords.filter((record) => record.projectId === project.id);
     const text = [
       `# ${project.title}`,
       '',
       `状态：${project.status}`,
+      `当前阶段：${PROJECT_STAGES.find((stage) => stage.id === getProjectStage(project))?.label || '找选题'}`,
       '',
       '## 创作进度',
       ...project.tasks.map((task) => `- [${task.done ? 'x' : ' '}] ${task.title}`),
+      ...(linkedTimerRecords.length ? ['', '## 关联计时', ...linkedTimerRecords.map((record) => `- ${record.projectStageLabel || '未标记阶段'} · ${formatTimerDuration(record.totalSeconds)}${record.note ? ` · ${record.note}` : ''}`)] : []),
       ...(project.record ? ['', '## 创作记录', '', `- 镜数：${project.record.shots || '未填写'}`, `- 时长：${project.record.duration || '未填写'}`, `- 使用工具：${project.record.tools || '未填写'}`, '', '### 遇到的问题', '', project.record.problems || '未填写', '', '### 心得笔记', '', project.record.notes || '未填写'] : []),
       ...(linkedPrompts.length ? ['', '## 关联提示词', ...linkedPrompts.map((prompt) => `### ${prompt.category}\n\n${prompt.body}`)] : []),
     ].join('\n');
@@ -236,7 +304,7 @@ export function CreatorDashboard({ view = 'overview' }) {
         </aside>
       </section>}
 
-      {showProjects && <section className="creator-single-column"><article className="creator-card"><div className="creator-card-head"><div><h3>视频项目与待办</h3><p>勾选完成后，脚本、分镜、成片会自动进入创作记录。</p></div><Film size={19} /></div><form className="creator-add-row" onSubmit={addProject}><input value={projectDraft} onChange={(event) => setProjectDraft(event.target.value)} placeholder="录入一支正在制作的视频" maxLength="80" /><button type="submit"><Plus size={16} />录入</button></form><div className="creator-project-list">{data.projects.length ? data.projects.map((project) => <ProjectCard key={project.id} project={project} onToggle={toggleTask} onAddTask={addTask} onUpdateTask={updateTaskTitle} onRemoveTask={removeTask} onUpdateRecord={updateProjectRecord} onCopy={() => copyProjectMarkdown(project)} />) : <Empty copy="从一支正在做的视频开始。之后你只需完成待办，创作记录会自己更新。" />}</div></article></section>}
+      {showProjects && <section className="creator-single-column"><article className="creator-card"><div className="creator-card-head"><div><h3>视频项目与待办</h3><p>选择当前制作阶段，再用待办记录每一步的完成情况。</p></div><Film size={19} /></div><form className="creator-add-row" onSubmit={addProject}><input value={projectDraft} onChange={(event) => setProjectDraft(event.target.value)} placeholder="录入一支正在制作的视频" maxLength="80" /><button type="submit"><Plus size={16} />录入</button></form><div className="creator-project-list">{data.projects.length ? data.projects.map((project) => <ProjectCard key={project.id} project={project} timerRecords={timerRecords.filter((record) => record.projectId === project.id)} onToggle={toggleTask} onAddTask={addTask} onUpdateTask={updateTaskTitle} onRemoveTask={removeTask} onUpdateRecord={updateProjectRecord} onUpdateStage={updateProjectStage} onUpdateTimerRecord={updateTimerRecord} onCopy={() => copyProjectMarkdown(project)} />) : <Empty copy="从一支正在做的视频开始。选择阶段后，用待办继续推进。" />}</div></article></section>}
 
       {showMaterials && <section className="creator-single-column"><article className="creator-card"><div className="creator-card-head"><div><h3>提示词素材库</h3><p>分类、标签、复用，并可关联作品。</p></div><LibraryBig size={19} /></div><form className="creator-prompt-form" onSubmit={addPrompt}><div className="creator-input-grid"><input value={promptDraft.category} onChange={(event) => setPromptDraft({ ...promptDraft, category: event.target.value })} placeholder="分类：教室题材、奇幻剧情…" /><input value={promptDraft.tags} onChange={(event) => setPromptDraft({ ...promptDraft, tags: event.target.value })} placeholder="标签，用逗号分隔" /><select value={promptDraft.projectId} onChange={(event) => setPromptDraft({ ...promptDraft, projectId: event.target.value })}><option value="">不关联作品</option>{data.projects.map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}</select><input value={promptDraft.reference} onChange={(event) => setPromptDraft({ ...promptDraft, reference: event.target.value })} placeholder="可选：参考图或视频链接" /></div><textarea value={promptDraft.body} onChange={(event) => setPromptDraft({ ...promptDraft, body: event.target.value })} placeholder="保存可直接复用的 AI 绘图 / AI 视频提示词" required /><button className="creator-save-prompt" type="submit"><Sparkles size={16} />保存提示词</button></form><div className="creator-prompt-list">{data.prompts.length ? data.prompts.map((prompt) => <PromptCard prompt={prompt} projects={data.projects} key={prompt.id} onDelete={() => updateData((current) => ({ ...current, prompts: current.prompts.filter((item) => item.id !== prompt.id) }))} onCopy={async () => { try { await copyText(prompt.body); setNotice('提示词已复制。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); } }} />) : <Empty copy="把你想反复使用的生成指令放在这里。" />}</div></article></section>}
 
@@ -315,14 +383,51 @@ function ActivityRadar({ events, onAddActivity }) {
   return <section className="creator-radar" aria-label="30 天创作能力雷达图"><svg viewBox="0 0 200 176" role="img" aria-label="输入、视频生产、复盘沉淀的三轴雷达图"><polygon className="creator-radar-grid" points={polygon(1)} /><polygon className="creator-radar-grid" points={polygon(.66)} /><polygon className="creator-radar-grid" points={polygon(.33)} />{values.map((_, index) => <line className="creator-radar-axis" key={index} x1={center.x} y1={center.y} x2={point(index, 1).split(',')[0]} y2={point(index, 1).split(',')[1]} />)}<polygon className="creator-radar-data" points={dataPolygon} />{values.map((item, index) => { const [x, y] = point(index, item.score).split(','); return <circle className="creator-radar-dot" key={item.key} cx={x} cy={y} r="3" />; })}<text x="100" y="10" textAnchor="middle">输入</text><text x="178" y="166" textAnchor="middle">视频生产</text><text x="22" y="166" textAnchor="middle">复盘沉淀</text></svg><aside className="creator-radar-side"><div className="creator-radar-values">{values.map((item) => <span key={item.key}>{item.label}<b>{item.value}</b></span>)}</div><div className="creator-radar-actions"><button type="button" onClick={() => onAddActivity('input')}>＋ 记录输入</button><button type="button" onClick={() => onAddActivity('retrospective')}>＋ 记录复盘</button></div></aside></section>;
 }
 
-function ProjectCard({ project, onToggle, onAddTask, onUpdateTask, onRemoveTask, onUpdateRecord, onCopy }) {
+function ProjectTimerResult({ record, onSave }) {
+  const [stage, setStage] = React.useState(record.projectStage || 'topic');
+  const [minutes, setMinutes] = React.useState(String(Math.max(1, Math.round((record.totalSeconds || 0) / 60))));
+  const [note, setNote] = React.useState(record.note || '');
+
+  React.useEffect(() => {
+    setStage(record.projectStage || 'topic');
+    setMinutes(String(Math.max(1, Math.round((record.totalSeconds || 0) / 60))));
+    setNote(record.note || '');
+  }, [record]);
+
+  const save = (event) => {
+    event.preventDefault();
+    const totalMinutes = Math.max(1, Math.round(Number(minutes) || 1));
+    const stageLabel = PROJECT_STAGES.find((item) => item.id === stage)?.label || '找选题';
+    const startedAt = new Date(record.startedAt).getTime();
+    onSave(record.id, {
+      projectStage: stage,
+      projectStageLabel: stageLabel,
+      totalSeconds: totalMinutes * 60,
+      endedAt: Number.isNaN(startedAt) ? record.endedAt : new Date(startedAt + totalMinutes * 60000).toISOString(),
+      note: note.trim(),
+    });
+  };
+
+  return <form className="creator-project-timer-result" onSubmit={save}><div><b>{record.taskName || '未命名专注'}</b><span>{formatTimerRecordDate(record.endedAt)} · {formatTimerDuration(record.totalSeconds)}</span></div><div className="creator-project-timer-fields"><label>阶段<select value={stage} onChange={(event) => setStage(event.target.value)}>{PROJECT_STAGES.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label><label>用时（分钟）<input type="number" min="1" step="1" inputMode="numeric" value={minutes} onChange={(event) => setMinutes(event.target.value)} /></label><label className="wide">备注<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="补充这段计时的结果" /></label><button type="submit">保存修改</button></div></form>;
+}
+
+function ProjectCard({ project, timerRecords, onToggle, onAddTask, onUpdateTask, onRemoveTask, onUpdateRecord, onUpdateStage, onUpdateTimerRecord, onCopy }) {
   const [taskDraft, setTaskDraft] = React.useState('');
   const [taskType, setTaskType] = React.useState('general');
   const [recordOpen, setRecordOpen] = React.useState(false);
   const done = project.tasks.filter((task) => task.done).length;
   const percent = project.tasks.length ? Math.round(done / project.tasks.length * 100) : 0;
+  const currentStage = getProjectStage(project);
   const updateRecord = (name, value) => onUpdateRecord(project.id, { [name]: value });
-  return <article className="creator-project"><div className="creator-project-title"><div><h4>{project.title}</h4><span>{project.status}</span></div><button type="button" title="复制项目 Markdown" onClick={onCopy}><Copy size={15} /></button></div><div className="creator-project-progress"><span><i style={{ width: `${percent}%` }} /></span><b>{percent}%</b></div><div className="creator-task-list">{project.tasks.map((task) => <div key={task.id} className={task.done ? 'done' : ''}><label><input type="checkbox" checked={task.done} onChange={() => onToggle(project.id, task.id)} /><input value={task.title} onChange={(event) => onUpdateTask(project.id, task.id, event.target.value)} aria-label="待办内容" />{task.type !== 'general' && <em>{TYPES.find((type) => type.id === task.type)?.short}</em>}</label><button className="creator-task-delete" type="button" aria-label={`删除 ${task.title}`} onClick={() => onRemoveTask(project.id, task.id)}>×</button></div>)}</div><form className="creator-inline-task" onSubmit={(event) => { event.preventDefault(); onAddTask(project.id, taskDraft, taskType); setTaskDraft(''); }}><input value={taskDraft} onChange={(event) => setTaskDraft(event.target.value)} placeholder="添加待办" /><select value={taskType} onChange={(event) => setTaskType(event.target.value)}><option value="general">普通待办</option>{TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}（自动统计）</option>)}</select><button type="submit"><Plus size={13} /></button></form><button className="creator-record-toggle" type="button" onClick={() => setRecordOpen(!recordOpen)}>创作记录台账 {recordOpen ? '收起' : '展开'}</button>{recordOpen && <div className="creator-record-grid"><input value={project.record?.shots || ''} onChange={(event) => updateRecord('shots', event.target.value)} placeholder="镜数，例如 10 镜" /><input value={project.record?.duration || ''} onChange={(event) => updateRecord('duration', event.target.value)} placeholder="时长，例如 15s" /><input value={project.record?.tools || ''} onChange={(event) => updateRecord('tools', event.target.value)} placeholder="使用工具" /><textarea value={project.record?.problems || ''} onChange={(event) => updateRecord('problems', event.target.value)} placeholder="遇到的问题" /><textarea value={project.record?.notes || ''} onChange={(event) => updateRecord('notes', event.target.value)} placeholder="心得笔记" /></div>}</article>;
+  return <article className="creator-project">
+    <div className="creator-project-title"><div><h4>{project.title}</h4><span>{project.status}</span></div><button type="button" title="复制项目 Markdown" onClick={onCopy}><Copy size={15} /></button></div>
+    <div className="creator-project-stages"><div><b>制作阶段</b><span>当前：{PROJECT_STAGES.find((stage) => stage.id === currentStage)?.label}</span></div><div className="creator-project-stage-list" role="group" aria-label={`${project.title} 的制作阶段`}>{PROJECT_STAGES.map((stage, index) => <button type="button" className={stage.id === currentStage ? 'active' : ''} aria-pressed={stage.id === currentStage} onClick={() => onUpdateStage(project.id, stage.id)} key={stage.id}><i>{index + 1}</i>{stage.label}</button>)}</div></div>
+    <div className="creator-project-progress"><span><i style={{ width: `${percent}%` }} /></span><b>{percent}%</b></div>
+    {timerRecords.length > 0 && <section className="creator-project-timer-results" aria-label={`${project.title} 的关联计时`}><div className="creator-project-timer-heading"><b>关联计时</b><span>{timerRecords.length} 条</span></div>{timerRecords.map((record) => <ProjectTimerResult record={record} onSave={onUpdateTimerRecord} key={record.id} />)}</section>}
+    <div className="creator-task-list">{project.tasks.map((task) => <div key={task.id} className={task.done ? 'done' : ''}><label><input type="checkbox" checked={task.done} onChange={() => onToggle(project.id, task.id)} /><input value={task.title} onChange={(event) => onUpdateTask(project.id, task.id, event.target.value)} aria-label="待办内容" />{task.type !== 'general' && <em>{TYPES.find((type) => type.id === task.type)?.short}</em>}</label><button className="creator-task-delete" type="button" aria-label={`删除 ${task.title}`} onClick={() => onRemoveTask(project.id, task.id)}>×</button></div>)}</div>
+    <form className="creator-inline-task" onSubmit={(event) => { event.preventDefault(); onAddTask(project.id, taskDraft, taskType); setTaskDraft(''); }}><input value={taskDraft} onChange={(event) => setTaskDraft(event.target.value)} placeholder="添加待办" /><select value={taskType} onChange={(event) => setTaskType(event.target.value)}><option value="general">普通待办</option>{TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}（自动统计）</option>)}</select><button type="submit"><Plus size={13} /></button></form>
+    <button className="creator-record-toggle" type="button" onClick={() => setRecordOpen(!recordOpen)}>创作记录台账 {recordOpen ? '收起' : '展开'}</button>{recordOpen && <div className="creator-record-grid"><input value={project.record?.shots || ''} onChange={(event) => updateRecord('shots', event.target.value)} placeholder="镜数，例如 10 镜" /><input value={project.record?.duration || ''} onChange={(event) => updateRecord('duration', event.target.value)} placeholder="时长，例如 15s" /><input value={project.record?.tools || ''} onChange={(event) => updateRecord('tools', event.target.value)} placeholder="使用工具" /><textarea value={project.record?.problems || ''} onChange={(event) => updateRecord('problems', event.target.value)} placeholder="遇到的问题" /><textarea value={project.record?.notes || ''} onChange={(event) => updateRecord('notes', event.target.value)} placeholder="心得笔记" /></div>}
+  </article>;
 }
 
 function PromptCard({ prompt, projects, onCopy, onDelete }) {

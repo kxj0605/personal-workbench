@@ -117,6 +117,22 @@
 .creator-project-title h4 { margin: 0 0 3px; font-size: 13px; }
 .creator-project-title span { color: #638067; font-size: 10px; font-weight: 800; }
 .creator-project-title button { border: 0; padding: 5px; color: #66806a; background: #edf4eb; border-radius: 7px; cursor: pointer; }
+.creator-project-stages { display: grid; gap: 7px; margin-top: 12px; border-radius: 11px; padding: 9px; background: #f4f7fb; }
+.creator-project-stages > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #667085; font-size: 11px; }
+.creator-project-stages b { color: #475467; font-size: 11px; }
+.creator-project-stages span { color: #3976d5; font-weight: 700; }
+.creator-project-stage-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.creator-project-stage-list button { display: inline-flex; min-height: 30px; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; padding: 0 7px; color: #667085; background: #fff; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.creator-project-stage-list button i { display: grid; width: 15px; height: 15px; place-items: center; border-radius: 999px; color: #98a2b3; background: #eef2f6; font-size: 9px; font-style: normal; }
+.creator-project-stage-list button:hover, .creator-project-stage-list button:focus-visible { border-color: rgba(57, 118, 213, .22); color: #3976d5; outline: none; }
+.creator-project-stage-list button.active { border-color: rgba(57, 118, 213, .22); color: #3976d5; background: #eaf3ff; }
+.creator-project-stage-list button.active i { color: #fff; background: #3976d5; }
+.creator-project-timer-results { display: grid; gap: 8px; margin: 12px 0; border-radius: 12px; padding: 10px; background: #f8fbff; }
+.creator-project-timer-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #475467; font-size: 11px; }
+.creator-project-timer-heading span { border-radius: 999px; padding: 3px 6px; color: #3976d5; background: #eaf3ff; font-size: 10px; font-weight: 700; }
+.creator-project-timer-result { display: grid; gap: 8px; border: 1px solid rgba(57, 118, 213, .10); border-radius: 10px; padding: 9px; background: #fff; }
+.creator-project-timer-result > div:first-child { display: grid; gap: 2px; }.creator-project-timer-result b { color: #344054; font-size: 12px; }.creator-project-timer-result > div:first-child span { color: #98a2b3; font-size: 10px; }
+.creator-project-timer-fields { display: grid; grid-template-columns: 1fr 92px; gap: 7px; align-items: end; }.creator-project-timer-fields label { display: grid; gap: 3px; color: #667085; font-size: 10px; font-weight: 700; }.creator-project-timer-fields label.wide { grid-column: 1 / -1; }.creator-project-timer-fields input, .creator-project-timer-fields select { min-width: 0; min-height: 30px; box-sizing: border-box; border: 1px solid #dfe6dc; border-radius: 8px; padding: 0 7px; color: var(--creator-ink); background: #fff; font: inherit; font-size: 11px; }.creator-project-timer-fields button { width: fit-content; min-height: 30px; border: 1px solid rgba(57, 118, 213, .18); border-radius: 8px; padding: 0 9px; color: #3976d5; background: #eaf3ff; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .creator-project-progress { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .creator-project-progress > span { margin: 10px 0; }.creator-project-progress b { font-size: 11px; }
 .creator-task-list { display: grid; gap: 0; }
