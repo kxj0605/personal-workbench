@@ -129,7 +129,7 @@ function getProjectStage(project) {
   return PROJECT_STAGES.find((stage) => unfinishedTasks.some((title) => stageMatchers[stage.id].test(title)))?.id || 'publish';
 }
 
-export function CreatorDashboard({ view = 'overview' }) {
+export function CreatorDashboard({ view = 'overview', projectSeed = null, onProjectSeedHandled }) {
   const [data, setData] = React.useState(loadData);
   const [archives, setArchives] = React.useState(loadArchives);
   const [timerRecords, setTimerRecords] = React.useState(loadTimerRecords);
@@ -138,6 +138,7 @@ export function CreatorDashboard({ view = 'overview' }) {
   const [promptDraft, setPromptDraft] = React.useState({ category: '未分类', tags: '', body: '', reference: '', projectId: '' });
   const [customMilestone, setCustomMilestone] = React.useState('');
   const [goalPeriod, setGoalPeriod] = React.useState('month');
+  const handledProjectSeedId = React.useRef('');
 
   React.useEffect(() => { window.localStorage.setItem(CREATOR_DASHBOARD_STORAGE_KEY, JSON.stringify(data)); }, [data]);
   React.useEffect(() => {
@@ -159,6 +160,23 @@ export function CreatorDashboard({ view = 'overview' }) {
   }, [notice]);
 
   const updateData = (updater) => setData((current) => typeof updater === 'function' ? updater(current) : updater);
+  React.useEffect(() => {
+    if (!projectSeed?.id || projectSeed.id === handledProjectSeedId.current) return;
+    handledProjectSeedId.current = projectSeed.id;
+    const title = projectSeed.title || '未命名对标视频';
+    updateData((current) => {
+      if (current.projects.some((project) => project.sourceVideoId === projectSeed.id)) {
+        setNotice(`「${title}」已经创建过改编项目。`);
+        return current;
+      }
+      setNotice(`已从「${title}」创建改编项目。`);
+      return {
+        ...current,
+        projects: [{ id: uid(), title: `${title} 改编`, status: '构思中', stage: 'topic', sourceVideoId: projectSeed.id, sourceVideoTitle: title, sourceVideoUrl: projectSeed.url || '', tasks: DEFAULT_TASKS.map((task) => ({ id: uid(), ...task, done: false })), createdAt: new Date().toISOString() }, ...current.projects],
+      };
+    });
+    onProjectSeedHandled?.();
+  }, [projectSeed, onProjectSeedHandled]);
   const weekly = getCounts(data.events, 'week');
   const month = getCounts(data.events, 'month');
   const currentTasks = data.projects.flatMap((project) => project.tasks.filter((task) => !task.done).map((task) => ({ ...task, project })));

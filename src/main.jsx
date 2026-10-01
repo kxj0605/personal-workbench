@@ -50,6 +50,7 @@ import {
   Target,
   Trash2,
   UserPlus,
+  UsersRound,
   Wifi,
   X,
   Zap,
@@ -61,6 +62,7 @@ import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
+import { BenchmarkLibraryPanel } from './components/BenchmarkLibraryPanel';
 import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
 import { FocusTimerCard } from './components/FocusTimerCard';
 import { getBenchmarkMetadataFields } from './components/BenchmarkVideoDetails';
@@ -439,6 +441,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
   const [taskViewRequest, setTaskViewRequest] = React.useState(null);
   const [isWebsiteCreateRequested, setIsWebsiteCreateRequested] = React.useState(false);
+  const [projectSeed, setProjectSeed] = React.useState(null);
 
   const loadData = React.useCallback(async () => {
     if (!session || !supabase) return;
@@ -485,11 +488,12 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const importantTodayTasks = todayTasks.filter(
     (task) => task.status !== 'completed' && task.matrix_category.startsWith('important_'),
   );
-  const creatorTabs = [tabs.creator, tabs.creatorProjects, tabs.creatorCollection, tabs.breakdown, tabs.creatorMaterials, tabs.creatorReview];
+  const creatorTabs = [tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorMaterials, tabs.creatorReview];
   const isCreatorTab = creatorTabs.includes(activeTab);
   const workspaceTitle = {
     [tabs.creator]: '创作概览',
     [tabs.creatorProjects]: '项目',
+    [tabs.creatorBenchmark]: '对标库',
     [tabs.creatorCollection]: '灵感视频',
     [tabs.breakdown]: '拆解学习',
     [tabs.creatorMaterials]: '素材库',
@@ -504,6 +508,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const workspaceDescription = {
     [tabs.creator]: '查看当前创作节奏，并回到最需要推进的一步。',
     [tabs.creatorProjects]: '管理每支视频的制作步骤；本阶段不与个人任务合并。',
+    [tabs.creatorBenchmark]: '先观察对标账号，再选择合适作品加入对标视频。',
     [tabs.creatorCollection]: '收集灵感视频，在同一张卡中补全对标资料并开始拆解。',
     [tabs.breakdown]: '按故事、情绪和传播维度，拆解对标视频的脚本结构。',
     [tabs.creatorMaterials]: '沉淀并复用创作中常用的提示词与参考资料。',
@@ -523,6 +528,10 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     setTaskViewRequest(tab === tabs.tasks ? taskViews.list : null);
     setActiveTab(tab);
     setIsUserMenuOpen(false);
+  };
+  const openProjectFromVideo = (video) => {
+    setProjectSeed(video);
+    setActiveTab(tabs.creatorProjects);
   };
 
   const openScheduleManager = () => {
@@ -594,7 +603,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         </div>
 
         <div className="workspace-module-group">
-          <button className={`sidebar-module-button ${isCreatorTab ? 'active' : ''}`} type="button" onClick={() => navigateTo(tabs.creator)} aria-label="工作台" title="工作台" aria-expanded={isCreatorTab}>
+          <button className={`sidebar-module-button ${isCreatorTab ? 'active' : ''}`} type="button" onClick={() => navigateTo(tabs.creatorBenchmark)} aria-label="工作台" title="工作台" aria-expanded={isCreatorTab}>
             <RoundedFolderIcon size={23} strokeWidth={2.4} />
             <span>工作台</span>
             {isCreatorTab ? <ChevronDown size={16} className="sidebar-module-chevron" /> : <ChevronRight size={16} className="sidebar-module-chevron" />}
@@ -602,6 +611,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           {isCreatorTab && (
             <nav className="workspace-nav sidebar-child-list" aria-label="工作台导航">
               <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
+              <SidebarButton icon={UsersRound} label="对标库" active={activeTab === tabs.creatorBenchmark} onClick={() => navigateTo(tabs.creatorBenchmark)} />
               <SidebarButton icon={Flag} label="项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
               <SidebarButton icon={Film} label="灵感视频" active={activeTab === tabs.creatorCollection} onClick={() => navigateTo(tabs.creatorCollection)} />
               <SidebarButton icon={PanelsTopLeft} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => navigateTo(tabs.breakdown)} />
@@ -679,7 +689,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </header>
         )}
 
-        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && (
+        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && (
           <header className="workspace-heading compact-heading">
             <div>
               <h1>{workspaceTitle}</h1>
@@ -701,7 +711,8 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           }} />
         )}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}
-        {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" />}
+        {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" projectSeed={projectSeed} onProjectSeedHandled={() => setProjectSeed(null)} />}
+        {activeTab === tabs.creatorBenchmark && <BenchmarkLibraryPanel onOpenBreakdown={(video) => { setSelectedCollectionVideo(video); setActiveTab(tabs.breakdown); }} onCreateProject={openProjectFromVideo} />}
         {activeTab === tabs.creatorCollection && <VideoCollectionPanel onOpenBreakdown={(video) => { setSelectedCollectionVideo(video); setActiveTab(tabs.breakdown); }} />}
         {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" />}
         {activeTab === tabs.creatorReview && <CreatorDashboard view="review" />}
