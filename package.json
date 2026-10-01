@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:p0": "playwright test tests/p0-local.spec.js --project=chrome",
+    "test:p1": "playwright test tests/p1-local.spec.js --project=chrome --project=edge"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
@@ -15,5 +17,9 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "vite": "^7.2.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0"
   }
 }

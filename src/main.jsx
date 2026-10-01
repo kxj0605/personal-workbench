@@ -63,6 +63,9 @@ import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
 import { BenchmarkLibraryPanel } from './components/BenchmarkLibraryPanel';
+import { ViralResearchPanel } from './components/ViralResearchPanel';
+import { ImageGenerationPanel } from './components/ImageGenerationPanel';
+import { loadBenchmarkAccounts, loadBenchmarkVideos } from './utils/benchmarkLibrary';
 import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
 import { FocusTimerCard } from './components/FocusTimerCard';
 import { getBenchmarkMetadataFields } from './components/BenchmarkVideoDetails';
@@ -442,6 +445,15 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const [taskViewRequest, setTaskViewRequest] = React.useState(null);
   const [isWebsiteCreateRequested, setIsWebsiteCreateRequested] = React.useState(false);
   const [projectSeed, setProjectSeed] = React.useState(null);
+  const [researchVideoId, setResearchVideoId] = React.useState('');
+
+  React.useEffect(() => {
+    const mobileQuery = window.matchMedia('(max-width: 600px)');
+    const syncSidebarForViewport = () => setIsSidebarHidden(mobileQuery.matches);
+    syncSidebarForViewport();
+    mobileQuery.addEventListener('change', syncSidebarForViewport);
+    return () => mobileQuery.removeEventListener('change', syncSidebarForViewport);
+  }, []);
 
   const loadData = React.useCallback(async () => {
     if (!session || !supabase) return;
@@ -488,15 +500,18 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const importantTodayTasks = todayTasks.filter(
     (task) => task.status !== 'completed' && task.matrix_category.startsWith('important_'),
   );
-  const creatorTabs = [tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorMaterials, tabs.creatorReview];
+  const creatorTabs = [tabs.imageGeneration, tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorResearch, tabs.creatorMaterials, tabs.creatorReview];
   const isCreatorTab = creatorTabs.includes(activeTab);
+  const isPromptLibraryTab = activeTab === tabs.creatorMaterials || activeTab === tabs.imageGeneration;
   const workspaceTitle = {
+    [tabs.imageGeneration]: '提示词库',
     [tabs.creator]: '创作概览',
-    [tabs.creatorProjects]: '项目',
+    [tabs.creatorProjects]: '改编项目',
     [tabs.creatorBenchmark]: '对标库',
     [tabs.creatorCollection]: '灵感视频',
     [tabs.breakdown]: '拆解学习',
-    [tabs.creatorMaterials]: '素材库',
+    [tabs.creatorResearch]: '爆款研究',
+    [tabs.creatorMaterials]: '提示词库',
     [tabs.creatorReview]: '复盘',
     [tabs.notes]: '笔记',
     [tabs.tasks]: '事件',
@@ -506,11 +521,13 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
     [tabs.profile]: '设置',
   }[activeTab];
   const workspaceDescription = {
+    [tabs.imageGeneration]: '沉淀并复用创作中常用的提示词与参考资料。',
     [tabs.creator]: '查看当前创作节奏，并回到最需要推进的一步。',
-    [tabs.creatorProjects]: '管理每支视频的制作步骤；本阶段不与个人任务合并。',
+    [tabs.creatorProjects]: '从对标视频开始，推进研究、拆解、素材、剪辑与发布。',
     [tabs.creatorBenchmark]: '先观察对标账号，再选择合适作品加入对标视频。',
     [tabs.creatorCollection]: '收集灵感视频，在同一张卡中补全对标资料并开始拆解。',
-    [tabs.breakdown]: '按故事、情绪和传播维度，拆解对标视频的脚本结构。',
+    [tabs.breakdown]: '从对标账号、对标视频或空白练习开始，拆解视频的脚本结构。',
+    [tabs.creatorResearch]: '围绕项目来源视频，沉淀可复用的爆点、脚本与开头。',
     [tabs.creatorMaterials]: '沉淀并复用创作中常用的提示词与参考资料。',
     [tabs.creatorReview]: '回看创作过程中的阶段记录与学习沉淀。',
     [tabs.notes]: `共 ${notes.length} 篇笔记，记录想法并决定内容是否公开。`,
@@ -532,6 +549,14 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const openProjectFromVideo = (video) => {
     setProjectSeed(video);
     setActiveTab(tabs.creatorProjects);
+  };
+  const openResearchFromVideo = (video) => {
+    setResearchVideoId(video?.id || '');
+    setActiveTab(tabs.creatorResearch);
+  };
+  const openBreakdownFromVideo = (video) => {
+    setSelectedCollectionVideo(video);
+    setActiveTab(tabs.breakdown);
   };
 
   const openScheduleManager = () => {
@@ -610,13 +635,13 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </button>
           {isCreatorTab && (
             <nav className="workspace-nav sidebar-child-list" aria-label="工作台导航">
-              <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
               <SidebarButton icon={UsersRound} label="对标库" active={activeTab === tabs.creatorBenchmark} onClick={() => navigateTo(tabs.creatorBenchmark)} />
-              <SidebarButton icon={Flag} label="项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
-              <SidebarButton icon={Film} label="灵感视频" active={activeTab === tabs.creatorCollection} onClick={() => navigateTo(tabs.creatorCollection)} />
+              <SidebarButton icon={Flag} label="改编项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
+              <SidebarButton icon={Sparkles} label="爆款研究" active={activeTab === tabs.creatorResearch} onClick={() => navigateTo(tabs.creatorResearch)} />
               <SidebarButton icon={PanelsTopLeft} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => navigateTo(tabs.breakdown)} />
-              <SidebarButton icon={LibraryBig} label="素材库" active={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)} />
+              <SidebarButton icon={LibraryBig} label="提示词库" active={isPromptLibraryTab} onClick={() => navigateTo(tabs.creatorMaterials)} />
               <SidebarButton icon={Clock3} label="复盘" active={activeTab === tabs.creatorReview} onClick={() => navigateTo(tabs.creatorReview)} />
+              <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
             </nav>
           )}
         </div>
@@ -689,7 +714,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </header>
         )}
 
-        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && (
+        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && (
           <header className="workspace-heading compact-heading">
             <div>
               <h1>{workspaceTitle}</h1>
@@ -710,11 +735,21 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
             updateTaskStatus(task, task.status === 'completed' ? 'in_progress' : 'completed', setTasks, setMessage);
           }} />
         )}
+        {isPromptLibraryTab && (
+          <section className="prompt-library-content" aria-label="提示词库内容">
+            <nav className="prompt-library-tabs" aria-label="提示词库分类">
+              <button className={activeTab === tabs.creatorMaterials ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)}>我的提示词</button>
+              <button className={activeTab === tabs.imageGeneration ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.imageGeneration} onClick={() => navigateTo(tabs.imageGeneration)}>图片改图模板</button>
+            </nav>
+            {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" />}
+            {activeTab === tabs.imageGeneration && <ImageGenerationPanel />}
+          </section>
+        )}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}
-        {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" projectSeed={projectSeed} onProjectSeedHandled={() => setProjectSeed(null)} />}
-        {activeTab === tabs.creatorBenchmark && <BenchmarkLibraryPanel onOpenBreakdown={(video) => { setSelectedCollectionVideo(video); setActiveTab(tabs.breakdown); }} onCreateProject={openProjectFromVideo} />}
-        {activeTab === tabs.creatorCollection && <VideoCollectionPanel onOpenBreakdown={(video) => { setSelectedCollectionVideo(video); setActiveTab(tabs.breakdown); }} />}
-        {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" />}
+        {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" projectSeed={projectSeed} onProjectSeedHandled={() => setProjectSeed(null)} onOpenResearch={openResearchFromVideo} onOpenBreakdown={openBreakdownFromVideo} />}
+        {activeTab === tabs.creatorBenchmark && <BenchmarkLibraryPanel onOpenBreakdown={openBreakdownFromVideo} onCreateProject={openProjectFromVideo} />}
+        {activeTab === tabs.creatorCollection && <VideoCollectionPanel onOpenBreakdown={openBreakdownFromVideo} onCreateProject={openProjectFromVideo} />}
+        {activeTab === tabs.creatorResearch && <ViralResearchPanel initialVideoId={researchVideoId} onInitialVideoHandled={() => setResearchVideoId('')} />}
         {activeTab === tabs.creatorReview && <CreatorDashboard view="review" />}
         {activeTab === tabs.notes && (
           <NotesPanel session={session} notes={notes} setNotes={setNotes} setMessage={setMessage} />
@@ -897,6 +932,11 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [exportFileName, setExportFileName] = React.useState('脚本拆解');
   const [notice, setNotice] = React.useState('');
   const [comparison, setComparison] = React.useState(null);
+  const [libraryVideos, setLibraryVideos] = React.useState(loadBenchmarkVideos);
+  const [libraryAccounts, setLibraryAccounts] = React.useState(loadBenchmarkAccounts);
+  const [breakdownSource, setBreakdownSource] = React.useState(collectionVideo ? 'video' : 'independent');
+  const [selectedLibraryVideoId, setSelectedLibraryVideoId] = React.useState(collectionVideo?.id || '');
+  const [selectedLibraryAccountId, setSelectedLibraryAccountId] = React.useState(collectionVideo?.accountId || '');
   const defaultBenchmarkPrompts = {
     youtube: '请根据 YouTube / YouTube Shorts 视频链接，提取公开资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n视频标题：仅保留标题正文，不包含任何 # 标签\n视频标签：去掉 #；剔除与频道名称相同的标签；多项用 、 分隔\n视频链接：原始视频链接\n背景音乐：歌曲或音乐名称；无法确认请写不可用\n视频时长：\n频道名称：使用 @频道 Handle\n频道主页链接：https://www.youtube.com/@频道Handle\n播放量：\n点赞量：\n评论量：\n\n无法可靠获取的字段请写“不可用”，不要猜测。\n\n视频链接：{{视频链接}}',
     douyin: '我会提供一条抖音视频链接和一张视频详情截图。请结合链接与截图提取公开资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n截图优先用于识别背景音乐、点赞量、评论量、收藏量和转发量；请只读取截图中清晰可见的数据。\n\n视频标题：优先读取作者昵称下方的视频发布文案第一句，去掉后续 # 标签；不要把封面、暂停画面、视频内容里的字幕或大字当作标题。若发布文案只有一句，视频标题和视频简介可以相同\n视频简介：\n视频标签：去掉 #；如果标签与频道名称相同则剔除\n视频链接：{{视频链接}}\n发布者：严格使用 Markdown 链接格式 [@昵称](https://www.douyin.com/user/...)\n背景音乐：\n点赞量：\n评论量：\n收藏量：\n转发量：\n\n无法可靠获取或截图中看不清的字段请写“不可用”，不要猜测。',
@@ -954,6 +994,26 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [aiDistributionSummary, setAiDistributionSummary] = React.useState(null);
   const [draftRevision, setDraftRevision] = React.useState(0);
   const [isDraftReady, setIsDraftReady] = React.useState(false);
+  const selectedLibraryVideo = libraryVideos.find((video) => video.id === selectedLibraryVideoId) || null;
+  const selectedLibraryAccount = libraryAccounts.find((account) => account.id === selectedLibraryAccountId) || null;
+  const activeCollectionVideo = breakdownSource === 'video' ? (selectedLibraryVideo || collectionVideo) : null;
+
+  React.useEffect(() => {
+    const refreshSources = () => {
+      setLibraryVideos(loadBenchmarkVideos());
+      setLibraryAccounts(loadBenchmarkAccounts());
+    };
+    window.addEventListener('focus', refreshSources);
+    window.addEventListener('storage', refreshSources);
+    return () => { window.removeEventListener('focus', refreshSources); window.removeEventListener('storage', refreshSources); };
+  }, []);
+
+  React.useEffect(() => {
+    if (!collectionVideo) return;
+    setBreakdownSource('video');
+    setSelectedLibraryVideoId(collectionVideo.id || '');
+    setSelectedLibraryAccountId(collectionVideo.accountId || '');
+  }, [collectionVideo]);
 
   const getEmotionLabel = (level) => {
     if (level >= 5) return '兴奋';
@@ -1823,27 +1883,27 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   }, []);
 
   React.useEffect(() => {
-    if (!collectionVideo || !isDraftReady || !formRef.current) return;
-    const platform = detectBenchmarkPlatform(collectionVideo.url);
-    const displayVideoUrl = platform === 'douyin' ? normalizeDouyinVideoUrl(collectionVideo.url) : collectionVideo.url;
+    if (!activeCollectionVideo || !isDraftReady || !formRef.current) return;
+    const platform = detectBenchmarkPlatform(activeCollectionVideo.url);
+    const displayVideoUrl = platform === 'douyin' ? normalizeDouyinVideoUrl(activeCollectionVideo.url) : activeCollectionVideo.url;
     const collectionCategoryToVideoType = {
       '情绪': 'emotion',
       '反转打脸爽剧': 'reversal',
       '搞笑整蛊': 'comedy',
     };
-    const carriedVideoType = collectionCategoryToVideoType[collectionVideo.category] || '';
+    const carriedVideoType = collectionCategoryToVideoType[activeCollectionVideo.category] || '';
     const benchmarkControl = formRef.current.elements.namedItem('benchmark-video');
     const titleControl = formRef.current.elements.namedItem('title');
     if (benchmarkControl && typeof benchmarkControl.value === 'string') benchmarkControl.value = displayVideoUrl;
-    if (titleControl && typeof titleControl.value === 'string' && !titleControl.value.trim()) titleControl.value = collectionVideo.title;
+    if (titleControl && typeof titleControl.value === 'string' && !titleControl.value.trim()) titleControl.value = activeCollectionVideo.title;
     setBenchmarkVideoUrl(displayVideoUrl);
     setBenchmarkPlatform(platform);
     setSelectedVideoType(carriedVideoType);
     setDraftRevision((revision) => revision + 1);
     setNotice(carriedVideoType
-      ? `已带入「${collectionVideo.title}」，并自动选中对应的视频类型。`
-      : `已带入「${collectionVideo.title}」，请按内容选择视频类型。`);
-  }, [collectionVideo, isDraftReady]);
+      ? `已带入「${activeCollectionVideo.title}」，并自动选中对应的视频类型。`
+      : `已带入「${activeCollectionVideo.title}」，请按内容选择视频类型。`);
+  }, [activeCollectionVideo, isDraftReady]);
 
   React.useEffect(() => {
     if (!notice) return undefined;
@@ -1879,7 +1939,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const buildExportContent = () => {
     const formData = getScriptFormData();
     const title = formData.get('title')?.trim() || '脚本拆解';
-    const collectionMetadata = collectionVideo?.details?.metadata || {};
+    const collectionMetadata = activeCollectionVideo?.details?.metadata || {};
     const benchmarkDetails = getBenchmarkMetadataFields(benchmarkVideoUrl)
       .map((field) => `${field.label}：${collectionMetadata[field.name]?.trim() || '（未填写）'}`)
       .join('\n');
@@ -2163,13 +2223,14 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         structureMode: activeStructureModeLabel,
         shotRows: coreEventChainRows.length,
         values: formValues,
+        source: { mode: breakdownSource, accountId: selectedLibraryAccountId || '', videoId: activeCollectionVideo?.id || '' },
       };
       window.localStorage.setItem(archiveKey, JSON.stringify([archive, ...(Array.isArray(existing) ? existing : [])]));
-      if (collectionVideo?.id) {
+      if (activeCollectionVideo?.id) {
         const collectionKey = 'video-collection-v1';
         const collectionVideos = JSON.parse(window.localStorage.getItem(collectionKey) || '[]');
         if (Array.isArray(collectionVideos)) {
-          window.localStorage.setItem(collectionKey, JSON.stringify(collectionVideos.map((video) => video.id === collectionVideo.id ? { ...video, status: 'archived', archivedAt } : video)));
+          window.localStorage.setItem(collectionKey, JSON.stringify(collectionVideos.map((video) => video.id === activeCollectionVideo.id ? { ...video, status: 'archived', archivedAt } : video)));
         }
       }
       persistDraft();
@@ -2437,6 +2498,17 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         </div>
       </div>
       {notice && <p className="script-breakdown-notice" role="status">{notice}</p>}
+      <section className="breakdown-source-picker" aria-labelledby="breakdown-source-title">
+        <div><strong id="breakdown-source-title">拆解来源</strong><span>可带入对标库资料，也可以从空白练习开始。</span></div>
+        <div className="breakdown-source-options" role="group" aria-label="选择拆解来源">
+          <button type="button" className={breakdownSource === 'video' ? 'active' : ''} aria-pressed={breakdownSource === 'video'} onClick={() => setBreakdownSource('video')}>从对标视频选择</button>
+          <button type="button" className={breakdownSource === 'account' ? 'active' : ''} aria-pressed={breakdownSource === 'account'} onClick={() => setBreakdownSource('account')}>从对标账号选择</button>
+          <button type="button" className={breakdownSource === 'independent' ? 'active' : ''} aria-pressed={breakdownSource === 'independent'} onClick={() => setBreakdownSource('independent')}>独立开始</button>
+        </div>
+        {breakdownSource === 'video' && <label className="breakdown-source-select">对标视频<select value={selectedLibraryVideoId} onChange={(event) => { const video = libraryVideos.find((item) => item.id === event.target.value); setSelectedLibraryVideoId(event.target.value); setSelectedLibraryAccountId(video?.accountId || ''); }}><option value="">选择已录入视频</option>{libraryVideos.map((video) => <option value={video.id} key={video.id}>{video.title}</option>)}</select></label>}
+        {breakdownSource === 'account' && <label className="breakdown-source-select">对标账号<select value={selectedLibraryAccountId} onChange={(event) => setSelectedLibraryAccountId(event.target.value)}><option value="">选择已录入账号</option>{libraryAccounts.map((account) => <option value={account.id} key={account.id}>{account.platform} · {account.name}</option>)}</select>{selectedLibraryAccount && <small>当前关联：{selectedLibraryAccount.name}。可在下方手动填写或粘贴本次要拆解的视频资料。</small>}</label>}
+        {breakdownSource === 'independent' && <p className="breakdown-source-empty">不关联对标账号或对标视频，直接填写本次拆解内容。</p>}
+      </section>
       {isExportOpen && (
         <section className="script-export-popover" aria-label="导出选项">
           <h3>导出</h3>
@@ -3167,8 +3239,7 @@ function LegacyDashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNote
   );
 }
 
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'personal-workbench-dashboard-layout-v3';
-const LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY = 'personal-workbench-dashboard-layout-v2';
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'personal-workbench-dashboard-layout-v4';
 const dashboardSizeOptions = [
   { width: 2, height: 2, label: '2 × 2' },
   { width: 3, height: 2, label: '3 × 2' },
@@ -3179,13 +3250,13 @@ const dashboardSizeOptions = [
 ];
 
 const defaultDashboardCards = [
-  { id: 'schedule', label: '今日日程', width: 6, height: 3, x: 0, y: 0, visible: true },
-  { id: 'quick-task', label: '新建任务', width: 1, height: 1, x: 0, y: 3, visible: true },
-  { id: 'quick-note', label: '写点东西', width: 1, height: 1, x: 1, y: 3, visible: true },
-  { id: 'websites', label: '常用网址', width: 6, height: 2, x: 0, y: 4, visible: true },
-  { id: 'upcoming', label: '未来任务', width: 6, height: 3, x: 0, y: 6, visible: true },
-  { id: 'notes', label: '最近笔记', width: 6, height: 3, x: 0, y: 9, visible: true, sizeMode: 'auto' },
-  { id: 'focus', label: '专注计时', width: 6, height: 4, x: 0, y: 13, visible: true },
+  { id: 'schedule', label: '今日日程', width: 3, height: 4, x: 0, y: 0, visible: true },
+  { id: 'quick-task', label: '新建任务', width: 1, height: 1, x: 0, y: 4, visible: true },
+  { id: 'quick-note', label: '写点东西', width: 1, height: 1, x: 1, y: 4, visible: true },
+  { id: 'focus', label: '专注计时', width: 3, height: 5, x: 3, y: 0, visible: true },
+  { id: 'upcoming', label: '未来任务', width: 3, height: 2, x: 0, y: 5, visible: true },
+  { id: 'notes', label: '最近笔记', width: 3, height: 2, x: 3, y: 5, visible: true, sizeMode: 'auto' },
+  { id: 'websites', label: '常用网址', width: 6, height: 1, x: 0, y: 7, visible: true },
 ];
 
 function getRecentNotesAutoHeight(notes) {
@@ -3201,7 +3272,7 @@ function getNoteRecentTimestamp(note) {
 
 function loadDashboardCards() {
   try {
-    const savedCards = JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) || window.localStorage.getItem(LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY) || '[]');
+    const savedCards = JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) || '[]');
     if (!Array.isArray(savedCards)) return defaultDashboardCards;
     const savedById = new Map(savedCards.map((card) => [card.id, card]));
     const savedOrder = savedCards.map((card) => card.id);
@@ -3214,11 +3285,11 @@ function loadDashboardCards() {
         sizeMode: savedCard && (savedCard.width !== card.width || savedCard.height !== card.height) ? 'custom' : 'auto',
       };
     }).sort((left, right) => (savedOrder.indexOf(left.id) === -1 ? 999 : savedOrder.indexOf(left.id)) - (savedOrder.indexOf(right.id) === -1 ? 999 : savedOrder.indexOf(right.id)));
-    const cardsWithFocusPlaced = savedById.has('focus') ? restoredCards : restoredCards.map((card) => {
+    const cardsWithFocusPlaced = savedCards.length > 0 && !savedById.has('focus') ? restoredCards.map((card) => {
       if (card.id !== 'focus') return card;
       const lastOccupiedRow = Math.max(0, ...restoredCards.filter((item) => item.id !== 'focus' && item.visible).map((item) => item.y + item.height));
       return { ...card, y: lastOccupiedRow };
-    });
+    }) : restoredCards;
     return assignDashboardPositions(cardsWithFocusPlaced);
   } catch {
     return defaultDashboardCards;
@@ -3891,7 +3962,13 @@ function NotesPanel({ session, notes, setNotes, setMessage }) {
 
       <section className="notes-collection">
         {notes.length === 0 ? (
-          <EmptyState text="还没有笔记，可以先写一个想法或记录。" />
+          <section className="notes-empty-state">
+            <EmptyState text="还没有笔记，可以先写一个想法或记录。" />
+            <button className="workspace-main-action notes-empty-action" type="button" onClick={() => setIsComposerOpen(true)}>
+              <Plus size={18} />
+              写第一篇笔记
+            </button>
+          </section>
         ) : (
           <div className="notes-card-grid">
             {notes.map((note, index) => (
@@ -5711,7 +5788,7 @@ function PublicNotesPage({ session, profile, onLogin, embedded = false }) {
       <div className="public-hero">
         <div>
           <p className="public-kicker"><Sparkles size={15} /> 灵感广场</p>
-          <h1>公开笔记</h1>
+          {!embedded && <h1>公开笔记</h1>}
           <p>看看大家最近记录的想法，也可以留下你的回应。</p>
         </div>
         <div className="public-summary">

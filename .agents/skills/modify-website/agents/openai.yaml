@@ -1,0 +1,4 @@
+interface:
+  display_name: "修改网站"
+  short_description: "小范围修改网站，完成构建、预览确认并按授权更新线上版本"
+  default_prompt: "使用 $modify-website 对当前网站做一轮小范围修改，完成构建检查、本地预览和用户确认。"

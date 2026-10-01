@@ -3999,6 +3999,46 @@ button {
   font-size: 14px;
 }
 
+.prompt-library-content {
+  display: grid;
+  gap: 24px;
+}
+
+.prompt-library-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 4px;
+  border: 1px solid rgba(17, 24, 39, .06);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: var(--shadow-sm);
+}
+
+.prompt-library-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.prompt-library-tabs button:hover,
+.prompt-library-tabs button:focus-visible {
+  color: #3976d5;
+}
+
+.prompt-library-tabs button.active {
+  background: #eaf3ff;
+  color: #3976d5;
+}
+
 .workspace-content .auth-state strong {
   color: #d96872;
   font-weight: 750;
@@ -5779,6 +5819,8 @@ button {
 }
 
 .workspace-content .calendar-cell > strong {
+  position: relative;
+  z-index: 3;
   justify-self: end;
   color: #475467;
   font-size: 15px;
@@ -5820,7 +5862,7 @@ button {
 
 .calendar-range-event {
   position: absolute;
-  top: calc(22px + var(--calendar-range-top));
+  top: calc(30px + var(--calendar-range-top));
   left: calc(var(--calendar-range-left) + 5px);
   display: block;
   width: calc(var(--calendar-range-width) - 10px);
@@ -11987,8 +12029,8 @@ button.calendar-range-event:focus-visible,
     padding: 0 10px;
   }
 
-  .script-breakdown-notice {
-    margin-left: 0;
+.script-breakdown-notice {
+  margin-left: 0;
   }
 
   .script-comparison-action,
@@ -11999,6 +12041,45 @@ button.calendar-range-event:focus-visible,
 
   .script-comparison-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 拆解来源可选：视频、账号或独立练习都保留在同一张拆解表单内。 */
+.breakdown-source-picker { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border: 1px solid rgba(57, 118, 213, .13); border-radius: 16px; padding: 14px 16px; background: rgba(234, 243, 255, .48); }
+.breakdown-source-picker > div:first-child { display: grid; gap: 3px; }.breakdown-source-picker strong { color: var(--ws-text); font-size: 13px; }.breakdown-source-picker > div:first-child span, .breakdown-source-empty, .breakdown-source-select small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }.breakdown-source-options { display: flex; flex-wrap: wrap; gap: 6px; }.breakdown-source-options button { min-height: 32px; border: 1px solid rgba(57, 118, 213, .16); border-radius: 10px; padding: 0 10px; background: #fff; color: var(--ws-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }.breakdown-source-options button.active { border-color: rgba(57, 118, 213, .35); background: var(--ws-primary-soft); color: var(--ws-primary); }.breakdown-source-select { display: grid; gap: 5px; color: var(--ws-muted); font-size: 12px; font-weight: 700; }.breakdown-source-select select { min-width: 210px; min-height: 34px; border: 1px solid var(--ws-border); border-radius: 10px; padding: 0 9px; background: #fff; color: var(--ws-text); font: inherit; font-size: 12px; }.breakdown-source-select small { display: block; max-width: 280px; }.breakdown-source-empty { margin: 0; }
+
+/* 桌面端的空状态和设置页避免为对齐而制造无效留白。 */
+@media (min-width: 781px) {
+  .workspace-content .notes-empty-state {
+    display: flex;
+    min-height: 144px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    border-radius: 28px;
+    padding: 28px 32px;
+    background: var(--ws-card);
+    box-shadow: var(--shadow-md);
+  }
+
+  .workspace-content .notes-empty-state .empty-state {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .notes-empty-action {
+    flex: 0 0 auto;
+  }
+
+  .profile-settings-grid {
+    align-items: start;
+  }
+
+  .workspace-content .calendar-cell {
+    min-height: calc(96px + var(--calendar-range-space));
   }
 }
 
@@ -12352,4 +12433,159 @@ button.calendar-range-event:focus-visible,
   .video-timeline-shape-choice { min-height: 54px; }
   .video-timeline-custom-type > span { width: 100%; }
   .video-timeline-custom-type input:not([type='color']) { flex: 1; width: auto; min-width: 140px; }
+}
+
+/* 首页改为今日行动优先：主任务与专注并列，空状态退到次级位置。 */
+@media (max-width: 600px) {
+  .workspace-frame,
+  .workspace-frame.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-sidebar {
+    position: fixed;
+    z-index: 30;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(280px, calc(100vw - 48px));
+    height: 100vh;
+    margin: 0;
+    box-shadow: 16px 0 36px rgba(52, 63, 84, 0.16);
+  }
+
+  .workspace-content {
+    padding: 24px 16px 56px;
+  }
+
+  .workspace-content .dashboard-heading {
+    margin-bottom: 14px;
+  }
+
+  .dashboard-greeting {
+    font-size: clamp(34px, 10vw, 42px) !important;
+  }
+
+  .dashboard-date-line {
+    margin-top: 8px !important;
+    font-size: 15px !important;
+    line-height: 1.55;
+  }
+
+  .dashboard-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-card {
+    min-height: 0;
+    overflow: visible;
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-card-quick-task,
+  .dashboard-card-quick-note {
+    min-height: 104px;
+    grid-column: span 1;
+  }
+
+  .dashboard-card-upcoming,
+  .dashboard-card-notes,
+  .dashboard-card-websites {
+    min-height: 0;
+  }
+
+  .dashboard-card-focus {
+    overflow: hidden;
+  }
+
+  .dashboard-schedule-date {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px 18px;
+  }
+
+  .dashboard-schedule-date-main {
+    justify-content: space-between;
+  }
+
+  .dashboard-schedule-week {
+    justify-self: stretch;
+    max-width: none;
+  }
+
+  .dashboard-schedule-content {
+    padding: 12px 18px 18px;
+  }
+
+  .dashboard-section-heading {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .dashboard-section-heading h2 {
+    font-size: 18px;
+  }
+
+  .dashboard-card .dashboard-empty {
+    min-height: 88px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .sidebar-show-button {
+    top: 12px;
+    left: 12px;
+  }
+}
+
+/* P0：长表单在窄屏上优先保留可读宽度，时间轴和表格继续在各自容器内横向滚动。 */
+@media (max-width: 680px) {
+  .script-breakdown-panel .form-card-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .script-breakdown-panel .form-card-heading > div:first-of-type {
+    min-width: 0;
+  }
+
+  .script-breakdown-actions {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin-left: 0;
+    gap: 8px;
+  }
+
+  .script-breakdown-actions .script-breakdown-save,
+  .script-breakdown-actions .script-breakdown-export,
+  .script-breakdown-actions .script-breakdown-clear {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  .script-breakdown-action-separator {
+    display: none;
+  }
+
+  .script-breakdown-title-field {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .script-breakdown-title-field input {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .video-timeline-heading,
+  .emotion-curve-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
