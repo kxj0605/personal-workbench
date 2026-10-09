@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronUp, ClipboardPaste, Copy, Pencil, X } from 'lucide-react';
+import { getStandaloneDouyinUrl, parseDouyinShareText } from '../utils/douyinPaste';
 
 const platformOptions = [
   { value: 'youtube', label: 'YouTube' },
@@ -156,7 +157,7 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
   const [pasteText, setPasteText] = React.useState('');
   const [isImportDialogOpen, setIsImportDialogOpen] = React.useState(false);
   const { platform, fields, platformLabel, filledCount, totalCount } = getVideoMetadataStatus(video, excludedFieldNames);
-  const metadata = { 'benchmark-video-url': video.url, ...(video.details?.metadata || {}) };
+  const metadata = { ...(video.details?.metadata || {}), 'benchmark-video-url': video.url || video.details?.metadata?.['benchmark-video-url'] || '' };
   const metadataColumns = getMetadataColumns(platform, fields);
   const metadataProgressLabel = filledCount ? `已填写 ${filledCount}/${totalCount} 项` : '未录入元数据';
   const promptTemplatePlatform = defaultPrompts[platform] ? platform : 'other';
@@ -191,20 +192,63 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
 
   const applyPaste = (text) => {
     setPasteText(text);
+    const standaloneUrl = getStandaloneDouyinUrl(text);
+    if (standaloneUrl) {
+      if (!video.url?.trim()) {
+        onChange({
+          ...video,
+          url: standaloneUrl,
+          platform: '抖音',
+          platformOverride: '',
+          details: { ...(video.details || {}), metadata: { ...metadata, 'benchmark-video-url': standaloneUrl } },
+        });
+        onNotice('已填入视频链接，未提取或替换其他资料');
+      } else {
+        onNotice('这是单独的视频链接，已保留现有视频资料；可直接粘贴到视频链接栏');
+      }
+      return;
+    }
+    const share = parseDouyinShareText(text);
+    if (share) {
+      const url = video.url?.trim() || share.url;
+      const nextMetadata = {
+        ...metadata,
+        'benchmark-video-title': metadata['benchmark-video-title'] || share.description.slice(0, 100),
+        'benchmark-video-tags': metadata['benchmark-video-tags'] || share.tags.join('、'),
+        'benchmark-video-url': url,
+      };
+      onChange({
+        ...video,
+        title: video.title || share.description.slice(0, 100),
+        url,
+        platform: video.url?.trim() ? video.platform : '抖音',
+        platformOverride: video.url?.trim() ? video.platformOverride : '',
+        details: { ...(video.details || {}), metadata: nextMetadata },
+      });
+      setPasteText('');
+      onNotice(`已从分享文案提取标题、${share.tags.length} 个话题和视频链接`);
+      return;
+    }
     const rawEntries = [];
     text.split(/\r?\n/).forEach((line) => {
       const normalized = line.replace(/^\s*(?:[-+•]\s+|\d+[.)]\s+)?/, '').replace(/[*_`]/g, '').trim();
       const separator = normalized.indexOf('：') >= 0 ? normalized.indexOf('：') : normalized.indexOf(':');
       if (separator >= 0) rawEntries.push([normalized.slice(0, separator).trim(), normalized.slice(separator + 1).trim()]);
     });
-    const pastedLink = rawEntries.find(([label]) => label === '视频链接')?.[1] || video.url;
-    const importPlatform = detectVideoPlatform(pastedLink);
+    const rawLink = rawEntries.find(([label]) => label === '视频链接')?.[1] || '';
+    let pastedLink = '';
+    try {
+      const candidate = new URL(rawLink);
+      if (candidate.protocol === 'https:' || candidate.protocol === 'http:') pastedLink = candidate.href;
+    } catch { /* Invalid or unavailable links must not replace a saved URL. */ }
+    const importPlatform = detectVideoPlatform(pastedLink || video.url);
     const importFields = fieldsByPlatform[importPlatform] || fieldsByPlatform.other;
     const parsed = {};
     rawEntries.forEach(([label, rawValue]) => {
       const field = importFields.find((item) => item.label === label);
       if (field) {
         const value = rawValue;
+        if (field.name === 'benchmark-video-url' && !pastedLink) return;
         parsed[field.name] = field.name === 'benchmark-video-tags'
           ? value.split(/[,，、]/).map((tag) => tag.replace(/^#\s*/, '').trim()).filter(Boolean).join('、')
           : value;
@@ -218,16 +262,15 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
       }
     });
     if (!Object.keys(parsed).length) return;
-    const metadataWithPaste = { ...metadata, ...parsed };
-    const pastedUrl = parsed['benchmark-video-url'];
+    const importedUrl = parsed['benchmark-video-url'];
+    const nextUrl = video.url?.trim() || (importedUrl && (detectVideoPlatform(importedUrl) === 'douyin' ? normalizeDouyinVideoUrl(importedUrl) : importedUrl)) || '';
+    const metadataWithPaste = { ...metadata, ...parsed, 'benchmark-video-url': nextUrl };
     const nextVideo = {
       ...video,
       ...(parsed['benchmark-video-title'] ? { title: parsed['benchmark-video-title'] } : {}),
-      ...(pastedUrl ? { url: detectVideoPlatform(pastedUrl) === 'douyin' ? normalizeDouyinVideoUrl(pastedUrl) : pastedUrl, platform: getVideoPlatformLabel(pastedUrl), platformOverride: '' } : {}),
+      ...(!video.url?.trim() && nextUrl ? { url: nextUrl, platform: getVideoPlatformLabel(nextUrl), platformOverride: '' } : {}),
     };
     onChange({ ...nextVideo, details: { ...(video.details || {}), metadata: metadataWithPaste } });
-    setPasteText('');
-    setIsPasteOpen(false);
     onNotice(`已填入 ${Object.keys(parsed).length} 项视频资料`);
   };
 
@@ -255,7 +298,7 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
   };
 
   const promptSettings = <section className="benchmark-prompt-settings" aria-label="视频资料提示词设置"><div><h3>视频资料提示词 · {promptPlatformOptions.find((item) => item.value === promptPlatform)?.label}</h3><p className="benchmark-prompt-flow">💡 流程：复制提示词 → AI 提取元数据 → 粘贴导入填充表单</p></div><div className="benchmark-prompt-platform-tabs" role="group" aria-label="选择提示词平台">{promptPlatformOptions.map((item) => <button type="button" className={promptPlatform === item.value ? 'active' : undefined} aria-pressed={promptPlatform === item.value} key={item.value} onClick={() => setPromptPlatform(item.value)}>{item.label}</button>)}</div><textarea value={settingsTemplate} onChange={(event) => setTemplates((current) => ({ ...current, [promptPlatform]: event.target.value }))} rows={14} aria-label="视频资料提示词内容" /><div className="benchmark-prompt-settings-actions"><button type="button" className="text-button" onClick={resetPrompt}>恢复默认</button><button type="button" className="primary-button" onClick={savePromptSettings}>保存提示词</button></div></section>;
-  const pastePanel = <div className="benchmark-metadata-paste-panel"><div className="benchmark-metadata-paste-heading"><span>在这里按 Ctrl+V，识别后会自动填入表格</span><button type="button" onClick={() => { setPasteText(''); setIsPasteOpen(false); }}>取消</button></div><textarea value={pasteText} onChange={(event) => applyPaste(event.target.value)} onPaste={(event) => { event.preventDefault(); applyPaste(event.clipboardData.getData('text/plain')); }} rows={4} autoFocus aria-label="粘贴视频资料内容" placeholder="在这里粘贴视频标题、标签、链接、互动数据等资料" /></div>;
+  const pastePanel = <div className="benchmark-metadata-paste-panel"><div className="benchmark-metadata-paste-heading"><span>粘贴后自动识别；也可编辑内容再手动回填</span><button type="button" onClick={() => { setPasteText(''); setIsPasteOpen(false); }}>取消</button></div><textarea value={pasteText} onChange={(event) => setPasteText(event.target.value)} onPaste={(event) => { event.preventDefault(); applyPaste(event.clipboardData.getData('text/plain')); }} rows={4} autoFocus aria-label="粘贴视频资料内容" placeholder="在这里粘贴视频标题、标签、链接、互动数据等资料" /><button type="button" onClick={() => applyPaste(pasteText)} disabled={!pasteText.trim()}>识别并回填</button></div>;
   const openImportDialog = () => {
     setPromptPlatform(promptTemplatePlatform);
     setIsPromptSettingsOpen(false);
@@ -266,7 +309,7 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
     setIsPromptSettingsOpen(false);
     setIsImportDialogOpen(false);
   };
-  const importPastePanel = <textarea value={pasteText} onChange={(event) => applyPaste(event.target.value)} onPaste={(event) => { event.preventDefault(); applyPaste(event.clipboardData.getData('text/plain')); }} rows={6} autoFocus aria-label="粘贴视频资料内容" placeholder="在这里粘贴 AI 提取出的结构化视频资料，识别后会自动填入表单" />;
+  const importPastePanel = <><textarea value={pasteText} onChange={(event) => setPasteText(event.target.value)} onPaste={(event) => { event.preventDefault(); applyPaste(event.clipboardData.getData('text/plain')); }} rows={6} autoFocus aria-label="粘贴视频资料内容" placeholder="在这里粘贴 AI 提取出的结构化视频资料，识别后会自动填入表单" /><button type="button" onClick={() => applyPaste(pasteText)} disabled={!pasteText.trim()}>识别并回填</button></>;
   const importDialog = isImportDialogOpen ? createPortal(<div className="video-import-dialog-backdrop" role="presentation" onMouseDown={closeImportDialog}><section className="video-import-dialog" role="dialog" aria-modal="true" aria-labelledby="video-import-dialog-title" onMouseDown={(event) => event.stopPropagation()}><header className="video-import-dialog-head"><div><h2 id="video-import-dialog-title">导入视频资料</h2><p>按步骤提取并粘贴，字段会自动回填到视频信息中。</p></div><button type="button" className="video-import-dialog-close" onClick={closeImportDialog} aria-label="关闭导入视频资料"><X size={18} /></button></header><div className="video-import-dialog-steps"><section><div className="video-import-dialog-step-head"><div><strong>① 复制提取提示词</strong><p>复制后，连同视频链接和截图发送给 AI。</p></div><div className="video-import-dialog-step-actions"><button type="button" className="video-import-copy-prompt" onClick={copyPrompt}><Copy size={16} />复制提示词</button><button type="button" className="video-import-settings-trigger" onClick={() => { setPromptPlatform(promptTemplatePlatform); setIsPromptSettingsOpen((open) => !open); }} aria-label="设置视频资料提示词" aria-expanded={isPromptSettingsOpen} title="设置提示词"><Pencil size={16} /></button></div></div>{isPromptSettingsOpen && promptSettings}</section><section><strong>② 粘贴提取结果</strong><p>粘贴 AI 按提示词返回的字段；标题、链接、话题和视频数据会自动填入。</p><div className="video-import-paste-panel">{importPastePanel}</div></section><section><strong>③ 检查并完成</strong><p>关闭弹窗后，可在第一张卡片继续校对视频信息。</p></section></div><footer className="video-import-dialog-footer"><button type="button" onClick={closeImportDialog}>完成导入</button></footer></section></div>, document.body) : null;
   const portalActions = <div className="video-basic-card-actions" aria-label="视频信息操作"><button type="button" className="video-basic-card-copy-all-action" onClick={onCopyAll || copyMetadata} aria-label="复制视频信息" title="复制视频信息"><Copy size={17} /></button><button type="button" className="video-basic-card-import-action" onClick={openImportDialog}><ClipboardPaste size={16} />导入视频资料</button></div>;
   const platformSelector = <PlatformCorrection label={platformLabel} value={video.platformOverride} onChange={(label) => onChange({ ...video, platform: label, platformOverride: label })} />;

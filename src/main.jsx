@@ -68,6 +68,7 @@ import { ImageGenerationPanel } from './components/ImageGenerationPanel';
 import { loadBenchmarkAccounts, loadBenchmarkVideos } from './utils/benchmarkLibrary';
 import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
 import { FocusTimerCard } from './components/FocusTimerCard';
+import EmbeddedVideoTimeline from './EmbeddedVideoTimeline';
 import { getBenchmarkMetadataFields } from './components/BenchmarkVideoDetails';
 import {
   formatDate,
@@ -714,7 +715,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </header>
         )}
 
-        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && (
+        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && activeTab !== tabs.breakdown && (
           <header className="workspace-heading compact-heading">
             <div>
               <h1>{workspaceTitle}</h1>
@@ -853,12 +854,16 @@ function parseDouyinAuthorProfile(value) {
 
 const scriptBreakdownNavItems = [
   { id: 'script-breakdown-timeline', label: '视频拆解时间轴' },
-  { id: 'script-breakdown-video-type', label: '视频类型' },
-  { id: 'script-breakdown-universal', label: '通用传播维度' },
-  { id: 'script-breakdown-structure', label: '剧情结构' },
-  { id: 'script-breakdown-extra', label: '补充维度' },
+  { id: 'script-breakdown-analysis-tabs', label: '分类拆解栏目' },
   { id: 'script-breakdown-ai', label: 'AI 独立拆解' },
   { id: 'script-breakdown-compare', label: '颜色对照' },
+];
+
+const scriptBreakdownAnalysisTabs = [
+  { id: 'story', label: '故事与叙事' },
+  { id: 'type', label: '类型专项' },
+  { id: 'audience', label: '传播与观众' },
+  { id: 'method', label: '方法提炼' },
 ];
 
 const breakdownStylePreviewOptions = [
@@ -949,6 +954,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [benchmarkVideoUrl, setBenchmarkVideoUrl] = React.useState('');
   const [benchmarkPlatform, setBenchmarkPlatform] = React.useState('youtube');
   const [selectedVideoType, setSelectedVideoType] = React.useState('');
+  const [activeAnalysisTab, setActiveAnalysisTab] = React.useState('story');
   const [videoTypeValues, setVideoTypeValues] = React.useState({});
   const [structureMode, setStructureMode] = React.useState('shots');
   const createEmotionCurveNode = (id, level = 0) => ({
@@ -975,6 +981,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   const [videoTimelineEntries, setVideoTimelineEntries] = React.useState([]);
   const [videoTimelineTypes, setVideoTimelineTypes] = React.useState(VIDEO_TIMELINE_DEFAULT_TYPES);
   const [videoTimelineDuration, setVideoTimelineDuration] = React.useState(60);
+  const [timelineResetKey, setTimelineResetKey] = React.useState(0);
   const createCoreEventChainRow = (id) => ({
     id,
     startName: `core-event-chain-${id}-start`,
@@ -1781,11 +1788,12 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         if (typeof draft['emotion-curve-nodes'] === 'string') {
           try {
             const restoredEmotionNodes = JSON.parse(draft['emotion-curve-nodes']);
-            if (Array.isArray(restoredEmotionNodes) && restoredEmotionNodes.length >= 2) {
+            if (Array.isArray(restoredEmotionNodes)) {
               const safeNodes = restoredEmotionNodes
                 .filter((node) => Number.isInteger(node?.id))
                 .map((node, index) => ({
                   id: node.id,
+                  linkedEntryId: typeof node.linkedEntryId === 'string' ? node.linkedEntryId : null,
                   startTime: typeof node.startTime === 'string' ? node.startTime : (index === 0 ? '00:00' : ''),
                   endTime: typeof node.endTime === 'string' ? node.endTime : (typeof node.phase === 'string' ? node.phase : ''),
                   phase: typeof node.phase === 'string' ? node.phase : '',
@@ -1793,9 +1801,9 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
                   idea: typeof node.idea === 'string' ? node.idea : '',
                   level: Math.max(-emotionCurveLevelLimit, Math.min(emotionCurveLevelLimit, Number.isFinite(node.level) ? node.level : 0)),
                 }));
-              if (safeNodes.length >= 2) {
+              if (safeNodes.length === restoredEmotionNodes.length) {
                 setEmotionCurveNodes(safeNodes);
-                setSelectedEmotionCurveNodeId(safeNodes[0].id);
+                setSelectedEmotionCurveNodeId(safeNodes[0]?.id ?? null);
                 setHasEditedEmotionCurve(true);
               }
             }
@@ -2257,6 +2265,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     setVideoTimelineEntries([]);
     setVideoTimelineTypes(VIDEO_TIMELINE_DEFAULT_TYPES);
     setVideoTimelineDuration(60);
+    setTimelineResetKey((key) => key + 1);
     setAiBreakdownValues({});
     setAiDistributionSummary(null);
     setBenchmarkVideoUrl('');
@@ -2430,6 +2439,26 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
     setNotice(`已将「${entry.title?.trim() || '时间轴事件'}」导入情绪曲线`);
   };
 
+  const renderSupplementaryField = (index) => {
+    const field = fields[index];
+    return (
+      <div className="script-breakdown-field" id={index === 0 ? 'script-breakdown-extra' : undefined} key={field.title}>
+        <label>
+          <span className="script-breakdown-label">
+            <strong className={field.accent ? 'script-breakdown-accent' : undefined}>
+              {index + 4}. {field.title}
+              <span className="script-breakdown-priority-star" role="img" aria-label="重点维度">⭐</span>
+            </strong>
+            {field.hint && <em>{field.hint}</em>}
+          </span>
+          <textarea name={field.title} rows={3} placeholder={field.placeholder} onInput={resizeTextarea} />
+        </label>
+        <TextFormattingToolbar />
+        {renderInlineAiBreakdown(`field-${index + 5}`, `${index + 4}. ${field.title}`)}
+      </div>
+    );
+  };
+
   return (
     <section className={`script-breakdown-panel${breakdownStylePreview ? ` breakdown-style-preview preview-${activeBreakdownStyle}` : ''}`} aria-label="脚本拆解">
       {breakdownStylePreview && (
@@ -2479,7 +2508,6 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         <span className="section-icon section-icon-blue"><Scissors size={18} /></span>
         <div>
           <h2>脚本拆解</h2>
-          <p>先自己拆解，再邀请 AI 独立作答，最后对照答案。</p>
         </div>
         <div className="script-breakdown-actions">
           <button className="script-breakdown-save" type="button" onClick={saveDraft}>
@@ -2499,7 +2527,7 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
       </div>
       {notice && <p className="script-breakdown-notice" role="status">{notice}</p>}
       <section className="breakdown-source-picker" aria-labelledby="breakdown-source-title">
-        <div><strong id="breakdown-source-title">拆解来源</strong><span>可带入对标库资料，也可以从空白练习开始。</span></div>
+        <div><strong id="breakdown-source-title">拆解来源</strong></div>
         <div className="breakdown-source-options" role="group" aria-label="选择拆解来源">
           <button type="button" className={breakdownSource === 'video' ? 'active' : ''} aria-pressed={breakdownSource === 'video'} onClick={() => setBreakdownSource('video')}>从对标视频选择</button>
           <button type="button" className={breakdownSource === 'account' ? 'active' : ''} aria-pressed={breakdownSource === 'account'} onClick={() => setBreakdownSource('account')}>从对标账号选择</button>
@@ -2507,7 +2535,6 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
         </div>
         {breakdownSource === 'video' && <label className="breakdown-source-select">对标视频<select value={selectedLibraryVideoId} onChange={(event) => { const video = libraryVideos.find((item) => item.id === event.target.value); setSelectedLibraryVideoId(event.target.value); setSelectedLibraryAccountId(video?.accountId || ''); }}><option value="">选择已录入视频</option>{libraryVideos.map((video) => <option value={video.id} key={video.id}>{video.title}</option>)}</select></label>}
         {breakdownSource === 'account' && <label className="breakdown-source-select">对标账号<select value={selectedLibraryAccountId} onChange={(event) => setSelectedLibraryAccountId(event.target.value)}><option value="">选择已录入账号</option>{libraryAccounts.map((account) => <option value={account.id} key={account.id}>{account.platform} · {account.name}</option>)}</select>{selectedLibraryAccount && <small>当前关联：{selectedLibraryAccount.name}。可在下方手动填写或粘贴本次要拆解的视频资料。</small>}</label>}
-        {breakdownSource === 'independent' && <p className="breakdown-source-empty">不关联对标账号或对标视频，直接填写本次拆解内容。</p>}
       </section>
       {isExportOpen && (
         <section className="script-export-popover" aria-label="导出选项">
@@ -2547,17 +2574,43 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
           <span>标题</span>
           <input name="title" placeholder="x月x日 脚本拆解v1" />
         </label>
-        <VideoBreakdownTimeline
+        {isDraftReady && <EmbeddedVideoTimeline
+          key={timelineResetKey}
           entries={videoTimelineEntries}
           types={videoTimelineTypes}
           duration={videoTimelineDuration}
-          sourceEntries={getTimelineSourceEntries()}
+          emotionNodes={emotionCurveNodes}
+          hasEditedEmotionCurve={hasEditedEmotionCurve}
           onEntriesChange={setVideoTimelineEntries}
           onTypesChange={setVideoTimelineTypes}
           onDurationChange={setVideoTimelineDuration}
-          onImportToEmotionCurve={importTimelineEntryToEmotionCurve}
-          onOpenSource={(kind) => scrollToBreakdownSection(kind === 'emotion' ? 'emotion-curve-title' : 'script-breakdown-structure')}
-        />
+          onEmotionNodesChange={(nodes) => { setHasEditedEmotionCurve(true); setEmotionCurveNodes(nodes); }}
+        />}
+        <div className="breakdown-analysis-tabs" id="script-breakdown-analysis-tabs" role="tablist" aria-label="拆解栏目分类">
+          {scriptBreakdownAnalysisTabs.map((tab, index) => (
+            <button
+              type="button"
+              role="tab"
+              id={`breakdown-analysis-tab-${tab.id}`}
+              aria-controls={`breakdown-analysis-panel-${tab.id}`}
+              aria-selected={activeAnalysisTab === tab.id}
+              tabIndex={activeAnalysisTab === tab.id ? 0 : -1}
+              className={activeAnalysisTab === tab.id ? 'is-active' : undefined}
+              key={tab.id}
+              onClick={() => setActiveAnalysisTab(tab.id)}
+              onKeyDown={(event) => {
+                const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+                const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? scriptBreakdownAnalysisTabs.length - 1 : offset ? (index + offset + scriptBreakdownAnalysisTabs.length) % scriptBreakdownAnalysisTabs.length : null;
+                if (nextIndex === null) return;
+                event.preventDefault();
+                const nextTab = scriptBreakdownAnalysisTabs[nextIndex];
+                setActiveAnalysisTab(nextTab.id);
+                document.getElementById(`breakdown-analysis-tab-${nextTab.id}`)?.focus();
+              }}
+            >{tab.label}</button>
+          ))}
+        </div>
+        <div className="breakdown-analysis-panel" id="breakdown-analysis-panel-type" role="tabpanel" aria-labelledby="breakdown-analysis-tab-type" hidden={activeAnalysisTab !== 'type'}>
         <section className="video-type-section" id="script-breakdown-video-type" aria-labelledby="video-type-title">
           <div className="video-type-heading">
             <div>
@@ -2618,6 +2671,8 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
             </div>
           )}
         </section>
+        </div>
+        <div className="breakdown-analysis-panel" id="breakdown-analysis-panel-audience" role="tabpanel" aria-labelledby="breakdown-analysis-tab-audience" hidden={activeAnalysisTab !== 'audience'}>
         <section className="video-type-section universal-dimensions-section" id="script-breakdown-universal" aria-labelledby="universal-dimensions-title">
           <div className="video-type-heading">
             <div>
@@ -2643,6 +2698,8 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
             ))}
           </div>
         </section>
+        </div>
+        <div className="breakdown-analysis-panel" id="breakdown-analysis-panel-story" role="tabpanel" aria-labelledby="breakdown-analysis-tab-story" hidden={activeAnalysisTab !== 'story'}>
         <section className="core-event-chain-structure" id="script-breakdown-structure" aria-labelledby="core-event-chain-structure-title">
           <h3 id="core-event-chain-structure-title">3. 剧情结构 <span className="script-breakdown-priority-star" role="img" aria-label="重点维度">⭐</span></h3>
           <div className="core-event-chain-mode-switcher" role="group" aria-label="剧情结构填写方式">
@@ -2705,27 +2762,13 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
           </div>
           {renderInlineAiBreakdown('story-structure', '3. 剧情结构')}
         </section>
-        {fields.map((field, index) => field.title === '观众情绪曲线' ? (
-          <React.Fragment key={field.title}>
-            {renderEmotionCurveEditor(index + 4)}
-            {renderInlineAiBreakdown(`field-${index + 5}`, `${index + 4}. ${field.title}`)}
-          </React.Fragment>
-        ) : (
-          <div className="script-breakdown-field" id={index === 0 ? 'script-breakdown-extra' : undefined} key={field.title}>
-            <label>
-              <span className="script-breakdown-label">
-                <strong className={field.accent ? 'script-breakdown-accent' : undefined}>
-                  {index + 4}. {field.title}
-                  <span className="script-breakdown-priority-star" role="img" aria-label="重点维度">⭐</span>
-                </strong>
-                {field.hint && <em>{field.hint}</em>}
-              </span>
-              <textarea name={field.title} rows={3} placeholder={field.placeholder} onInput={resizeTextarea} />
-            </label>
-            <TextFormattingToolbar />
-            {renderInlineAiBreakdown(`field-${index + 5}`, `${index + 4}. ${field.title}`)}
-          </div>
-        ))}
+        {renderSupplementaryField(0)}
+        {renderSupplementaryField(3)}
+        </div>
+        <div className="breakdown-analysis-panel" id="breakdown-analysis-panel-method" role="tabpanel" aria-labelledby="breakdown-analysis-tab-method" hidden={activeAnalysisTab !== 'method'}>
+          {renderSupplementaryField(1)}
+          {renderSupplementaryField(4)}
+        </div>
         <section className="ai-breakdown-step" id="script-breakdown-ai" aria-labelledby="ai-breakdown-title">
           <div className="ai-breakdown-step-heading">
             <div>
@@ -2808,12 +2851,31 @@ function ScriptBreakdownPanel({ collectionVideo = null }) {
   );
 }
 
-function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEntriesChange, onTypesChange, onDurationChange, onImportToEmotionCurve, onOpenSource }) {
+function TimelineTimeInput({ label, value, max, min = 0, onCommit }) {
+  const [parts, setParts] = React.useState([String(Math.floor(value / 60)), String(value % 60)]);
+  React.useEffect(() => { setParts([String(Math.floor(value / 60)), String(value % 60)]); }, [value]);
+  const commit = () => {
+    const valid = parts.every((part) => /^\d+$/.test(part));
+    const next = valid ? Math.max(min, Math.min(max, Number(parts[0]) * 60 + Number(parts[1]))) : value;
+    setParts([String(Math.floor(next / 60)), String(next % 60)]);
+    if (next !== value) onCommit(next);
+  };
+  return <div className="timeline-time-input" role="group" aria-label={label} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) commit(); }}>
+    <span>{label}</span><div>{parts.map((part, index) => <React.Fragment key={index}><input type="number" min="0" max={index ? 59 : Math.floor(max / 60)} step="1" aria-label={`${label}${index ? '秒' : '分'}`} value={part} onChange={(event) => setParts(parts.map((item, i) => i === index ? event.target.value : item))} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } }} />{index ? '秒' : '分'}</React.Fragment>)}</div>
+  </div>;
+}
+
+function VideoBreakdownTimeline({ entries, types, duration, emotionNodes, onEntriesChange, onTypesChange, onDurationChange, onEmotionNodesChange }) {
   const railRef = React.useRef(null);
   const dragRef = React.useRef(null);
+  const emotionDragRef = React.useRef(null);
+  const [deletedItems, setDeletedItems] = React.useState([]);
+  const [newEmotionTime, setNewEmotionTime] = React.useState(null);
   const [selectedEntryId, setSelectedEntryId] = React.useState(null);
   const [draggingEntryId, setDraggingEntryId] = React.useState(null);
   const [timelinePointer, setTimelinePointer] = React.useState(null);
+  const [selectedEmotionId, setSelectedEmotionId] = React.useState(null);
+  const [isColorPaletteOpen, setIsColorPaletteOpen] = React.useState(false);
   const [customTypeName, setCustomTypeName] = React.useState('');
   const [customTypeColor, setCustomTypeColor] = React.useState('#3976d5');
   const safeDuration = Math.max(1, Number(duration) || 60);
@@ -2825,7 +2887,15 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
     return groups;
   }, {});
   const sortedEntries = [...entries].sort((first, second) => first.start - second.start);
-  const latestContentTime = [...entries, ...sourceEntries].reduce((latest, entry) => Math.max(latest, entry.end ?? entry.start ?? 0), 0);
+  const emotionEntries = emotionNodes.map((node, index) => {
+    const linkedEntry = entries.find((entry) => entry.id === node.linkedEntryId);
+    const fallbackStart = index === 0 ? '00:00' : (emotionNodes[index - 1]?.endTime || '');
+    const start = linkedEntry?.start ?? parseVideoTimelineTime(node.startTime || fallbackStart);
+    const end = linkedEntry?.end ?? parseVideoTimelineTime(node.endTime);
+    const position = clampVideoTimelineTime(linkedEntry?.end ?? linkedEntry?.start ?? end ?? start ?? 0, safeDuration);
+    return { ...node, linkedEntryId: linkedEntry?.id ?? null, start: position, end: null, position };
+  });
+  const latestContentTime = [...entries, ...emotionEntries].reduce((latest, entry) => Math.max(latest, entry.end ?? entry.start ?? 0), 0);
   const minimumVisibleDuration = Math.min(safeDuration, VIDEO_TIMELINE_MIN_VISIBLE_SECONDS);
   const visibleDuration = Math.min(
     safeDuration,
@@ -2841,28 +2911,32 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
     (_, index) => index * rulerInterval,
   );
   if (rulerMarks[rulerMarks.length - 1] !== visibleDuration) rulerMarks.push(visibleDuration);
+  const selectedEmotion = emotionEntries.find((node) => node.id === selectedEmotionId) || null;
+  const linkedEmotion = selectedEntry ? emotionEntries.find((node) => node.linkedEntryId === selectedEntry.id) || null : null;
+  const getEmotionY = (level) => 50 - (Math.max(-5, Math.min(5, level || 0)) * 8);
+  const emotionCurvePath = emotionEntries.length > 1 ? emotionEntries
+    .sort((first, second) => first.position - second.position)
+    .map((node, index, nodes) => {
+      const x = (node.position / visibleDuration) * 1000;
+      const y = 150 - ((node.level || 0) * 24);
+      if (!index) return `M ${x} ${y}`;
+      const previous = nodes[index - 1];
+      const previousX = (previous.position / visibleDuration) * 1000;
+      const previousY = 150 - ((previous.level || 0) * 24);
+      const middle = (previousX + x) / 2;
+      return `C ${middle} ${previousY}, ${middle} ${y}, ${x} ${y}`;
+    }).join(' ') : '';
 
   React.useEffect(() => {
+    if (selectedEmotionId !== null) return;
     if (selectedEntryId && entries.some((entry) => entry.id === selectedEntryId)) return;
     setSelectedEntryId(entries[0]?.id || null);
-  }, [entries, selectedEntryId]);
+  }, [entries, selectedEntryId, selectedEmotionId]);
+
+  const selectEmotion = (id) => { setSelectedEmotionId(id); setSelectedEntryId(null); };
+  const selectEntry = (id) => { setSelectedEntryId(id); setSelectedEmotionId(null); };
 
   const updateEntry = (id, changes) => onEntriesChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry));
-
-  const updateTimeFromInput = (entry, field, rawValue, input) => {
-    const parsed = parseVideoTimelineTime(rawValue);
-    if (parsed === null) {
-      input.value = field === 'start' ? formatVideoTimelineTime(entry.start) : formatVideoTimelineTime(entry.end);
-      return;
-    }
-    const snappedValue = snapVideoTimelineTime(parsed);
-    const nextValue = clampVideoTimelineTime(snappedValue, safeDuration);
-    if (field === 'start') {
-      updateEntry(entry.id, { start: entry.end !== null ? Math.min(nextValue, entry.end - VIDEO_TIMELINE_DRAG_STEP_SECONDS) : nextValue });
-      return;
-    }
-    updateEntry(entry.id, { end: Math.max(nextValue, entry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS) });
-  };
 
   const createEntry = () => {
     const defaultType = typeById.get('story-hook') || types[0];
@@ -2880,12 +2954,32 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
       color: defaultType?.color || '#7647c8',
     };
     onEntriesChange([...entries, nextEntry]);
-    setSelectedEntryId(nextEntry.id);
+    selectEntry(nextEntry.id);
   };
 
   const removeEntry = () => {
     if (!selectedEntry) return;
+    const linkedNodes = emotionEntries.filter((node) => node.linkedEntryId === selectedEntry.id);
+    setDeletedItems((items) => [...items, { entry: selectedEntry, nodes: linkedNodes }]);
+    onEmotionNodesChange(emotionNodes.map((node) => {
+      const linked = linkedNodes.find((item) => item.id === node.id);
+      return linked ? { ...node, linkedEntryId: null, startTime: formatVideoTimelineTime(linked.position), endTime: '' } : node;
+    }));
     onEntriesChange(entries.filter((entry) => entry.id !== selectedEntry.id));
+  };
+
+  const undoDelete = () => {
+    const item = deletedItems.at(-1);
+    if (!item) return;
+    if (item.entry) {
+      onEntriesChange([...entries, item.entry]);
+      onEmotionNodesChange(emotionNodes.map((node) => item.nodes.some((linked) => linked.id === node.id) ? { ...node, linkedEntryId: item.entry.id } : node));
+      selectEntry(item.entry.id);
+    } else {
+      onEmotionNodesChange([...emotionNodes, item.node]);
+      selectEmotion(item.node.id);
+    }
+    setDeletedItems((items) => items.slice(0, -1));
   };
 
   const addCustomType = () => {
@@ -2898,13 +2992,14 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
   };
 
   const updateDuration = (value) => {
-    const nextDuration = Math.max(VIDEO_TIMELINE_DRAG_STEP_SECONDS, snapVideoTimelineTime((Number(value) || 0.5) * 60));
+    const nextDuration = Math.max(1, snapVideoTimelineTime(value));
     onDurationChange(nextDuration);
     onEntriesChange(entries.map((entry) => ({
       ...entry,
-      start: clampVideoTimelineTime(entry.start, nextDuration),
-      end: entry.end === null ? null : Math.max(clampVideoTimelineTime(entry.end, nextDuration), Math.min(nextDuration, entry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS)),
+      start: clampVideoTimelineTime(entry.start, entry.end === null ? nextDuration : nextDuration - 1),
+      end: entry.end === null ? null : Math.max(clampVideoTimelineTime(entry.end, nextDuration), Math.min(nextDuration, entry.start + 1)),
     })));
+    onEmotionNodesChange(emotionNodes.map((node) => node.linkedEntryId ? node : { ...node, startTime: formatVideoTimelineTime(Math.min(nextDuration, parseVideoTimelineTime(node.endTime) ?? parseVideoTimelineTime(node.startTime) ?? 0)), endTime: '' }));
   };
 
   const moveEntryWithKeyboard = (event, entry) => {
@@ -2922,14 +3017,16 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragRef.current = { id: entry.id, mode, clientX: event.clientX, start: entry.start, end: entry.end, visibleDuration };
-    setSelectedEntryId(entry.id);
-    setDraggingEntryId(entry.id);
+    selectEntry(entry.id);
   };
 
   const dragEntry = (event) => {
     const drag = dragRef.current;
     const railRect = railRef.current?.getBoundingClientRect();
     if (!drag || !railRect) return;
+    if (!drag.active && Math.abs(event.clientX - drag.clientX) < 5) return;
+    drag.active = true;
+    setDraggingEntryId(drag.id);
     const entry = entries.find((item) => item.id === drag.id);
     if (!entry) return;
     const delta = snapVideoTimelineTime(((event.clientX - drag.clientX) / railRect.width) * drag.visibleDuration);
@@ -2962,26 +3059,54 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
     setTimelinePointer({ position, time });
   };
 
+  const updateEmotion = (id, changes) => onEmotionNodesChange(emotionNodes.map((node) => node.id === id ? { ...node, ...changes } : node));
+  const addEmotionNode = (linkedEntryId = null, time = 0) => {
+    const id = Math.max(Date.now(), ...emotionNodes.map((node) => Number(node.id) || 0), ...deletedItems.map((item) => Number(item.node?.id) || 0)) + 1;
+    const linkedEntry = entries.find((entry) => entry.id === linkedEntryId);
+    onEmotionNodesChange([...emotionNodes, {
+      id,
+      linkedEntryId,
+      startTime: formatVideoTimelineTime(linkedEntry?.end ?? linkedEntry?.start ?? time),
+      endTime: linkedEntry?.end !== null && linkedEntry?.end !== undefined ? formatVideoTimelineTime(linkedEntry.end) : '',
+      range: '',
+      idea: '',
+      level: 0,
+    }]);
+    selectEmotion(id);
+    setNewEmotionTime(null);
+  };
+  const removeEmotion = (id) => {
+    const node = emotionNodes.find((item) => item.id === id);
+    if (!node) return;
+    setDeletedItems((items) => [...items, { node }]);
+    onEmotionNodesChange(emotionNodes.filter((node) => node.id !== id));
+    setSelectedEmotionId(null);
+  };
+  const updateEmotionLevelFromPointer = (event, id) => {
+    const drag = emotionDragRef.current;
+    if (!drag || drag.id !== id) return;
+    const delta = event.clientY - drag.y;
+    if (!drag.active && Math.abs(delta) < 5) return;
+    drag.active = true;
+    updateEmotion(id, { level: Math.max(-5, Math.min(5, Math.round(drag.level - delta / (drag.height * 0.08)))) });
+  };
+  const stopEmotionDrag = (event) => {
+    emotionDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
   return (
     <section className="video-breakdown-timeline" id="script-breakdown-timeline" aria-labelledby="video-breakdown-timeline-title">
       <div className="video-timeline-heading">
         <div>
-          <span className="video-timeline-kicker">视频拆解时间轴</span>
-          <h3 id="video-breakdown-timeline-title">用时码记录关键事件</h3>
-          <p>拖动节点、区间条或两端把手直接调整时间，每次按 1 秒更新。</p>
+          <h3 id="video-breakdown-timeline-title">时间轴</h3>
         </div>
-        <label className="video-timeline-duration">
-          视频时长
-          <span><input type="number" min="0.5" step="0.5" value={safeDuration / 60} onChange={(event) => updateDuration(event.target.value)} aria-label="视频总时长，单位分钟，可填0.5表示00:30" /> 分钟</span>
-        </label>
-      </div>
-      <div className="video-timeline-toolbar">
-        <span>时间点显示为节点；时间段显示为区间条。拖动节点、区间条或两端把手即可调整时码。</span>
+        <TimelineTimeInput label="视频时长" value={safeDuration} min={1} max={Number.MAX_SAFE_INTEGER} onCommit={updateDuration} />
       </div>
       <div className="video-timeline-workbench">
       <div className="video-timeline-canvas">
       <div className="video-timeline-rail-scroll">
-        <div className="video-timeline-rail" ref={railRef} style={{ '--video-timeline-rows': 2, '--video-timeline-sources': sourceEntries.length }} onMouseMove={updateTimelinePointer} onMouseLeave={() => setTimelinePointer(null)}>
+        <div className="video-timeline-rail is-unified" ref={railRef} style={{ '--video-timeline-rows': 2, '--video-timeline-sources': 0 }} onMouseMove={updateTimelinePointer} onMouseLeave={() => setTimelinePointer(null)}>
           <div className="video-timeline-ruler" aria-hidden="true">
             {rulerMarks.map((mark) => <span key={mark} style={{ left: `${(mark / visibleDuration) * 100}%` }}>{formatVideoTimelineTime(mark)}</span>)}
           </div>
@@ -2989,6 +3114,17 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
             {rulerMarks.map((mark) => <i key={mark} style={{ left: `${(mark / visibleDuration) * 100}%` }} />)}
           </div>
           {timelinePointer && <div className={`video-timeline-hover-guide${timelinePointer.position < 8 ? ' edge-start' : ''}${timelinePointer.position > 92 ? ' edge-end' : ''}`} style={{ '--timeline-hover-left': `${timelinePointer.position}%` }} aria-hidden="true"><span>{formatVideoTimelineTime(timelinePointer.time)}</span></div>}
+          <div className="video-timeline-emotion-layer" aria-label="观众情绪曲线">
+            <span className="video-timeline-lane-label">观众情绪</span>
+            <svg viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true"><path className="video-timeline-emotion-path" d={emotionCurvePath} /></svg>
+            {emotionEntries.map((node) => <button type="button" className={`video-timeline-emotion-node${selectedEmotionId === node.id ? ' is-selected' : ''}`} key={node.id} style={{ left: `${(node.position / visibleDuration) * 100}%`, top: `${getEmotionY(node.level)}%` }} aria-label={`${formatVideoTimelineTime(node.position)}，情绪 ${node.level > 0 ? '+' : ''}${node.level}`} onClick={() => selectEmotion(node.id)} onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              selectEmotion(node.id);
+              emotionDragRef.current = { id: node.id, y: event.clientY, level: node.level || 0, height: event.currentTarget.parentElement.getBoundingClientRect().height };
+            }} onPointerMove={(event) => updateEmotionLevelFromPointer(event, node.id)} onPointerUp={stopEmotionDrag} onPointerCancel={stopEmotionDrag} onLostPointerCapture={stopEmotionDrag}>{['😭', '😨', '😢', '😞', '😔', '😐', '😬', '🙂', '😄', '😆', '🤩'][(node.level || 0) + 5]}</button>)}
+          </div>
+          <span className="video-timeline-event-lane point">时间点</span><span className="video-timeline-event-lane range">时间段</span>
           {sortedEntries.map((entry, index) => {
             const type = typeById.get(entry.typeId);
             const isInterval = entry.end !== null && entry.end > entry.start;
@@ -3000,7 +3136,7 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
                 <button
                   type="button"
                   className="video-timeline-entry-body"
-                  onClick={() => setSelectedEntryId(entry.id)}
+                  onClick={() => selectEntry(entry.id)}
                   onPointerDown={(event) => startDrag(event, entry, 'move')}
                   onPointerMove={dragEntry}
                   onPointerUp={stopDrag}
@@ -3020,17 +3156,26 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
               </div>
             );
           })}
-          {sourceEntries.map((entry, index) => {
-            const left = (clampVideoTimelineTime(entry.start, visibleDuration) / visibleDuration) * 100;
-            const isInterval = entry.end !== null && entry.end > entry.start;
-            const width = isInterval ? Math.max(0.8, ((Math.min(entry.end, visibleDuration) - entry.start) / visibleDuration) * 100) : 0.8;
-            return <button type="button" className={`video-timeline-source source-${entry.kind}`} key={entry.id} style={{ '--timeline-left': `${left}%`, '--timeline-width': `${width}%`, '--timeline-source-row': index }} onClick={() => onOpenSource(entry.kind)} title={`来自${entry.kind === 'emotion' ? '情绪曲线' : '核心事件链'}：${entry.label}`}><span>{entry.kind === 'emotion' ? '情绪' : '事件链'} · {entry.label}</span></button>;
-          })}
         </div>
       </div>
-      <div className="video-timeline-source-key" aria-label="时间轴来源标记说明"><span className="emotion">情绪曲线来源</span><span className="core">核心事件链来源</span></div>
+      <div className="video-timeline-source-key" aria-label="时间轴图例"><span className="emotion">观众情绪</span><span className="core">关键事件</span></div>
+      <div className="video-timeline-toolbar timeline-create-actions">
+        <button type="button" className="video-timeline-add" onClick={createEntry}><Plus size={15} /> 新增事件</button>
+        <button type="button" className="video-timeline-import" onClick={() => setNewEmotionTime(0)}>＋ 新增独立情绪节点</button>
       </div>
-      {selectedEntry ? (
+      {newEmotionTime !== null && <div className="timeline-create-emotion" role="group" aria-label="新增独立情绪节点">
+        <TimelineTimeInput label="新节点时间点" value={newEmotionTime} max={safeDuration} onCommit={setNewEmotionTime} />
+        <button type="button" className="video-timeline-add" onClick={() => addEmotionNode(null, newEmotionTime)}>确认新增</button>
+        <button type="button" className="video-timeline-import" onClick={() => setNewEmotionTime(null)}>取消</button>
+      </div>}
+      {deletedItems.length > 0 && <div className="timeline-delete-notice"><span role="status">已删除{deletedItems.at(-1).entry ? '事件，关联情绪已保留为独立节点' : '情绪节点'}</span><button type="button" className="video-timeline-import" onClick={undoDelete}>撤销删除</button></div>}
+      </div>
+      {selectedEmotion ? <section className="video-timeline-emotion-editor" aria-label="编辑情绪节点">
+        <div><strong>编辑情绪节点</strong><button type="button" className="video-timeline-emotion-remove" onClick={() => removeEmotion(selectedEmotion.id)}>删除情绪节点</button></div>
+        {selectedEmotion.linkedEntryId ? <span>时间点：{formatVideoTimelineTime(selectedEmotion.position)} · 随事件同步</span> : <TimelineTimeInput key={selectedEmotion.id} label="情绪时间点" value={selectedEmotion.position} max={safeDuration} onCommit={(time) => updateEmotion(selectedEmotion.id, { startTime: formatVideoTimelineTime(time), endTime: '' })} />}
+        <label>观众想法 / 感受<textarea value={selectedEmotion.idea || ''} rows={2} onChange={(event) => updateEmotion(selectedEmotion.id, { idea: event.target.value })} placeholder="这一步让观众感到什么？" /></label>
+        <label>情绪值：{selectedEmotion.level > 0 ? '+' : ''}{selectedEmotion.level || 0}<input type="range" min="-5" max="5" step="1" value={selectedEmotion.level || 0} onChange={(event) => updateEmotion(selectedEmotion.id, { level: Number(event.target.value) })} aria-label="情绪值" /></label>
+      </section> : selectedEntry ? (
         <section className="video-timeline-editor" aria-label="编辑时间轴事件">
           <div className="video-timeline-editor-heading">
             <div><strong>编辑事件</strong><span>{formatVideoTimelineRange(selectedEntry.start, selectedEntry.end)}</span></div>
@@ -3038,7 +3183,7 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
           </div>
           <div className="video-timeline-editor-grid">
             <div className="video-timeline-editor-half video-timeline-editor-left">
-              <label className="video-timeline-color-field">颜色<span className="video-timeline-color-control"><input type="color" value={selectedEntry.color || typeById.get(selectedEntry.typeId)?.color || '#3976d5'} onChange={(event) => updateEntry(selectedEntry.id, { color: event.target.value })} aria-label="事件颜色" /></span></label>
+              <div className="video-timeline-color-field"><span>事件颜色</span><div className="video-timeline-color-palette"><button type="button" className="video-timeline-current-color" style={{ '--event-color': selectedEntry.color || typeById.get(selectedEntry.typeId)?.color || '#3976d5' }} onClick={() => setIsColorPaletteOpen((open) => !open)} aria-label="当前事件颜色，点击展开颜色选项" aria-expanded={isColorPaletteOpen} />{isColorPaletteOpen && <><span className="video-timeline-color-options">{['#7399d0', '#8d73c9', '#dc8b4a', '#5eaa88', '#cf6d79'].map((color) => <button type="button" className={(selectedEntry.color || typeById.get(selectedEntry.typeId)?.color) === color ? 'is-selected' : undefined} key={color} style={{ '--event-color': color }} onClick={() => { updateEntry(selectedEntry.id, { color }); setIsColorPaletteOpen(false); }} aria-label={`选择 ${color} 事件颜色`} />)}<label className="video-timeline-custom-color">＋<input type="color" value={selectedEntry.color || typeById.get(selectedEntry.typeId)?.color || '#3976d5'} onChange={(event) => { updateEntry(selectedEntry.id, { color: event.target.value }); setIsColorPaletteOpen(false); }} aria-label="自定义事件颜色" /></label></span></>}</div></div>
               <label className="video-timeline-type-field">事件类型
                 <select className="video-timeline-type-select" value={selectedEntry.typeId} onChange={(event) => { const nextType = typeById.get(event.target.value); updateEntry(selectedEntry.id, { typeId: event.target.value, color: nextType?.color || selectedEntry.color }); }}>
                   {Object.entries(typeGroups).map(([group, groupTypes]) => <optgroup label={group} key={group}>{groupTypes.map((type) => <option value={type.id} key={type.id}>{type.label}</option>)}</optgroup>)}
@@ -3054,15 +3199,15 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
                   role="switch"
                   aria-checked={selectedEntry.end !== null}
                   aria-label={`时间形态：${selectedEntry.end === null ? '时间点' : '时间段'}`}
-                  onClick={() => updateEntry(selectedEntry.id, { end: selectedEntry.end === null ? Math.min(safeDuration, selectedEntry.start + VIDEO_TIMELINE_DRAG_STEP_SECONDS) : null })}
+                  onClick={() => updateEntry(selectedEntry.id, selectedEntry.end === null ? { start: Math.min(selectedEntry.start, safeDuration - 1), end: Math.min(safeDuration, selectedEntry.start + 1) } : { end: null })}
                 >
                   <i aria-hidden="true" />
                   <b>时间点</b>
                   <b>时间段</b>
                 </button>
               </div>
-              <label className="video-timeline-timecode-field">开始时码<input key={`${selectedEntry.id}-${selectedEntry.start}`} defaultValue={formatVideoTimelineTime(selectedEntry.start)} onBlur={(event) => updateTimeFromInput(selectedEntry, 'start', event.currentTarget.value, event.currentTarget)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} inputMode="decimal" aria-label="自定义开始时码，格式为0:00或输入十进制分钟，如1.5表示1:30" /></label>
-              {selectedEntry.end !== null && <label className="video-timeline-timecode-field is-end">结束时码<input key={`${selectedEntry.id}-${selectedEntry.end}`} defaultValue={formatVideoTimelineTime(selectedEntry.end)} onBlur={(event) => updateTimeFromInput(selectedEntry, 'end', event.currentTarget.value, event.currentTarget)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} inputMode="decimal" aria-label="自定义结束时码，格式为0:00或输入十进制分钟，如1.5表示1:30" /></label>}
+              <TimelineTimeInput key={`${selectedEntry.id}-start`} label="开始时间" value={selectedEntry.start} max={selectedEntry.end === null ? safeDuration : Math.max(0, selectedEntry.end - 1)} onCommit={(start) => updateEntry(selectedEntry.id, { start })} />
+              {selectedEntry.end !== null && <TimelineTimeInput key={`${selectedEntry.id}-end`} label="结束时间" value={selectedEntry.end} min={selectedEntry.start + 1} max={safeDuration} onCommit={(end) => updateEntry(selectedEntry.id, { end })} />}
             </div>
             <label className="video-timeline-title-field">标题<input value={selectedEntry.title} onChange={(event) => updateEntry(selectedEntry.id, { title: event.target.value })} placeholder="例如：主角身份暴露" maxLength="60" /></label>
           </div>
@@ -3071,8 +3216,15 @@ function VideoBreakdownTimeline({ entries, types, duration, sourceEntries, onEnt
             <label>标签<input value={selectedEntry.tags} onChange={(event) => updateEntry(selectedEntry.id, { tags: event.target.value })} placeholder="多个标签用逗号分隔" /></label>
             <label>可借鉴做法<input value={selectedEntry.takeaway} onChange={(event) => updateEntry(selectedEntry.id, { takeaway: event.target.value })} placeholder="我能怎样借鉴？" /></label>
           </div>
-          <button type="button" className="video-timeline-import" onClick={() => onImportToEmotionCurve(selectedEntry)}><Sparkles size={16} /> 导入情绪曲线</button>
-          <small className="video-timeline-autosave">可输入 1.5 表示 1:30；输入后会自动保存到当前拆解草稿。</small>
+          <section className="video-timeline-emotion-editor" aria-label="观众情绪">
+            <div><strong>观众情绪 {linkedEmotion ? ['😭', '😨', '😢', '😞', '😔', '😐', '😬', '🙂', '😄', '😆', '🤩'][(linkedEmotion.level || 0) + 5] : ''}</strong><span>{linkedEmotion ? `落点：${formatVideoTimelineTime(linkedEmotion.position)} · 随事件同步` : '这个事件还没有情绪记录。'}</span></div>
+            {linkedEmotion ? <>
+              <label>观众想法 / 感受<textarea value={linkedEmotion.idea || ''} rows={2} onChange={(event) => updateEmotion(linkedEmotion.id, { idea: event.target.value })} placeholder="这一步让观众感到什么？" /></label>
+              <label>情绪值 <b>{linkedEmotion.level > 0 ? '+' : ''}{linkedEmotion.level || 0}</b><input type="range" min="-5" max="5" step="1" value={linkedEmotion.level || 0} onChange={(event) => updateEmotion(linkedEmotion.id, { level: Number(event.target.value) })} aria-label="情绪值" /></label>
+              <button type="button" className="video-timeline-emotion-remove" onClick={() => removeEmotion(linkedEmotion.id)}>移除情绪，保留事件</button>
+            </> : <button type="button" className="video-timeline-import" onClick={() => addEmotionNode(selectedEntry.id)}>＋ 添加情绪</button>}
+          </section>
+          <small className="video-timeline-autosave">时间输入完成后，按回车或点击输入区外生效；内容自动保存到当前拆解草稿。</small>
         </section>
       ) : <div className="video-timeline-empty"><Clock3 size={20} /><span>还没有事件。新增一个时间点或时间段开始拆解。</span><button type="button" className="video-timeline-add" onClick={createEntry}><Plus size={16} /> 新增事件</button></div>}
       </div>

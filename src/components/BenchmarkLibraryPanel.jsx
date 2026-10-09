@@ -1,7 +1,8 @@
 import React from 'react';
-import { BookOpen, Clapperboard, Copy, Download, Film, Globe2, Music2, Pencil, Plus, Radio, Trash2, Tv, Upload, UsersRound, X, Youtube } from 'lucide-react';
+import { BookOpen, Clapperboard, Copy, Download, Film, Globe2, Layers3, Music2, Pencil, Plus, Radio, Trash2, Tv, Upload, UsersRound, X, Youtube } from 'lucide-react';
 import './BenchmarkLibraryPanel.css';
 import { VideoCollectionPanel } from './VideoCollectionPanel';
+import { TopicLibraryHome } from './TopicLibraryHome';
 import { BENCHMARK_ACCOUNTS_KEY, loadBenchmarkAccounts, loadBenchmarkVideos, makeBenchmarkId } from '../utils/benchmarkLibrary';
 
 const PLATFORM_OPTIONS = ['抖音', 'YouTube', '快手', 'B站', '小红书', '其他'];
@@ -54,7 +55,12 @@ function PlatformIcon({ platform }) {
 }
 
 export function BenchmarkLibraryPanel({ onOpenBreakdown, onCreateProject }) {
-  const [view, setView] = React.useState('accounts');
+  const [view, setView] = React.useState('topics');
+  const [selectedTopicGroup, setSelectedTopicGroup] = React.useState('');
+  const [videoTarget, setVideoTarget] = React.useState('');
+  const [comparisonTarget, setComparisonTarget] = React.useState('');
+  const [comparisonVideoIds, setComparisonVideoIds] = React.useState([]);
+  const [addToTopic, setAddToTopic] = React.useState('');
   const [selectedAccountId, setSelectedAccountId] = React.useState('');
   const [accounts, setAccounts] = React.useState(loadBenchmarkAccounts);
   const [draft, setDraft] = React.useState(blankAccount);
@@ -200,11 +206,11 @@ export function BenchmarkLibraryPanel({ onOpenBreakdown, onCreateProject }) {
 
   return <section className="benchmark-library" aria-label="对标库">
     <header className="benchmark-library-header">
-      <h1>对标库</h1>
       <div className="benchmark-library-toolbar">
         <nav className="benchmark-library-tabs" role="tablist" aria-label="对标库内容">
+          <button type="button" role="tab" aria-selected={view === 'topics'} className={view === 'topics' ? 'active' : ''} onClick={() => setView('topics')}><Layers3 size={16} />母题库</button>
           <button type="button" role="tab" aria-selected={view === 'accounts'} className={view === 'accounts' ? 'active' : ''} onClick={() => setView('accounts')}><UsersRound size={16} />对标账号</button>
-          <button type="button" role="tab" aria-selected={view === 'videos'} className={view === 'videos' ? 'active' : ''} onClick={() => setView('videos')}><Film size={16} />对标视频</button>
+          <button type="button" role="tab" aria-selected={view === 'videos'} className={view === 'videos' ? 'active' : ''} onClick={() => { setSelectedAccountId(''); setVideoTarget(''); setComparisonTarget(''); setComparisonVideoIds([]); setAddToTopic(''); setView('videos'); }}><Film size={16} />对标视频</button>
         </nav>
         {view === 'accounts' && (
           <div className="benchmark-library-actions">
@@ -232,7 +238,7 @@ export function BenchmarkLibraryPanel({ onOpenBreakdown, onCreateProject }) {
       </div>
     </header>
     {notice && <p className="benchmark-library-notice" role="status">{notice}</p>}
-    {view === 'accounts' ? <section className="benchmark-account-layout">
+    {view === 'topics' ? <TopicLibraryHome selectedGroup={selectedTopicGroup} onSelectGroup={setSelectedTopicGroup} onOpenVideo={(id) => { setSelectedAccountId(''); setVideoTarget(id); setComparisonTarget(''); setComparisonVideoIds([]); setAddToTopic(''); setView('videos'); }} onAddVideo={(name) => { setSelectedAccountId(''); setVideoTarget(''); setComparisonTarget(''); setComparisonVideoIds([]); setAddToTopic(name); setView('videos'); }} onOpenComparison={(name, ids = []) => { setSelectedAccountId(''); setVideoTarget(''); setComparisonTarget(name); setComparisonVideoIds(ids); setAddToTopic(''); setView('videos'); }} onOpenVideos={() => { setSelectedAccountId(''); setVideoTarget(''); setComparisonTarget(''); setComparisonVideoIds([]); setAddToTopic(''); setView('videos'); }} /> : view === 'accounts' ? <section className="benchmark-account-layout">
       <div className="benchmark-account-create">
       {isAccountFormOpen && <article className="benchmark-account-form-card">
         <div className="benchmark-account-form-heading"><div className="benchmark-section-heading"><span><Radio size={18} /></span><div><h2>{editingAccountId ? '修改对标账号' : '新增对标账号'}</h2><p>{editingAccountId ? '调整账号资料，或在此删除该账号。' : '建立长期观察对象，之后可在对标视频与拆解学习中选择。'}</p></div></div><button className="benchmark-account-form-close" type="button" aria-label="关闭账号表单" title="关闭" onClick={closeAccountForm}><X size={18} /></button></div>
@@ -246,8 +252,8 @@ export function BenchmarkLibraryPanel({ onOpenBreakdown, onCreateProject }) {
         </form>
       </article>}
       </div>
-      {accounts.map((account) => <AccountCard account={account} key={account.id} onEdit={() => openEditAccountForm(account)} onViewVideos={(item) => { setSelectedAccountId(item.id); setView('videos'); }} />)}
-    </section> : <VideoCollectionPanel initialAccountId={selectedAccountId} onOpenBreakdown={onOpenBreakdown} onCreateProject={onCreateProject} />}
+      {accounts.map((account) => <AccountCard account={account} key={account.id} onEdit={() => openEditAccountForm(account)} onViewVideos={(item) => { setSelectedAccountId(item.id); setVideoTarget(''); setComparisonTarget(''); setComparisonVideoIds([]); setAddToTopic(''); setView('videos'); }} />)}
+    </section> : <VideoCollectionPanel initialAccountId={selectedAccountId} initialVideoId={videoTarget} initialTopicGroup={addToTopic} initialComparisonGroup={comparisonTarget} initialComparisonVideoIds={comparisonVideoIds} onOpenBreakdown={onOpenBreakdown} onCreateProject={onCreateProject} />}
   </section>;
 }
 

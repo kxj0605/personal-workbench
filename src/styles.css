@@ -9614,6 +9614,12 @@ button.calendar-range-event:focus-visible,
   max-width: 960px;
 }
 
+@media (min-width: 481px) and (max-width: 1000px) {
+  .workspace-content:has(> .script-breakdown-panel) {
+    padding-inline: 20px;
+  }
+}
+
 .script-breakdown-minimap {
   position: fixed;
   left: 16px;
@@ -9796,6 +9802,54 @@ button.calendar-range-event:focus-visible,
 
 .script-breakdown-form {
   gap: 20px;
+}
+
+.breakdown-analysis-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  scroll-margin-top: 20px;
+}
+
+.breakdown-analysis-tabs button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--ws-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.breakdown-analysis-tabs button:hover,
+.breakdown-analysis-tabs button:focus-visible {
+  color: var(--ws-primary);
+  background: var(--ws-primary-soft);
+}
+
+.breakdown-analysis-tabs button.is-active {
+  border-color: rgba(57, 118, 213, 0.28);
+  background: var(--ws-primary-soft);
+  color: var(--ws-primary);
+}
+
+.breakdown-analysis-panel {
+  display: grid;
+  min-width: 0;
+  gap: 20px;
+}
+
+.breakdown-analysis-panel[hidden] {
+  display: none;
+}
+
+@media (max-width: 680px) {
+  .breakdown-analysis-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .script-breakdown-title-field {
@@ -10972,7 +11026,7 @@ button.calendar-range-event:focus-visible,
   gap: 6px;
 }
 
-.video-timeline-editor-heading > div { display: grid; gap: 2px; }
+.video-timeline-editor-heading > div:not(.video-timeline-editor-actions) { display: grid; gap: 2px; }
 .video-timeline-editor-heading strong { color: var(--ws-text); font-size: 14px; }
 .video-timeline-editor-heading span { color: var(--ws-primary); font-size: 12px; font-weight: 750; }
 
@@ -10981,6 +11035,56 @@ button.calendar-range-event:focus-visible,
   background: rgba(255, 232, 236, 0.62);
   color: #b83450;
 }
+
+.video-timeline-selected-emotion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid rgba(201, 120, 8, 0.2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 242, 222, 0.52);
+  color: #816a48;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.video-timeline-selected-emotion-actions button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 232, 236, 0.8);
+  color: #a65c63;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+}
+
+.video-timeline-selected-emotion-actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-timeline-selected-emotion-actions input {
+  width: 64px;
+  border: 1px solid rgba(201, 120, 8, 0.24);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ws-text);
+  font: inherit;
+}
+
+.timeline-time-input { display: grid; gap: 6px; color: var(--ws-text); font-size: 12px; font-weight: 700; }
+.timeline-time-input > div { display: flex; align-items: center; gap: 6px; }
+.video-breakdown-timeline .timeline-time-input input { width: 62px; min-height: 40px; box-sizing: border-box; border: 1px solid var(--ws-border); border-radius: 10px; padding: 6px 8px; background: #fff; color: var(--ws-text); font: inherit; }
+.timeline-create-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; }
+.timeline-create-emotion, .timeline-delete-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; padding: 12px; border-radius: 12px; background: rgba(234, 243, 255, .6); font-size: 13px; }
+.video-timeline-emotion-editor > .timeline-time-input { display: grid; justify-content: start; }
+.video-timeline-emotion-editor .video-timeline-emotion-remove { min-height: 40px; padding: 6px 10px; }
 
 .video-timeline-editor-grid {
   display: grid;
@@ -12048,6 +12152,56 @@ button.calendar-range-event:focus-visible,
 .breakdown-source-picker { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border: 1px solid rgba(57, 118, 213, .13); border-radius: 16px; padding: 14px 16px; background: rgba(234, 243, 255, .48); }
 .breakdown-source-picker > div:first-child { display: grid; gap: 3px; }.breakdown-source-picker strong { color: var(--ws-text); font-size: 13px; }.breakdown-source-picker > div:first-child span, .breakdown-source-empty, .breakdown-source-select small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }.breakdown-source-options { display: flex; flex-wrap: wrap; gap: 6px; }.breakdown-source-options button { min-height: 32px; border: 1px solid rgba(57, 118, 213, .16); border-radius: 10px; padding: 0 10px; background: #fff; color: var(--ws-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }.breakdown-source-options button.active { border-color: rgba(57, 118, 213, .35); background: var(--ws-primary-soft); color: var(--ws-primary); }.breakdown-source-select { display: grid; gap: 5px; color: var(--ws-muted); font-size: 12px; font-weight: 700; }.breakdown-source-select select { min-width: 210px; min-height: 34px; border: 1px solid var(--ws-border); border-radius: 10px; padding: 0 9px; background: #fff; color: var(--ws-text); font: inherit; font-size: 12px; }.breakdown-source-select small { display: block; max-width: 280px; }.breakdown-source-empty { margin: 0; }
 
+/* 统一时间轴：情绪、时间点与时间段使用同一组时码。 */
+.video-timeline-rail.is-unified { min-height: 304px; }
+.video-timeline-rail.is-unified .video-timeline-entry { top: calc(218px + (var(--timeline-row) * 42px)); }
+.video-timeline-rail.is-unified .video-timeline-entry.is-point::before,
+.video-timeline-rail.is-unified .video-timeline-entry.is-interval::before { position: absolute; right: calc(100% + 10px); top: 6px; color: var(--ws-muted); font-size: 11px; font-weight: 750; white-space: nowrap; }
+.video-timeline-rail.is-unified .video-timeline-entry.is-point::before { content: '时间点'; }
+.video-timeline-rail.is-unified .video-timeline-entry.is-interval::before { content: '时间段'; }
+.video-timeline-rail.is-unified .video-timeline-entry::before { display: none; }
+.video-timeline-event-lane { position: absolute; z-index: 2; left: 18px; color: var(--ws-muted); font-size: 11px; font-weight: 750; }
+.video-timeline-event-lane.point { top: 224px; }
+.video-timeline-event-lane.range { top: 267px; }
+.video-timeline-emotion-layer { position: absolute; top: 34px; right: 18px; left: 18px; height: 162px; border-bottom: 1px solid rgba(17, 24, 39, .07); }
+.video-timeline-emotion-layer::before,
+.video-timeline-emotion-layer::after { position: absolute; z-index: 0; right: 0; left: 0; border-top: 1px solid rgba(102, 125, 157, .12); content: ''; }
+.video-timeline-emotion-layer::before { top: 50%; }
+.video-timeline-emotion-layer::after { top: 8%; border-top-style: dashed; }
+.video-timeline-lane-label { position: absolute; z-index: 2; top: 5px; left: 0; color: var(--ws-muted); font-size: 11px; font-weight: 750; transform: translateY(-18px); }
+.video-timeline-emotion-layer svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.video-timeline-emotion-path { fill: none; stroke: #d5a33d; stroke-width: 4; stroke-linecap: round; }
+.video-timeline-emotion-node { position: absolute; z-index: 3; width: 32px; height: 32px; border: 1px solid rgba(201, 120, 8, .2); border-radius: 50%; padding: 0; background: #fffdf6; box-shadow: 0 3px 10px rgba(52, 63, 84, .1); cursor: ns-resize; font-size: 20px; line-height: 1; transform: translate(-50%, -50%); touch-action: none; }
+.video-timeline-emotion-node:hover,
+.video-timeline-emotion-node:focus-visible,
+.video-timeline-emotion-node.is-selected { outline: 3px solid rgba(201, 120, 8, .22); outline-offset: 2px; }
+.video-timeline-duration span input { width: 48px; }
+.video-timeline-emotion-editor { display: grid; gap: 11px; border: 1px solid rgba(201, 120, 8, .2); border-radius: 14px; padding: 14px; background: rgba(255, 242, 222, .52); }
+.video-timeline-emotion-editor > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.video-timeline-emotion-editor strong { color: var(--ws-text); font-size: 13px; }
+.video-timeline-emotion-editor span { color: var(--ws-muted); font-size: 12px; }
+.video-timeline-emotion-editor label { color: #816a48; }
+.video-timeline-emotion-editor textarea { width: 100%; min-height: 54px; box-sizing: border-box; margin-top: 6px; border: 1px solid rgba(201, 120, 8, .18); border-radius: 10px; padding: 8px 10px; background: rgba(255, 255, 255, .8); color: var(--ws-text); font: inherit; font-size: 12px; resize: vertical; }
+.video-timeline-emotion-editor input[type='range'] { display: block; width: 100%; margin-top: 6px; accent-color: #c97808; }
+.video-timeline-emotion-add,
+.video-timeline-emotion-remove { width: fit-content; border: 0; padding: 0; background: transparent; color: #9d670e; cursor: pointer; font: inherit; font-size: 12px; font-weight: 750; }
+.video-timeline-emotion-remove { color: #a65c63; }
+.video-timeline-editor .video-timeline-color-palette { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.video-timeline-editor .video-timeline-color-palette > button,
+.video-timeline-editor .video-timeline-custom-color { position: relative; display: grid; width: 27px; min-width: 27px; height: 27px; place-items: center; overflow: hidden; border: 2px solid #fff; border-radius: 50%; padding: 0; background: var(--event-color); box-shadow: 0 0 0 1px rgba(17, 24, 39, .12); cursor: pointer; }
+.video-timeline-editor .video-timeline-color-palette > button.is-selected { box-shadow: 0 0 0 3px rgba(57, 118, 213, .38); }
+.video-timeline-editor .video-timeline-current-color { width: 34px; min-width: 34px; height: 34px; border: 2px solid #fff; border-radius: 50%; padding: 0; background: var(--event-color); box-shadow: 0 0 0 1px rgba(17, 24, 39, .12); cursor: pointer; }
+.video-timeline-editor .video-timeline-color-options { display: flex; align-items: center; gap: 7px; }
+.video-timeline-editor .video-timeline-color-options > button { width: 27px; min-width: 27px; height: 27px; border: 2px solid #fff; border-radius: 50%; padding: 0; background: var(--event-color); box-shadow: 0 0 0 1px rgba(17, 24, 39, .12); cursor: pointer; }
+.video-timeline-editor .video-timeline-color-options > button.is-selected { box-shadow: 0 0 0 3px rgba(57, 118, 213, .38); }
+.video-timeline-editor .video-timeline-custom-color { background: #fff; color: var(--ws-muted); font-size: 17px; line-height: 1; }
+.video-timeline-editor .video-timeline-custom-color input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+
+@media (max-width: 680px) {
+  .video-timeline-rail.is-unified { min-width: 600px; }
+  .video-timeline-lane-label { transform: translateY(-18px); }
+}
+
 /* 桌面端的空状态和设置页避免为对齐而制造无效留白。 */
 @media (min-width: 781px) {
   .workspace-content .notes-empty-state {
@@ -12143,6 +12297,7 @@ button.calendar-range-event:focus-visible,
 
 /* A: 专注蓝图——给长表单更清晰的区块边界和流程感。 */
 .preview-blueprint .form-card-heading,
+.preview-blueprint .breakdown-analysis-panel > :is(.video-type-section, .core-event-chain-structure, .script-breakdown-field),
 .preview-blueprint .script-breakdown-form > .video-type-section,
 .preview-blueprint .script-breakdown-form > .core-event-chain-structure,
 .preview-blueprint .script-breakdown-form > .script-breakdown-field,
@@ -12208,6 +12363,7 @@ button.calendar-range-event:focus-visible,
   gap: 32px;
 }
 
+.preview-paper .breakdown-analysis-panel > :is(.video-type-section, .core-event-chain-structure, .script-breakdown-field),
 .preview-paper .script-breakdown-form > .video-type-section,
 .preview-paper .script-breakdown-form > .core-event-chain-structure,
 .preview-paper .script-breakdown-form > .script-breakdown-field,
@@ -12222,6 +12378,7 @@ button.calendar-range-event:focus-visible,
   background: transparent;
 }
 
+.preview-paper .breakdown-analysis-panel > :is(.video-type-section, .core-event-chain-structure, .script-breakdown-field)::before,
 .preview-paper .script-breakdown-form > .video-type-section::before,
 .preview-paper .script-breakdown-form > .core-event-chain-structure::before,
 .preview-paper .script-breakdown-form > .script-breakdown-field::before,
@@ -12263,6 +12420,7 @@ button.calendar-range-event:focus-visible,
   gap: 18px;
 }
 
+.preview-timeline .breakdown-analysis-panel > :is(.video-type-section, .core-event-chain-structure, .script-breakdown-field),
 .preview-timeline .script-breakdown-form > .video-type-section,
 .preview-timeline .script-breakdown-form > .core-event-chain-structure,
 .preview-timeline .script-breakdown-form > .script-breakdown-field,
@@ -12277,6 +12435,7 @@ button.calendar-range-event:focus-visible,
   background: rgba(255, 255, 255, 0.76);
 }
 
+.preview-timeline .breakdown-analysis-panel > :is(.video-type-section, .core-event-chain-structure, .script-breakdown-field)::before,
 .preview-timeline .script-breakdown-form > .video-type-section::before,
 .preview-timeline .script-breakdown-form > .core-event-chain-structure::before,
 .preview-timeline .script-breakdown-form > .script-breakdown-field::before,

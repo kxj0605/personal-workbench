@@ -1,0 +1,2085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视频脚本拆解工具 - 时间轴卡片</title>
+  <style>
+    :root {
+      --bg-card: #18191c;
+      --bg-track: #1e2025;
+      --bg-panel: #23262d;
+      --bg-input: #121316;
+      --border-color: #31353f;
+      --border-focus: #4e80ee;
+      --text-main: #f0f2f5;
+      --text-muted: #8b92a0;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --accent-point: #f59e0b;
+      --accent-range: #10b981;
+      --accent-emotion: #8b5cf6;
+      --ruler-height: 28px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background-color: #0d0e11;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+    }
+    body.embedded { padding: 0; background: transparent; display: block; }
+    body.embedded .timeline-card { max-width: none; box-shadow: none; }
+    body.embedded .emotion-node:focus-visible { outline: 2px solid #3976d5; outline-offset: 3px; }
+
+    .timeline-card {
+      width: 100%;
+      max-width: 1400px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 顶部操作条 */
+    .card-header {
+      padding: 12px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #20232a;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 11px;
+      background: #2d3340;
+      color: var(--text-muted);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .duration-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: var(--bg-input);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+    .duration-control input {
+      width: 32px;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 13px;
+      text-align: center;
+      outline: none;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .btn-secondary {
+      background: #2c303a;
+      color: var(--text-main);
+      border-color: var(--border-color);
+    }
+    .btn-secondary:hover { background: #353b47; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+
+    /* 主体工作区分栏：宽屏双栏，窄屏自适应堆叠 */
+    .card-body {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      min-height: 520px;
+    }
+    @media (max-width: 980px) {
+      .card-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 左侧轨道区 */
+    .timeline-view {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-color);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* 轨道通用骨架 */
+    .track-row {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      border-bottom: 1px solid var(--border-color);
+      position: relative;
+    }
+    .track-label {
+      padding: 4px 0;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: #1a1b20;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+    }
+    .track-label > span {
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
+    .track-label small {
+      display: none;
+    }
+    .track-stage {
+      position: relative;
+      background: var(--bg-track);
+      overflow: hidden;
+    }
+
+    /* 时间刻度条 */
+    .ruler-row {
+      height: var(--ruler-height);
+      background: #141518;
+      border-bottom: 1px solid #2b2e37;
+    }
+    .ruler-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 情绪区 */
+    .emotion-stage {
+      height: 140px;
+      position: relative;
+    }
+    .emotion-svg {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    .emotion-zero-line {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      top: 50%;
+      border-top: 1px dashed rgba(255,255,255,0.12);
+      pointer-events: none;
+    }
+    .emotion-node {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 5;
+    }
+    .emotion-node.selected {
+      z-index: 10;
+    }
+    .emotion-node > span,
+    .point-pin,
+    .range-bar { transition: filter 0.15s; }
+    .emotion-node.selected > span,
+    .point-marker.selected .point-pin,
+    .range-bar.selected {
+      filter: drop-shadow(0 0 2px #3976d5) drop-shadow(0 0 7px rgba(57, 118, 213, 0.85));
+    }
+    .emotion-tag {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      background: rgba(0,0,0,0.75);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: #ddd;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* 时间点区 */
+    .point-stage {
+      height: 64px;
+      position: relative;
+    }
+    .point-marker {
+      position: absolute;
+      top: 10px;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      z-index: 6;
+    }
+    .point-pin {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      transform: rotate(45deg);
+      background: var(--accent-point);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+    .point-title {
+      margin-top: 6px;
+      font-size: 10px;
+      background: rgba(18, 19, 23, 0.85);
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.1);
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #e5e7eb;
+    }
+
+    /* 时间段区 */
+    .range-stage {
+      min-height: 100px;
+      position: relative;
+      padding: 6px 0;
+    }
+    .range-bar {
+      position: absolute;
+      height: 26px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.25);
+      border: 1px solid var(--accent-range);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6px;
+      font-size: 11px;
+      color: #fff;
+      cursor: pointer;
+      z-index: 4;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .range-bar.selected {
+      z-index: 8;
+    }
+    .range-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      font-weight: 500;
+    }
+    .range-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 7px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .range-bar:hover .range-handle, .range-bar.selected .range-handle { opacity: 1; }
+    .range-handle.left { left: 0; }
+    .range-handle.right { right: 0; }
+
+    /* 垂直贯通辅助线 (关联情绪与事件) */
+    .sync-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      border-left: 1px dashed rgba(167, 139, 250, 0.4);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .hover-time-guide {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 4;
+      border-left: 2px dashed rgba(57, 118, 213, 0.86);
+      pointer-events: none;
+    }
+    .hover-time-guide[hidden] { display: none; }
+    .hover-time-guide span {
+      position: absolute;
+      top: 4px;
+      left: 0;
+      border-radius: 999px;
+      padding: 3px 6px;
+      background: rgba(17, 24, 39, 0.88);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      transform: translateX(-50%);
+    }
+    .hover-time-guide.edge-start span { transform: translateX(0); }
+    .hover-time-guide.edge-end span { transform: translateX(-100%); }
+
+    /* 右侧编辑面板 (Inspector) */
+    .inspector-panel {
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 14px;
+      overflow-y: auto;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+    .inspector-panel.is-range-selected { gap: 6px; }
+    .inspector-panel.is-range-selected .panel-header {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .event-fields-toggle {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .event-fields-toggle:hover { color: var(--primary); border-color: var(--border-focus); }
+    .event-fields-toggle:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    .event-fields-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .event-extra-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .event-extra-fields[hidden] { display: none; }
+    .event-extra-fields .form-group { min-width: 0; }
+    .event-extra-fields textarea { min-height: 78px; }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .form-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .event-primary-row {
+      display: grid;
+      grid-template-columns: 38px minmax(0, calc(50% - 50px)) repeat(2, minmax(0, 1fr));
+      align-items: end;
+      gap: 8px;
+    }
+    .event-primary-row .form-group { min-width: 0; }
+    .event-primary-row .form-label { white-space: nowrap; }
+    .event-primary-row .form-control { min-width: 0; height: 32px; }
+    .event-primary-row .event-time-input { text-align: center; padding: 6px 2px; }
+    .event-primary-row.is-point { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
+    .point-title-line, .point-time-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .point-title-line .event-color-picker { flex: 0 0 32px; }
+    .point-title-line .form-label, .point-time-line .form-label { flex: none; white-space: nowrap; }
+    .point-title-line .form-control { flex: 1; min-width: 0; }
+    .point-time-line .event-time-input { flex: 1; width: 0; min-width: 36px; }
+    .event-primary-row.is-range { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
+    .range-title-line, .range-time-line { display: flex; align-items: center; min-width: 0; gap: 8px; }
+    .range-title-line .event-color-picker { flex: 0 0 32px; }
+    .range-title-line .form-label, .range-time-line .form-label { flex: none; white-space: nowrap; }
+    .range-title-line .form-control { flex: 1; min-width: 0; }
+    .range-time-line .compact-time-pair { flex: 1; width: 0; min-width: 0; }
+    .event-extra-fields > .form-group:nth-child(-n+2) { flex-direction: row; align-items: center; gap: 8px; }
+    .event-extra-fields > .form-group:nth-child(-n+2) .form-label { flex: none; white-space: nowrap; }
+    .event-extra-fields > .form-group:nth-child(-n+2) .form-control { flex: 1; min-width: 0; }
+    .event-color-picker { position: relative; }
+    .event-current-color,
+    .event-color-options button,
+    .event-custom-color {
+      display: grid;
+      place-items: center;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      padding: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.18);
+      cursor: pointer;
+    }
+    .event-current-color { width: 32px; height: 32px; background: var(--event-color); }
+    .event-color-options {
+      position: absolute;
+      top: calc(100% + 7px);
+      left: 0;
+      z-index: 30;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 9px;
+      border: 1px solid var(--border-color);
+      border-radius: 9px;
+      background: #2b2e36;
+      box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    }
+    .event-color-options[hidden] { display: none; }
+    .event-color-options button,
+    .event-custom-color { width: 26px; min-width: 26px; height: 26px; }
+    .event-color-options button { background: var(--event-color); }
+    .event-color-options button.is-selected { box-shadow: 0 0 0 3px rgba(103,232,249,.45); }
+    .event-custom-color { position: relative; overflow: hidden; background: #fff; color: #59616f; font-size: 18px; }
+    .event-custom-color input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .compact-time-pair {
+      display: flex;
+      align-items: center;
+      height: 32px;
+      padding: 0 3px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text-muted);
+    }
+    .compact-time-pair:focus-within { border-color: var(--border-focus); }
+    .compact-time-pair input {
+      width: 50%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      padding: 4px 0;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 500px) {
+      .header-left, .header-actions { flex-wrap: wrap; }
+      .header-actions .btn { flex: 0 0 auto; white-space: nowrap; }
+      .card-title { white-space: nowrap; }
+      .event-primary-row.is-point, .event-primary-row.is-range { grid-template-columns: minmax(0, 1fr); }
+      .event-extra-fields .event-long-field { grid-column: 1 / -1; }
+    }
+    .form-control, .input-time-box input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      width: 100%;
+    }
+    .form-control:focus, .input-time-box input:focus {
+      border-color: var(--border-focus);
+    }
+    textarea.form-control {
+      resize: vertical;
+      min-height: 50px;
+    }
+    .time-inputs-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .input-time-box {
+      display: flex;
+      align-items: center;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0 6px;
+      flex: 1;
+    }
+    .input-time-box input {
+      border: none;
+      padding: 6px 2px;
+      text-align: center;
+      width: 100%;
+    }
+    .input-time-box span {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-emotion);
+    }
+    .emotion-primary-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: end;
+      gap: 12px;
+    }
+    .emotion-primary-row .form-group,
+    .emotion-primary-row .slider-row,
+    .emotion-primary-row .slider-row input,
+    .emotion-primary-row .input-time-box { min-width: 0; }
+    .emotion-primary-row .form-label { white-space: nowrap; }
+    .emotion-primary-row .slider-row { height: 32px; gap: 5px; }
+    .emotion-primary-row .input-time-box { height: 32px; padding: 0 4px; }
+    .emotion-primary-row .input-time-box input { min-width: 0; padding: 4px 0; }
+
+    .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      background: rgba(139, 92, 246, 0.2);
+      color: #c4b5fd;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
+
+    .details-toggle {
+      font-size: 11px;
+      color: #60a5fa;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    /* 全局轻提示 (Toast) */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #252830;
+      color: #fff;
+      border: 1px solid #414756;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+      animation: fadeIn 0.2s ease;
+    }
+    .toast.toast-error {
+      border-color: var(--danger);
+      background: #321c1f;
+      color: #fca5a5;
+    }
+    .toast-action {
+      color: #60a5fa;
+      cursor: pointer;
+      text-decoration: underline;
+      font-weight: 500;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 拖拽指示悬浮信息 */
+    .drag-tooltip {
+      position: fixed;
+      background: #000;
+      color: #67e8f9;
+      font-size: 11px;
+      font-family: monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+    }
+
+    /* 接入网站后使用浅色工作台外观；独立原型的深色版保持不变。 */
+    body.embedded {
+      --bg-card: #ffffff;
+      --bg-track: #fbfdff;
+      --bg-panel: #f8faff;
+      --bg-input: #ffffff;
+      --border-color: #dce5f1;
+      --border-focus: #3976d5;
+      --text-main: #1f2937;
+      --text-muted: #667085;
+      --accent-emotion: #7647c8;
+      color: var(--text-main);
+    }
+    body.embedded .timeline-card {
+      border-color: #dce5f1;
+      box-shadow: 0 8px 24px rgba(52, 63, 84, .06);
+    }
+    body.embedded .card-header { background: #f5f8ff; }
+    body.embedded .badge { background: #e8f0fc; color: #58708f; }
+    body.embedded .btn-secondary { background: #ffffff; color: #34445d; }
+    body.embedded .btn-secondary:hover { background: #eaf3ff; }
+    body.embedded .btn-danger { background: #ffe8ec; color: #b82e4c; border-color: #f4c7d0; }
+    body.embedded .btn-danger:hover { background: #fbd6df; color: #9d2240; }
+    body.embedded .track-label { background: #f2f6fc; }
+    body.embedded .ruler-row,
+    body.embedded .ruler-row .track-label { background: #eef3fb; border-bottom-color: #dce5f1; }
+    body.embedded .emotion-zero-line { border-top-color: #dbe3ef; }
+    body.embedded .emotion-tag {
+      background: #ffffff;
+      color: #34445d;
+      border: 1px solid #dce5f1;
+      box-shadow: 0 2px 6px rgba(52, 63, 84, .08);
+    }
+    body.embedded .point-pin { box-shadow: 0 2px 6px rgba(52, 63, 84, .18); }
+    body.embedded .point-title {
+      background: #ffffff;
+      color: #34445d;
+      border-color: #dce5f1;
+      box-shadow: 0 2px 6px rgba(52, 63, 84, .06);
+    }
+    body.embedded .range-bar {
+      background: #eaf7f1;
+      color: #254d3c;
+      box-shadow: 0 2px 5px rgba(52, 63, 84, .1);
+    }
+    body.embedded .range-handle { background: rgba(36, 123, 85, .22); }
+    body.embedded .sync-line { border-left-color: rgba(118, 71, 200, .38); }
+    body.embedded .panel-title { color: #34445d; }
+    body.embedded .event-color-options {
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(52, 63, 84, .14);
+    }
+    body.embedded .event-color-options button.is-selected { box-shadow: 0 0 0 3px rgba(57, 118, 213, .28); }
+    body.embedded .sync-badge { background: #f0eaff; color: #6840af; border-color: #dccdf5; }
+    body.embedded .details-toggle,
+    body.embedded .toast-action { color: #3976d5; }
+    body.embedded .toast {
+      background: #ffffff;
+      color: #34445d;
+      border-color: #dce5f1;
+      box-shadow: 0 8px 24px rgba(52, 63, 84, .14);
+    }
+    body.embedded .toast.toast-error { background: #fff1f3; color: #b82e4c; border-color: #f4c7d0; }
+    body.embedded .drag-tooltip {
+      background: #ffffff;
+      color: #3976d5;
+      border: 1px solid #dce5f1;
+      box-shadow: 0 4px 10px rgba(52, 63, 84, .14);
+    }
+  </style>
+</head>
+<body>
+
+<div class="timeline-card">
+  <!-- 头部控制栏 -->
+  <div class="card-header">
+    <div class="header-left">
+      <div class="card-title">
+        <span>⏱️ 时间轴</span>
+        <span class="badge" id="scaleInfo">自适应全貌</span>
+      </div>
+      <div class="duration-control" title="视频总时长 (分:秒)">
+        <span>总时长</span>
+        <input type="text" id="durM" maxlength="2" value="03">:
+        <input type="text" id="durS" maxlength="2" value="30">
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary" id="btnAddEmotion">+ 情绪节点</button>
+      <button class="btn btn-secondary" id="btnAddPoint">+ 时间点</button>
+      <button class="btn btn-secondary" id="btnAddRange">+ 时间段</button>
+      <button class="btn btn-danger" id="btnDeleteSelected" style="display:none;">删除当前项</button>
+    </div>
+  </div>
+
+  <!-- 主体工作区 -->
+  <div class="card-body">
+    <!-- 左侧三大轨道与标尺 -->
+    <div class="timeline-view" id="timelineContainer">
+      <!-- 刻度尺 -->
+      <div class="track-row ruler-row">
+        <div class="track-label" style="font-size:10px;" title="刻度（分:秒）">刻度</div>
+        <div class="track-stage" id="rulerStage">
+          <canvas class="ruler-canvas" id="rulerCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- 1. 情绪区 -->
+      <div class="track-row">
+        <div class="track-label">
+          <span>情绪曲线</span>
+        </div>
+        <div class="track-stage emotion-stage" id="emotionStage">
+          <div class="emotion-zero-line"></div>
+          <svg class="emotion-svg" id="emotionSvg"></svg>
+          <div id="emotionNodesLayer"></div>
+        </div>
+      </div>
+
+      <!-- 2. 时间点区 -->
+      <div class="track-row">
+        <div class="track-label">
+          <span>时间点</span>
+        </div>
+        <div class="track-stage point-stage" id="pointStage">
+          <div id="pointLayer"></div>
+        </div>
+      </div>
+
+      <!-- 3. 时间段区 -->
+      <div class="track-row" style="border-bottom:none; flex:1;">
+        <div class="track-label">
+          <span>时间段</span>
+        </div>
+        <div class="track-stage range-stage" id="rangeStage">
+          <div id="rangeLayer"></div>
+        </div>
+      </div>
+      <div class="hover-time-guide" id="hoverTimeGuide" aria-hidden="true" hidden><span>00:00</span></div>
+    </div>
+
+    <!-- 右侧属性检查与编辑面板 -->
+    <div class="inspector-panel" id="inspectorPanel">
+      <div class="panel-header">
+        <div class="panel-title" id="inspectorTitle">属性检查器</div>
+        <span style="font-size:11px;color:var(--text-muted);" id="inspectorType">未选中项</span>
+      </div>
+
+      <div id="inspectorContent" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:12px; color:var(--text-muted); text-align:center; margin-top:40px;">
+          点击时间轴上的情绪点、标记或事件条进行编辑。<br><br>
+          支持拖动微调；同一区域不允许时间冲突。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drag-tooltip" id="dragTooltip">00:00</div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/**
+ * 状态管理与初始化配置
+ */
+const STORAGE_KEY = 'SCRIPT_TIMELINE_PROTOTYPE_2026_10_03';
+const IS_EMBEDDED = new URLSearchParams(location.search).get('embedded') === '1';
+if (IS_EMBEDDED) document.body.classList.add('embedded');
+
+// 初始默认数据 (3分30秒 = 210秒)
+const DEFAULT_STORE = {
+  duration: 210, // 秒
+  emotions: [
+    { id: 'emo_1', time: 10, value: 2, feeling: '开场抛出反直觉提问，引发好奇', linkedEventId: null },
+    { id: 'emo_2', time: 50, value: 4, feeling: '痛点引起强烈共鸣', linkedEventId: 'ev_p1' }, // 关联时间点
+    { id: 'emo_3', time: 110, value: -3, feeling: '展示翻车案例，观众感到焦虑', linkedEventId: null },
+    { id: 'emo_4', time: 160, value: 5, feeling: '给出极简解法，情绪达到高潮', linkedEventId: null },
+    { id: 'emo_5', time: 200, value: 3, feeling: '行动呼吁自然，愿意点赞', linkedEventId: 'ev_r2' } // 关联时间段结束
+  ],
+  pointEvents: [
+    { id: 'ev_p1', time: 50, title: '黄金3秒钩子', type: '钩子', color: '#f59e0b', note: '提出痛点反问', tags: '开篇', takeaway: '前3秒必须交代收益' },
+    { id: 'ev_p2', time: 110, title: '核心反转', type: '反转', color: '#ef4444', note: '推翻传统认知', tags: '反转,剧情', takeaway: '用反常识留住完播' },
+    { id: 'ev_p3', time: 185, title: '行动指引(CTA)', type: '引导', color: '#3b82f6', note: '引导领清单', tags: '转化', takeaway: '话术简洁直接' }
+  ],
+  rangeEvents: [
+    { id: 'ev_r1', startTime: 15, endTime: 90, title: '背景与常见坑演示', type: '铺垫', color: '#10b981', note: '详细拆解传统方式的三大硬伤', tags: '干货', takeaway: '先共情再纠错' },
+    { id: 'ev_r2', startTime: 75, endTime: 200, title: '核心方法论实操演示', type: '核心', color: '#06b6d4', note: '分步讲解标准动作，与上一段重叠展示对照', tags: '实操', takeaway: '步骤控制在3步内' }
+  ]
+};
+
+// 运行时状态
+let store = loadStore();
+let selectedItem = null; // { type: 'emotion'|'point'|'range', id: string }
+let lastDeletedSnapshot = null; // 支持恢复撤销
+const eventFieldsVisibility = new Map(); // 仅记住本次页面中每个事件的面板展开状态
+
+/**
+ * 本地存储读写
+ */
+function loadStore() {
+  if (IS_EMBEDDED) return { duration: 60, emotions: [], pointEvents: [], rangeEvents: [] };
+  const local = localStorage.getItem(STORAGE_KEY);
+  if (local) {
+    try {
+      return JSON.parse(local);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_STORE));
+}
+
+function saveStore() {
+  // 同步关联情绪的时间
+  store.emotions.forEach(emo => {
+    if (emo.linkedEventId) {
+      const p = store.pointEvents.find(x => x.id === emo.linkedEventId);
+      if (p) emo.time = p.time;
+      const r = store.rangeEvents.find(x => x.id === emo.linkedEventId);
+      if (r) emo.time = r.endTime;
+    }
+  });
+  if (IS_EMBEDDED) {
+    window.parent.postMessage({ type: 'video-timeline:change', store }, '*');
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  }
+}
+
+/**
+ * 辅助工具函数
+ */
+function formatTime(seconds) {
+  seconds = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function parseTimeToSec(mStr, sStr) {
+  if (!/^\d+$/.test(mStr.trim()) || !/^\d+$/.test(sStr.trim())) return null;
+  const m = parseInt(mStr, 10);
+  const s = parseInt(sStr, 10);
+  if (isNaN(m) || isNaN(s) || m < 0 || s < 0 || s >= 60) return null;
+  return m * 60 + s;
+}
+
+function showToast(msg, isError = false, undoCallback = null) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${isError ? 'toast-error' : ''}`;
+  toast.innerHTML = `<span>${msg}</span>`;
+
+  if (undoCallback) {
+    const act = document.createElement('span');
+    act.className = 'toast-action';
+    act.innerText = '撤销';
+    act.onclick = () => {
+      undoCallback();
+      toast.remove();
+    };
+    toast.appendChild(act);
+  }
+
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 250);
+  }, 4000);
+}
+
+/**
+ * 坐标与时间转换 (按可用真实物理宽度动态映射)
+ */
+function getTrackWidth() {
+  const el = document.getElementById('rulerStage');
+  return el ? el.clientWidth : 800;
+}
+
+const TRACK_EDGE_PADDING = 18;
+
+function getUsableTrackWidth() {
+  return Math.max(1, getTrackWidth() - TRACK_EDGE_PADDING * 2);
+}
+
+function timeToX(t) {
+  return TRACK_EDGE_PADDING + (t / store.duration) * getUsableTrackWidth();
+}
+
+function xToTime(x) {
+  const clampedX = Math.max(TRACK_EDGE_PADDING, Math.min(getTrackWidth() - TRACK_EDGE_PADDING, x));
+  return Math.round(((clampedX - TRACK_EDGE_PADDING) / getUsableTrackWidth()) * store.duration);
+}
+
+function emotionValueToY(val, height = 140) {
+  // val: -5 ~ +5. y: 0 为顶部(+5)，height为底部(-5)
+  // 留 padding 16px 避免圆点被截断
+  const pad = 16;
+  const h = height - pad * 2;
+  const ratio = (5 - val) / 10;
+  return pad + ratio * h;
+}
+
+function yToEmotionValue(y, height = 140) {
+  const pad = 16;
+  const h = height - pad * 2;
+  const clampedY = Math.max(pad, Math.min(height - pad, y));
+  const ratio = (clampedY - pad) / h;
+  const val = 5 - ratio * 10;
+  return Math.round(val);
+}
+
+/**
+ * 冲突检测
+ */
+function hasEmotionConflict(time, excludeId = null) {
+  return store.emotions.some(e => e.time === time && e.id !== excludeId);
+}
+
+function hasPointConflict(time, excludeId = null) {
+  return store.pointEvents.some(p => p.time === time && p.id !== excludeId);
+}
+
+function hasLinkedEmotionConflict(eventId, time) {
+  return store.emotions.some(emo =>
+    emo.linkedEventId === eventId && hasEmotionConflict(time, emo.id)
+  );
+}
+
+/**
+ * 渲染标尺 (Canvas 自适应绘制刻度)
+ */
+function renderRuler() {
+  const canvas = document.getElementById('rulerCanvas');
+  const stage = document.getElementById('rulerStage');
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  canvas.width = w * window.devicePixelRatio;
+  canvas.height = h * window.devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = IS_EMBEDDED ? '#c3cede' : '#383d47';
+  ctx.fillStyle = IS_EMBEDDED ? '#667085' : '#7c8594';
+  ctx.font = '10px monospace';
+
+  // 根据总秒数与宽度计算合适的主刻度步长 (例如 5s, 10s, 30s, 60s)
+  const minPxPerLabel = 60;
+  const totalSec = store.duration;
+  let stepSec = 5;
+  if (w / (totalSec / 5) < minPxPerLabel) stepSec = 10;
+  if (w / (totalSec / 10) < minPxPerLabel) stepSec = 15;
+  if (w / (totalSec / 15) < minPxPerLabel) stepSec = 30;
+  if (w / (totalSec / 30) < minPxPerLabel) stepSec = 60;
+
+  for (let s = 0; s <= totalSec; s++) {
+    const x = timeToX(s);
+    if (s % stepSec === 0) {
+      // 主刻度
+      ctx.beginPath();
+      ctx.moveTo(x, h - 12);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      const txt = formatTime(s);
+      ctx.fillText(txt, Math.min(x + 3, w - 32), h - 12);
+    } else if (stepSec >= 15 && s % 5 === 0) {
+      // 次刻度
+      ctx.beginPath();
+      ctx.moveTo(x, h - 6);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+  }
+}
+
+/**
+ * 渲染情绪轨道
+ */
+function renderEmotions() {
+  const svg = document.getElementById('emotionSvg');
+  const container = document.getElementById('emotionNodesLayer');
+  container.innerHTML = '';
+
+  // 排序后绘制贝塞尔平滑曲线
+  const sorted = [...store.emotions].sort((a, b) => a.time - b.time);
+  if (sorted.length > 1) {
+    let d = '';
+    sorted.forEach((pt, i) => {
+      const x = timeToX(pt.time);
+      const y = emotionValueToY(pt.value);
+      if (i === 0) {
+        d += `M ${x} ${y}`;
+      } else {
+        const prev = sorted[i - 1];
+        const prevX = timeToX(prev.time);
+        const prevY = emotionValueToY(prev.value);
+        const cx1 = prevX + (x - prevX) / 2;
+        const cy1 = prevY;
+        const cx2 = prevX + (x - prevX) / 2;
+        const cy2 = y;
+        d += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x} ${y}`;
+      }
+    });
+    svg.innerHTML = `
+      <path d="${d}" fill="none" stroke="rgba(139, 92, 246, 0.45)" stroke-width="2" />
+      <path d="${d}" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="4 2" />
+    `;
+  } else {
+    svg.innerHTML = '';
+  }
+
+  // 绘制节点
+  sorted.forEach(node => {
+    const isSelected = selectedItem?.type === 'emotion' && selectedItem?.id === node.id;
+    const x = timeToX(node.time);
+    const y = emotionValueToY(node.value);
+
+    const el = document.createElement('div');
+    el.className = `emotion-node ${isSelected ? 'selected' : ''}`;
+    if (IS_EMBEDDED) {
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          select('emotion', node.id);
+        }
+      });
+    }
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+
+    // 与原网站相同的 -5 到 +5 表情映射
+    const emoji = ['😭', '😨', '😢', '😞', '😔', '😐', '😬', '🙂', '😄', '😆', '🤩'][node.value + 5] || '😐';
+    el.setAttribute('aria-label', `${formatTime(node.time)}，情绪强度 ${node.value > 0 ? '+' : ''}${node.value}`);
+
+    el.innerHTML = `
+      <span aria-hidden="true">${emoji}</span>
+      <div class="emotion-tag">${formatTime(node.time)}</div>
+    `;
+
+    // 绑定交互：拖拽纵向情绪值 + 阈值识别点选
+    attachDragHandler(el, {
+      onDown: () => select('emotion', node.id),
+      onDrag: (dx, dy, currentX, currentY, startNodeY) => {
+        const stageH = 140;
+        const newVal = yToEmotionValue(startNodeY + dy, stageH);
+        if (newVal !== node.value) {
+          node.value = newVal;
+          saveStore();
+          renderEmotions();
+          renderInspector();
+          showTooltip(`${node.value > 0 ? '+' : ''}${node.value}分`, currentX, currentY);
+        }
+      },
+      onEnd: () => hideTooltip()
+    });
+
+    container.appendChild(el);
+  });
+}
+
+/**
+ * 渲染时间点轨道
+ */
+function renderPoints() {
+  const layer = document.getElementById('pointLayer');
+  layer.innerHTML = '';
+
+  store.pointEvents.forEach(pt => {
+    const isSelected = selectedItem?.type === 'point' && selectedItem?.id === pt.id;
+    const x = timeToX(pt.time);
+
+    const el = document.createElement('div');
+    el.className = `point-marker ${isSelected ? 'selected' : ''}`;
+    el.style.left = `${x}px`;
+    el.innerHTML = `
+      <div class="point-pin" style="background:${pt.color || 'var(--accent-point)'}"></div>
+      <div class="point-title" title="${pt.title}">${pt.title}</div>
+    `;
+
+    let blockedTime = null;
+    let dragStartTime = pt.time;
+
+    attachDragHandler(el, {
+      onDown: () => {
+        select('point', pt.id);
+        blockedTime = null;
+        dragStartTime = pt.time;
+      },
+      onDrag: (dx, dy, curX, curY) => {
+        const newSec = xToTime(timeToX(dragStartTime) + dx);
+
+        showTooltip(`${formatTime(newSec)}`, curX, curY - 24);
+        if (newSec !== pt.time) {
+          if (hasPointConflict(newSec, pt.id) || hasLinkedEmotionConflict(pt.id, newSec)) {
+            blockedTime = newSec;
+            return;
+          }
+          blockedTime = null;
+          pt.time = newSec;
+          saveStore();
+          renderPoints();
+          renderEmotions();
+          renderSyncLines();
+          renderInspector();
+        }
+      },
+      onEnd: () => {
+        hideTooltip();
+        if (blockedTime !== null) {
+          showToast(`${formatTime(blockedTime)} 已有同区域节点，无法移动到该时间`, true);
+        }
+      }
+    });
+
+    layer.appendChild(el);
+  });
+}
+
+/**
+ * 渲染时间段轨道 (自动多轨道贪心排布，杜绝重叠覆盖)
+ */
+function renderRanges() {
+  const stage = document.getElementById('rangeStage');
+  const layer = document.getElementById('rangeLayer');
+  layer.innerHTML = '';
+
+  // 贪心算法分配 row index
+  const sorted = [...store.rangeEvents].sort((a, b) => a.startTime - b.startTime);
+  const rows = []; // rows[i] = 该行目前最右侧结束时间
+
+  sorted.forEach(ev => {
+    let assignedRow = -1;
+    for (let r = 0; r < rows.length; r++) {
+      if (rows[r] <= ev.startTime) {
+        assignedRow = r;
+        rows[r] = ev.endTime;
+        break;
+      }
+    }
+    if (assignedRow === -1) {
+      assignedRow = rows.length;
+      rows.push(ev.endTime);
+    }
+    ev._row = assignedRow;
+  });
+
+  const rowHeight = 32;
+  stage.style.minHeight = `${Math.max(80, (rows.length || 1) * rowHeight + 16)}px`;
+
+  sorted.forEach(ev => {
+    const isSelected = selectedItem?.type === 'range' && selectedItem?.id === ev.id;
+    const leftX = timeToX(ev.startTime);
+    const rightX = timeToX(ev.endTime);
+    const width = Math.max(6, rightX - leftX);
+
+    const bar = document.createElement('div');
+    bar.className = `range-bar ${isSelected ? 'selected' : ''}`;
+    bar.style.left = `${leftX}px`;
+    bar.style.width = `${width}px`;
+    bar.style.top = `${ev._row * rowHeight + 8}px`;
+    bar.style.borderColor = ev.color || 'var(--accent-range)';
+    bar.innerHTML = `
+      <div class="range-handle left" data-side="left"></div>
+      <div class="range-title" title="${ev.title}">${ev.title} (${formatTime(ev.startTime)}-${formatTime(ev.endTime)})</div>
+      <div class="range-handle right" data-side="right"></div>
+    `;
+
+    let blockedEndTime = null;
+    // 拖拽整体移动
+    attachDragHandler(bar, {
+      onDown: (e) => {
+        select('range', ev.id);
+      },
+      onDrag: (dx, dy, curX, curY, startLeft, startTop, startPayload) => {
+        if (startPayload.handleSide) return; // 留给两端拉伸处理
+        const durationSpan = ev.endTime - ev.startTime;
+        const stageBox = document.getElementById('rangeStage').getBoundingClientRect();
+        const curSec = xToTime(curX - stageBox.left - startPayload.offsetX);
+        const clampedStart = Math.max(0, Math.min(store.duration - durationSpan, curSec));
+        if (hasLinkedEmotionConflict(ev.id, clampedStart + durationSpan)) {
+          blockedEndTime = clampedStart + durationSpan;
+          return;
+        }
+        blockedEndTime = null;
+        ev.startTime = clampedStart;
+        ev.endTime = clampedStart + durationSpan;
+        saveStore();
+        renderRanges();
+        renderEmotions();
+        renderSyncLines();
+        renderInspector();
+        showTooltip(`${formatTime(ev.startTime)} - ${formatTime(ev.endTime)}`, curX, curY - 24);
+      },
+      onEnd: () => {
+        hideTooltip();
+        if (blockedEndTime !== null) showToast(`情绪区冲突：${formatTime(blockedEndTime)} 已有情绪节点`, true);
+      },
+      getCustomPayload: (e, el) => {
+        const side = e.target.getAttribute('data-side');
+        const box = el.getBoundingClientRect();
+        return { handleSide: side, offsetX: e.clientX - box.left };
+      }
+    });
+
+    // 左侧拉伸
+    const leftHandle = bar.querySelector('.range-handle.left');
+    attachDragHandler(leftHandle, {
+      onDown: (e) => { e.stopPropagation(); select('range', ev.id); },
+      onDrag: (dx, dy, curX, curY) => {
+        const stageBox = document.getElementById('rangeStage').getBoundingClientRect();
+        const curSec = xToTime(curX - stageBox.left);
+        const validStart = Math.max(0, Math.min(ev.endTime - 1, curSec));
+        ev.startTime = validStart;
+        saveStore();
+        renderRanges();
+        renderEmotions();
+        renderSyncLines();
+        renderInspector();
+        showTooltip(`开始: ${formatTime(ev.startTime)}`, curX, curY - 24);
+      },
+      onEnd: () => hideTooltip()
+    });
+
+    // 右侧拉伸
+    const rightHandle = bar.querySelector('.range-handle.right');
+    attachDragHandler(rightHandle, {
+      onDown: (e) => { e.stopPropagation(); select('range', ev.id); },
+      onDrag: (dx, dy, curX, curY) => {
+        const stageBox = document.getElementById('rangeStage').getBoundingClientRect();
+        const curSec = xToTime(curX - stageBox.left);
+        const validEnd = Math.min(store.duration, Math.max(ev.startTime + 1, curSec));
+        if (hasLinkedEmotionConflict(ev.id, validEnd)) {
+          blockedEndTime = validEnd;
+          return;
+        }
+        blockedEndTime = null;
+        ev.endTime = validEnd;
+        saveStore();
+        renderRanges();
+        renderEmotions();
+        renderSyncLines();
+        renderInspector();
+        showTooltip(`结束: ${formatTime(ev.endTime)}`, curX, curY - 24);
+      },
+      onEnd: () => {
+        hideTooltip();
+        if (blockedEndTime !== null) showToast(`情绪区冲突：${formatTime(blockedEndTime)} 已有情绪节点`, true);
+      }
+    });
+
+    layer.appendChild(bar);
+  });
+}
+
+/**
+ * 绘制关联对齐虚线
+ */
+function renderSyncLines() {
+  document.querySelectorAll('.sync-line').forEach(el => el.remove());
+  const view = document.getElementById('timelineContainer');
+
+  store.emotions.forEach(emo => {
+    if (emo.linkedEventId) {
+      const x = timeToX(emo.time);
+      const line = document.createElement('div');
+      line.className = 'sync-line';
+      const stageOffset = document.getElementById('rulerStage').getBoundingClientRect().left - view.getBoundingClientRect().left;
+      line.style.left = `${x + stageOffset}px`;
+      view.appendChild(line);
+    }
+  });
+}
+
+/**
+ * 通用拖拽绑定 (内置阈值防误触，区分单击与拖动)
+ */
+function attachDragHandler(domElement, handlers) {
+  domElement.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startNodeY = domElement.offsetTop;
+    const startNodeLeft = domElement.offsetLeft;
+    let hasMoved = false;
+    let customPayload = handlers.getCustomPayload ? handlers.getCustomPayload(e, domElement) : {};
+
+    if (handlers.onDown) handlers.onDown(e);
+
+    const onMouseMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (!hasMoved) {
+        if (Math.hypot(dx, dy) > 3) {
+          hasMoved = true;
+        }
+      }
+      if (hasMoved && handlers.onDrag) {
+        handlers.onDrag(dx, dy, moveEvent.clientX, moveEvent.clientY, startNodeY, startNodeLeft, customPayload);
+      }
+    };
+
+    const onMouseUp = (upEvent) => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      if (handlers.onEnd) handlers.onEnd(hasMoved);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+}
+
+function showTooltip(text, clientX, clientY) {
+  const tip = document.getElementById('dragTooltip');
+  tip.innerText = text;
+  tip.style.display = 'block';
+  tip.style.left = `${clientX + 10}px`;
+  tip.style.top = `${clientY + 10}px`;
+}
+function hideTooltip() {
+  document.getElementById('dragTooltip').style.display = 'none';
+}
+
+/**
+ * 选中逻辑
+ */
+function select(type, id) {
+  selectedItem = { type, id };
+  document.getElementById('btnDeleteSelected').style.display = 'inline-flex';
+  renderAll();
+  renderInspector();
+}
+
+function clearSelection() {
+  selectedItem = null;
+  document.getElementById('btnDeleteSelected').style.display = 'none';
+  renderAll();
+  renderInspector();
+}
+
+const EVENT_PRESET_COLORS = ['#7399d0', '#8d73c9', '#dc8b4a', '#5eaa88', '#cf6d79'];
+
+function colorPickerMarkup(prefix, color) {
+  return `<div class="event-color-picker">
+    <button type="button" class="event-current-color" id="${prefix}ColorToggle" style="--event-color:${color}" aria-label="当前事件颜色，点击展开颜色选项" aria-expanded="false"></button>
+    <div class="event-color-options" id="${prefix}ColorOptions" hidden>
+      ${EVENT_PRESET_COLORS.map(option => `<button type="button" data-color="${option}" class="${color === option ? 'is-selected' : ''}" style="--event-color:${option}" aria-label="选择 ${option} 事件颜色"></button>`).join('')}
+      <label class="event-custom-color" aria-label="自定义事件颜色">＋<input type="color" id="${prefix}Color" value="${color}" aria-label="自定义事件颜色"></label>
+    </div>
+  </div>`;
+}
+
+function bindColorPicker(prefix, item, renderItem) {
+  const toggle = document.getElementById(`${prefix}ColorToggle`);
+  const options = document.getElementById(`${prefix}ColorOptions`);
+  toggle.onclick = () => {
+    options.hidden = !options.hidden;
+    toggle.setAttribute('aria-expanded', String(!options.hidden));
+  };
+  options.querySelectorAll('button[data-color]').forEach(button => {
+    button.onclick = () => {
+      item.color = button.dataset.color;
+      saveStore();
+      renderItem();
+      renderInspector();
+    };
+  });
+  document.getElementById(`${prefix}Color`).onchange = (event) => {
+    item.color = event.target.value;
+    saveStore();
+    renderItem();
+    renderInspector();
+  };
+}
+
+const EYE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A10.5 10.5 0 0 1 12 6c6.5 0 10 6 10 6a15 15 0 0 1-3.2 3.7M6.3 6.3C3.5 8.1 2 12 2 12s3.5 6 10 6c1.5 0 2.9-.3 4.1-.8"/><path d="M10 10a3 3 0 0 0 4 4"/></svg>';
+const eventFieldKey = (type, id) => `${type}:${id}`;
+const areEventFieldsVisible = (type, id) => eventFieldsVisibility.get(eventFieldKey(type, id)) !== false;
+
+function eventFieldsButtonMarkup(type, id) {
+  const visible = areEventFieldsVisible(type, id);
+  const label = visible ? '隐藏四个字段' : '显示四个字段';
+  return `<button type="button" id="toggleEventFields" class="event-fields-toggle" aria-label="${label}" title="${label}" aria-expanded="${visible}" aria-controls="eventExtraFields">${visible ? EYE_ICON : EYE_OFF_ICON}</button>`;
+}
+
+function bindEventFieldsButton(type, id) {
+  const button = document.getElementById('toggleEventFields');
+  const fields = document.getElementById('eventExtraFields');
+  button.onclick = () => {
+    const visible = fields.hidden;
+    fields.hidden = !visible;
+    eventFieldsVisibility.set(eventFieldKey(type, id), visible);
+    const label = visible ? '隐藏四个字段' : '显示四个字段';
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
+    button.setAttribute('aria-expanded', String(visible));
+    button.innerHTML = visible ? EYE_ICON : EYE_OFF_ICON;
+  };
+}
+
+/**
+ * 渲染右侧属性检查器 (双输入框时间，失焦/Enter提交，杜绝输入中乱跳)
+ */
+function renderInspector() {
+  const titleEl = document.getElementById('inspectorTitle');
+  const typeEl = document.getElementById('inspectorType');
+  const contentEl = document.getElementById('inspectorContent');
+  document.getElementById('inspectorPanel').classList.toggle('is-range-selected', selectedItem?.type === 'range');
+
+  if (!selectedItem) {
+    titleEl.innerText = '属性检查器';
+    typeEl.innerText = '未选中项';
+    contentEl.innerHTML = `
+      <div style="font-size:12px; color:var(--text-muted); text-align:center; margin-top:40px;">
+        在左侧点击任意对象开始编辑。<br><br>
+        可使用上方按钮随时新增。
+      </div>
+    `;
+    return;
+  }
+
+  const { type, id } = selectedItem;
+
+  // 1. 情绪节点
+  if (type === 'emotion') {
+    const emo = store.emotions.find(e => e.id === id);
+    if (!emo) return clearSelection();
+
+    titleEl.innerText = '情绪节点';
+    typeEl.innerText = `ID: ${emo.id}`;
+
+    const isLinked = !!emo.linkedEventId;
+    const linkedEvent = isLinked ?
+      (store.pointEvents.find(p => p.id === emo.linkedEventId) || store.rangeEvents.find(r => r.id === emo.linkedEventId)) : null;
+
+    contentEl.innerHTML = `
+      <div class="emotion-primary-row">
+        <div class="form-group">
+          <div class="form-label">
+            <span>情绪强度分值</span>
+            <b id="emoValDisplay" style="color:var(--accent-emotion);">${emo.value > 0 ? '+'+emo.value : emo.value}</b>
+          </div>
+          <div class="slider-row">
+            <span style="font-size:11px;color:#ef4444;">-5</span>
+            <input type="range" id="emoValRange" min="-5" max="5" step="1" value="${emo.value}" aria-label="情绪强度分值">
+            <span style="font-size:11px;color:#10b981;">+5</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">发生时间 (分:秒)</div>
+          <div class="time-inputs-wrapper">
+            <div class="input-time-box">
+              <input type="text" id="emoMin" maxlength="2" value="${String(Math.floor(emo.time / 60)).padStart(2,'0')}" ${isLinked ? 'disabled' : ''}>
+              <span>分</span>
+            </div>
+            <div class="input-time-box">
+              <input type="text" id="emoSec" maxlength="2" value="${String(emo.time % 60).padStart(2,'0')}" ${isLinked ? 'disabled' : ''}>
+              <span>秒</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${isLinked ? `<div class="emotion-link-note"><span class="sync-badge">🔗 跟随事件「${linkedEvent?.title || '已关联'}」同步</span></div>` : ''}
+
+      <div class="form-group">
+        <div class="form-label">观众预期与心理感受</div>
+        <textarea class="form-control" id="emoFeeling" placeholder="观众此时在想什么？">${emo.feeling || ''}</textarea>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">绑定事件关联</div>
+        <select class="form-control" id="emoLinkSelect">
+          <option value="">-- 保持独立情绪节点 --</option>
+          <optgroup label="时间点事件">
+            ${store.pointEvents.map(p => `<option value="${p.id}" ${emo.linkedEventId===p.id?'selected':''}>[点] ${p.title} (${formatTime(p.time)})</option>`).join('')}
+          </optgroup>
+          <optgroup label="时间段事件 (关联结束时刻)">
+            ${store.rangeEvents.map(r => `<option value="${r.id}" ${emo.linkedEventId===r.id?'selected':''}>[段] ${r.title} (至 ${formatTime(r.endTime)})</option>`).join('')}
+          </optgroup>
+        </select>
+      </div>
+    `;
+
+    // 绑定时间失焦更新
+    setupTimeBoxCommit(['emoMin', 'emoSec'], (newSec) => {
+      if (newSec === emo.time) return;
+      if (hasEmotionConflict(newSec, emo.id)) {
+        showToast(`情绪区冲突：${formatTime(newSec)} 已存在情绪节点！`, true);
+        renderInspector();
+        return;
+      }
+      emo.time = newSec;
+      saveStore();
+      renderAll();
+    });
+
+    // 滑块
+    document.getElementById('emoValRange').oninput = (e) => {
+      emo.value = parseInt(e.target.value, 10);
+      document.getElementById('emoValDisplay').innerText = emo.value > 0 ? '+'+emo.value : emo.value;
+      saveStore();
+      renderEmotions();
+    };
+
+    // 感受文本
+    document.getElementById('emoFeeling').onchange = (e) => {
+      emo.feeling = e.target.value.trim();
+      saveStore();
+    };
+
+    // 关联下拉框
+    document.getElementById('emoLinkSelect').onchange = (e) => {
+      const targetId = e.target.value;
+      if (!targetId) {
+        emo.linkedEventId = null;
+        showToast('已转为独立情绪节点');
+      } else {
+        // 获取事件时间，检查冲突
+        let targetTime = null;
+        const p = store.pointEvents.find(x => x.id === targetId);
+        if (p) targetTime = p.time;
+        const r = store.rangeEvents.find(x => x.id === targetId);
+        if (r) targetTime = r.endTime;
+
+        if (targetTime !== null && hasEmotionConflict(targetTime, emo.id)) {
+          showToast(`关联失败：事件对应时间 ${formatTime(targetTime)} 已有其他情绪节点`, true);
+          renderInspector();
+          return;
+        }
+        emo.linkedEventId = targetId;
+        emo.time = targetTime;
+        showToast('已建立关联，时间随事件同步');
+      }
+      saveStore();
+      renderAll();
+      renderInspector();
+    };
+  }
+
+  // 2. 时间点事件
+  else if (type === 'point') {
+    const pt = store.pointEvents.find(p => p.id === id);
+    if (!pt) return clearSelection();
+
+    titleEl.innerText = '时间点事件';
+    typeEl.innerHTML = eventFieldsButtonMarkup('point', pt.id);
+
+    contentEl.innerHTML = `
+      <div class="event-primary-row is-point">
+        <div class="point-title-line">
+          ${colorPickerMarkup('pt', pt.color || '#f59e0b')}
+          <label class="form-label" for="ptTitle">标题</label>
+          <input type="text" class="form-control" id="ptTitle" value="${pt.title}">
+        </div>
+        <div class="point-time-line">
+          <label class="form-label" for="ptMin">发生·分</label>
+          <input type="text" class="form-control event-time-input" id="ptMin" inputmode="numeric" maxlength="2" value="${String(Math.floor(pt.time / 60)).padStart(2,'0')}">
+          <label class="form-label" for="ptSec">秒</label>
+          <input type="text" class="form-control event-time-input" id="ptSec" inputmode="numeric" maxlength="2" value="${String(pt.time % 60).padStart(2,'0')}">
+        </div>
+      </div>
+      <div class="event-extra-fields is-point" id="eventExtraFields" ${areEventFieldsVisible('point', pt.id) ? '' : 'hidden'}>
+        <div class="form-group">
+          <label class="form-label" for="ptType">类型</label>
+          <input type="text" class="form-control" id="ptType" value="${pt.type || ''}" placeholder="如：钩子、冲突">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="ptTags">标签</label>
+          <input type="text" class="form-control" id="ptTags" value="${pt.tags || ''}" title="多个标签用逗号分隔">
+        </div>
+        <div class="form-group event-long-field">
+          <label class="form-label" for="ptNote">说明详情</label>
+          <textarea class="form-control" id="ptNote">${pt.note || ''}</textarea>
+        </div>
+        <div class="form-group event-long-field">
+          <label class="form-label" for="ptTakeaway">借鉴做法</label>
+          <textarea class="form-control" id="ptTakeaway">${pt.takeaway || ''}</textarea>
+        </div>
+      </div>
+    `;
+
+    setupTimeBoxCommit(['ptMin', 'ptSec'], (newSec) => {
+      if (newSec === pt.time) return;
+      if (hasPointConflict(newSec, pt.id) || hasLinkedEmotionConflict(pt.id, newSec)) {
+        showToast(`时间冲突：${formatTime(newSec)} 已有同区域节点`, true);
+        renderInspector();
+        return;
+      }
+      pt.time = newSec;
+      saveStore();
+      renderAll();
+    });
+
+    document.getElementById('ptTitle').title = pt.title;
+    document.getElementById('ptTitle').onchange = (e) => { pt.title = e.target.value.trim() || '未命名点'; e.target.title = pt.title; saveStore(); renderPoints(); };
+    document.getElementById('ptType').onchange = (e) => { pt.type = e.target.value; saveStore(); };
+    bindColorPicker('pt', pt, renderPoints);
+    bindEventFieldsButton('point', pt.id);
+    document.getElementById('ptNote').onchange = (e) => { pt.note = e.target.value; saveStore(); };
+    document.getElementById('ptTags').onchange = (e) => { pt.tags = e.target.value; saveStore(); };
+    document.getElementById('ptTakeaway').onchange = (e) => { pt.takeaway = e.target.value; saveStore(); };
+  }
+
+  // 3. 时间段事件
+  else if (type === 'range') {
+    const rg = store.rangeEvents.find(r => r.id === id);
+    if (!rg) return clearSelection();
+
+    titleEl.innerText = '时间段事件';
+    typeEl.innerHTML = eventFieldsButtonMarkup('range', rg.id);
+
+    contentEl.innerHTML = `
+      <div class="event-primary-row is-range">
+        <div class="range-title-line">
+          ${colorPickerMarkup('rg', rg.color || '#10b981')}
+          <label class="form-label" for="rgTitle">标题</label>
+          <input type="text" class="form-control" id="rgTitle" value="${rg.title}">
+        </div>
+        <div class="range-time-line">
+          <label class="form-label" for="rgStartM">开始</label>
+          <div class="compact-time-pair">
+            <input type="text" id="rgStartM" inputmode="numeric" maxlength="2" aria-label="开始时间 分" value="${String(Math.floor(rg.startTime / 60)).padStart(2,'0')}">:<input type="text" id="rgStartS" inputmode="numeric" maxlength="2" aria-label="开始时间 秒" value="${String(rg.startTime % 60).padStart(2,'0')}">
+          </div>
+          <label class="form-label" for="rgEndM">结束</label>
+          <div class="compact-time-pair">
+            <input type="text" id="rgEndM" inputmode="numeric" maxlength="2" aria-label="结束时间 分" value="${String(Math.floor(rg.endTime / 60)).padStart(2,'0')}">:<input type="text" id="rgEndS" inputmode="numeric" maxlength="2" aria-label="结束时间 秒" value="${String(rg.endTime % 60).padStart(2,'0')}">
+          </div>
+        </div>
+      </div>
+      <div class="event-extra-fields" id="eventExtraFields" ${areEventFieldsVisible('range', rg.id) ? '' : 'hidden'}>
+        <div class="form-group">
+          <label class="form-label" for="rgType">类型</label>
+          <input type="text" class="form-control" id="rgType" value="${rg.type || ''}" placeholder="如：铺垫、演示">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rgTags">标签</label>
+          <input type="text" class="form-control" id="rgTags" value="${rg.tags || ''}" title="多个标签用逗号分隔">
+        </div>
+        <div class="form-group event-long-field">
+          <label class="form-label" for="rgNote">说明详情</label>
+          <textarea class="form-control" id="rgNote">${rg.note || ''}</textarea>
+        </div>
+        <div class="form-group event-long-field">
+          <label class="form-label" for="rgTakeaway">借鉴做法</label>
+          <textarea class="form-control" id="rgTakeaway">${rg.takeaway || ''}</textarea>
+        </div>
+      </div>
+    `;
+
+    setupTimeBoxCommit(['rgStartM', 'rgStartS'], (newSec) => {
+      if (newSec >= rg.endTime) {
+        showToast('开始时间必须小于结束时间！', true);
+        renderInspector();
+        return;
+      }
+      rg.startTime = newSec;
+      saveStore();
+      renderAll();
+    });
+
+    setupTimeBoxCommit(['rgEndM', 'rgEndS'], (newSec) => {
+      if (newSec <= rg.startTime) {
+        showToast('结束时间必须大于开始时间！', true);
+        renderInspector();
+        return;
+      }
+      if (hasLinkedEmotionConflict(rg.id, newSec)) {
+        showToast(`情绪区冲突：${formatTime(newSec)} 已有情绪节点`, true);
+        renderInspector();
+        return;
+      }
+      rg.endTime = newSec;
+      saveStore();
+      renderAll();
+    });
+
+    document.getElementById('rgTitle').title = rg.title;
+    document.getElementById('rgTitle').onchange = (e) => { rg.title = e.target.value.trim() || '未命名段落'; e.target.title = rg.title; saveStore(); renderRanges(); };
+    document.getElementById('rgType').onchange = (e) => { rg.type = e.target.value; saveStore(); };
+    bindColorPicker('rg', rg, renderRanges);
+    bindEventFieldsButton('range', rg.id);
+    document.getElementById('rgNote').onchange = (e) => { rg.note = e.target.value; saveStore(); };
+    document.getElementById('rgTags').onchange = (e) => { rg.tags = e.target.value; saveStore(); };
+    document.getElementById('rgTakeaway').onchange = (e) => { rg.takeaway = e.target.value; saveStore(); };
+  }
+}
+
+/**
+ * 时间输入防抖与安全提交管理器
+ */
+function setupTimeBoxCommit([minInputId, secInputId], onCommit, { enforceDurationLimit = true } = {}) {
+  const mInput = document.getElementById(minInputId);
+  const sInput = document.getElementById(secInputId);
+  if (!mInput || !sInput) return;
+
+  const commit = () => {
+    const sec = parseTimeToSec(mInput.value, sInput.value);
+    if (sec === null) {
+      showToast('请输入有效的时间数字（00~59秒）', true);
+      return;
+    }
+    if (enforceDurationLimit && sec > store.duration) {
+      showToast(`超出总时长上限（${formatTime(store.duration)}）`, true);
+      return;
+    }
+    onCommit(sec);
+  };
+
+  [mInput, sInput].forEach(inp => {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        inp.blur();
+      }
+    });
+  });
+
+  // 当用户焦点完全离开分和秒两个框时提交
+  let blurTimer = null;
+  const handleBlur = () => {
+    blurTimer = setTimeout(() => {
+      const active = document.activeElement;
+      if (active !== mInput && active !== sInput) {
+        commit();
+      }
+    }, 120);
+  };
+  mInput.addEventListener('blur', handleBlur);
+  sInput.addEventListener('blur', handleBlur);
+  mInput.addEventListener('focus', () => clearTimeout(blurTimer));
+  sInput.addEventListener('focus', () => clearTimeout(blurTimer));
+}
+
+/**
+ * 新增对象逻辑 (带冲突防御与智能预设时间)
+ */
+function findAvailableTime(preferSec, checkConflictFn) {
+  let t = preferSec;
+  if (!checkConflictFn(t)) return t;
+  // 向后找空闲秒数
+  for (let s = preferSec + 1; s <= store.duration; s++) {
+    if (!checkConflictFn(s)) return s;
+  }
+  // 向前找
+  for (let s = preferSec - 1; s >= 0; s--) {
+    if (!checkConflictFn(s)) return s;
+  }
+  return null;
+}
+
+function handleAddEmotion() {
+  const prefer = Math.min(store.duration, Math.round(store.duration / 3));
+  const t = findAvailableTime(prefer, hasEmotionConflict);
+  if (t === null) {
+    showToast('轨道已满，无法新增情绪节点', true);
+    return;
+  }
+  const newEmo = {
+    id: IS_EMBEDDED ? Date.now() + Math.floor(Math.random() * 1000) : 'emo_' + Date.now().toString(36),
+    time: t,
+    value: 1,
+    feeling: '',
+    linkedEventId: null
+  };
+  store.emotions.push(newEmo);
+  saveStore();
+  select('emotion', newEmo.id);
+  showToast(`已创建情绪节点，位于 ${formatTime(t)}`);
+}
+
+function handleAddPoint() {
+  const prefer = Math.min(store.duration, Math.round(store.duration / 2));
+  const t = findAvailableTime(prefer, hasPointConflict);
+  if (t === null) {
+    showToast('时间点轨道同一时刻无法放置更多事件', true);
+    return;
+  }
+  const newPoint = {
+    id: 'ev_p_' + Date.now().toString(36),
+    time: t,
+    title: '新建关键事件',
+    type: '关键点',
+    color: '#f59e0b',
+    note: '',
+    tags: '',
+    takeaway: ''
+  };
+  store.pointEvents.push(newPoint);
+  saveStore();
+  select('point', newPoint.id);
+  showToast(`已创建时间点，位于 ${formatTime(t)}`);
+}
+
+function handleAddRange() {
+  const start = 10;
+  const end = Math.min(store.duration, start + 30);
+  const newRange = {
+    id: 'ev_r_' + Date.now().toString(36),
+    startTime: start,
+    endTime: end,
+    title: '新建时间段事件',
+    type: '内容段',
+    color: '#10b981',
+    note: '',
+    tags: '',
+    takeaway: ''
+  };
+  store.rangeEvents.push(newRange);
+  saveStore();
+  select('range', newRange.id);
+  showToast(`已创建时间段事件 (${formatTime(start)} ~ ${formatTime(end)})`);
+}
+
+/**
+ * 删除与撤销恢复
+ */
+function handleDeleteSelected() {
+  if (!selectedItem) return;
+  const { type, id } = selectedItem;
+
+  lastDeletedSnapshot = {
+    type,
+    itemData: null,
+    linkedEmotions: [] // 被解除关联的情绪恢复现场
+  };
+
+  if (type === 'emotion') {
+    const idx = store.emotions.findIndex(e => e.id === id);
+    if (idx !== -1) {
+      lastDeletedSnapshot.itemData = { ...store.emotions[idx] };
+      store.emotions.splice(idx, 1);
+    }
+  } else if (type === 'point') {
+    const idx = store.pointEvents.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      lastDeletedSnapshot.itemData = { ...store.pointEvents[idx] };
+      // 级联处理：关联的情绪转为独立，留在原位置
+      store.emotions.forEach(emo => {
+        if (emo.linkedEventId === id) {
+          lastDeletedSnapshot.linkedEmotions.push(emo.id);
+          emo.linkedEventId = null;
+        }
+      });
+      store.pointEvents.splice(idx, 1);
+    }
+  } else if (type === 'range') {
+    const idx = store.rangeEvents.findIndex(r => r.id === id);
+    if (idx !== -1) {
+      lastDeletedSnapshot.itemData = { ...store.rangeEvents[idx] };
+      store.emotions.forEach(emo => {
+        if (emo.linkedEventId === id) {
+          lastDeletedSnapshot.linkedEmotions.push(emo.id);
+          emo.linkedEventId = null;
+        }
+      });
+      store.rangeEvents.splice(idx, 1);
+    }
+  }
+
+  saveStore();
+  clearSelection();
+
+  const deletedSnapshot = lastDeletedSnapshot;
+  showToast('已删除选中项', false, () => {
+    // 撤销回调
+    if (!deletedSnapshot?.itemData) return;
+    const { type: dType, itemData, linkedEmotions } = deletedSnapshot;
+
+    if (dType === 'emotion') {
+      if (hasEmotionConflict(itemData.time)) {
+        showToast(`无法撤销：${formatTime(itemData.time)} 已有情绪节点`, true);
+        return;
+      }
+      store.emotions.push(itemData);
+    } else if (dType === 'point') {
+      if (hasPointConflict(itemData.time) || linkedEmotions.some(eid => {
+        const emo = store.emotions.find(e => e.id === eid);
+        return emo && hasEmotionConflict(itemData.time, eid);
+      })) {
+        showToast(`无法撤销：${formatTime(itemData.time)} 已有同区域节点`, true);
+        return;
+      }
+      store.pointEvents.push(itemData);
+      linkedEmotions.forEach(eid => {
+        const emo = store.emotions.find(e => e.id === eid);
+        if (emo) emo.linkedEventId = itemData.id;
+      });
+    } else if (dType === 'range') {
+      if (linkedEmotions.some(eid => {
+        const emo = store.emotions.find(e => e.id === eid);
+        return emo && hasEmotionConflict(itemData.endTime, eid);
+      })) {
+        showToast(`无法撤销：${formatTime(itemData.endTime)} 已有情绪节点`, true);
+        return;
+      }
+      store.rangeEvents.push(itemData);
+      linkedEmotions.forEach(eid => {
+        const emo = store.emotions.find(e => e.id === eid);
+        if (emo) emo.linkedEventId = itemData.id;
+      });
+    }
+    saveStore();
+    select(dType, itemData.id);
+    showToast('已撤销删除');
+  });
+}
+
+/**
+ * 界面统一全量刷新
+ */
+function renderAll() {
+  renderRuler();
+  renderEmotions();
+  renderPoints();
+  renderRanges();
+  renderSyncLines();
+}
+
+/**
+ * 事件监听与初始化绑定
+ */
+window.addEventListener('resize', () => {
+  renderAll();
+});
+
+const timelineContainer = document.getElementById('timelineContainer');
+const hoverTimeGuide = document.getElementById('hoverTimeGuide');
+timelineContainer.addEventListener('pointermove', (event) => {
+  const stage = event.target.closest('.track-stage');
+  const rulerRect = document.getElementById('rulerStage').getBoundingClientRect();
+  if (!stage || event.clientX < rulerRect.left || event.clientX > rulerRect.right) {
+    hoverTimeGuide.hidden = true;
+    return;
+  }
+  const time = xToTime(event.clientX - rulerRect.left);
+  const guideX = timeToX(time);
+  hoverTimeGuide.style.left = `${rulerRect.left - timelineContainer.getBoundingClientRect().left + guideX}px`;
+  hoverTimeGuide.querySelector('span').textContent = formatTime(time);
+  hoverTimeGuide.classList.toggle('edge-start', guideX < 44);
+  hoverTimeGuide.classList.toggle('edge-end', guideX > rulerRect.width - 44);
+  hoverTimeGuide.hidden = false;
+});
+timelineContainer.addEventListener('pointerleave', () => { hoverTimeGuide.hidden = true; });
+
+document.getElementById('btnAddEmotion').onclick = handleAddEmotion;
+document.getElementById('btnAddPoint').onclick = handleAddPoint;
+document.getElementById('btnAddRange').onclick = handleAddRange;
+document.getElementById('btnDeleteSelected').onclick = handleDeleteSelected;
+
+// 点击空白区域取消选中
+document.getElementById('timelineContainer').addEventListener('mousedown', (e) => {
+  if (e.target.closest('.emotion-node, .point-marker, .range-bar, .header-actions')) return;
+  clearSelection();
+});
+
+// 视频总时长输入修改
+setupTimeBoxCommit(['durM', 'durS'], (newTotalSec) => {
+  if (newTotalSec < 10) {
+    showToast('视频总时长至少应为 10 秒', true);
+    return;
+  }
+  if (store.emotions.some(e => e.time > newTotalSec) ||
+      store.pointEvents.some(p => p.time > newTotalSec) ||
+      store.rangeEvents.some(r => r.endTime > newTotalSec)) {
+    showToast('有节点或事件超出新时长，请先调整它们的时间', true);
+    document.getElementById('durM').value = String(Math.floor(store.duration / 60)).padStart(2, '0');
+    document.getElementById('durS').value = String(store.duration % 60).padStart(2, '0');
+    return;
+  }
+  store.duration = newTotalSec;
+  saveStore();
+  renderAll();
+  renderInspector();
+  showToast(`总时长已调整为 ${formatTime(newTotalSec)}`);
+}, { enforceDurationLimit: false });
+
+// 初始化回显总时长
+document.getElementById('durM').value = String(Math.floor(store.duration / 60)).padStart(2, '0');
+document.getElementById('durS').value = String(store.duration % 60).padStart(2, '0');
+
+// 首次渲染
+renderAll();
+renderInspector();
+if (IS_EMBEDDED) {
+  const reportHeight = () => window.parent.postMessage({ type: 'video-timeline:height', height: Math.ceil(document.body.scrollHeight) }, '*');
+  window.addEventListener('message', (event) => {
+    if (event.source !== window.parent || event.data?.type !== 'video-timeline:init') return;
+    const nextStore = event.data.store;
+    if (!nextStore || !Array.isArray(nextStore.emotions) || !Array.isArray(nextStore.pointEvents) || !Array.isArray(nextStore.rangeEvents)) return;
+    store = nextStore;
+    selectedItem = null;
+    lastDeletedSnapshot = null;
+    document.getElementById('durM').value = String(Math.floor(store.duration / 60)).padStart(2, '0');
+    document.getElementById('durS').value = String(store.duration % 60).padStart(2, '0');
+    renderAll();
+    renderInspector();
+    reportHeight();
+  });
+  new ResizeObserver(reportHeight).observe(document.querySelector('.timeline-card'));
+  window.parent.postMessage({ type: 'video-timeline:ready' }, '*');
+}
+</script>
+</body>
+</html>

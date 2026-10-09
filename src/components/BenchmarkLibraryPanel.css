@@ -28,3 +28,4 @@
 .benchmark-export-panel > footer { flex-wrap: wrap; }
 .benchmark-export-copy { border: 1px solid rgba(57,118,213,.22); background: #fff; color: #3976d5; }
 .benchmark-export-copy:hover, .benchmark-export-copy:focus-visible { background: #eef5ff; }
+@media (max-width: 560px) { .benchmark-library-tabs button { gap: 5px; padding: 0 8px; font-size: 12px; white-space: nowrap; } }
