@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight, CircleHelp, Copy, FileUp, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import './VideoCollectionPanel.css';
-import { BenchmarkVideoDetails, getBenchmarkMetadataFields, getVideoPlatformLabel } from './BenchmarkVideoDetails';
+import { BenchmarkVideoDetails, detectVideoPlatform, getBenchmarkMetadataFields, getVideoPlatformLabel } from './BenchmarkVideoDetails';
 import { loadBenchmarkAccounts } from '../utils/benchmarkLibrary';
 import { analyzeCommentFeedback, importCommentText } from '../utils/commentFeedback';
 import { moveTopicSummary } from '../utils/topicLibrary';
@@ -13,6 +13,7 @@ const TOPIC_GROUPS_KEY = 'benchmark-topic-groups-v1';
 const PLATFORMS = ['抖音', 'YouTube', '快手', 'B站', '小红书', '其他'];
 const CATEGORIES = ['情绪', '反转打脸爽剧', '搞笑整蛊', '剧情', 'shorts'];
 const BASIC_METADATA_FIELD_NAMES = ['benchmark-video-title', 'benchmark-video-tags', 'benchmark-video-url'];
+const INTAKE_METADATA_FIELD_NAMES = [...BASIC_METADATA_FIELD_NAMES, 'benchmark-author', 'benchmark-author-url', 'benchmark-channel-name', 'benchmark-channel-url'];
 const STATUSES = {
   pending: { label: '待补资料', className: 'pending' },
   breaking: { label: '拆解中', className: 'breaking' },
@@ -87,7 +88,7 @@ const toVideoDraft = (video, topicGroups) => ({
   details: video.details || emptyDetails(),
 });
 
-export function VideoCollectionPanel({ initialAccountId = '', initialVideoId = '', initialTopicGroup = '', initialComparisonGroup = '', initialComparisonVideoIds = [], onOpenBreakdown, onCreateProject }) {
+export function VideoCollectionPanel({ videoScope = 'all', initialAccountId = '', initialVideoId = '', initialTopicGroup = '', initialComparisonGroup = '', initialComparisonVideoIds = [], onOpenBreakdown, onCreateProject }) {
   const intakeRef = React.useRef(null);
   const comparisonRef = React.useRef(null);
   const savedDraftRef = React.useRef(JSON.stringify({ ...emptyVideoDraft(), topicGroup: initialTopicGroup }));
@@ -149,6 +150,7 @@ export function VideoCollectionPanel({ initialAccountId = '', initialVideoId = '
     return (!selectedPlatforms.length || selectedPlatforms.includes(video.platform))
       && (!selectedCategories.length || selectedCategories.includes(category))
       && (!selectedAccountId || video.accountId === selectedAccountId)
+      && (videoScope !== 'ungrouped' || !normalizeGroupName(video.topicGroup))
       && (!query.trim() || searchable.includes(query.trim().toLowerCase()));
   });
   const relatedVideos = editingVideoId && draft.topicGroup ? videos.filter((video) => video.id !== editingVideoId && groupKey(video.topicGroup) === groupKey(draft.topicGroup)) : [];
@@ -364,15 +366,19 @@ export function VideoCollectionPanel({ initialAccountId = '', initialVideoId = '
     };
   });
   const metadata = draft.details?.metadata || {};
+  const accountMetadataName = (draft.platformOverride === 'YouTube' || (!draft.platformOverride && detectVideoPlatform(draft.url) === 'youtube')) ? 'benchmark-channel-name' : 'benchmark-author';
+  const accountUrlMetadataName = accountMetadataName === 'benchmark-channel-name' ? 'benchmark-channel-url' : 'benchmark-author-url';
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const copyAllVideoInformation = async () => {
     const metadataLines = getBenchmarkMetadataFields(draft.url)
-      .filter((field) => !BASIC_METADATA_FIELD_NAMES.includes(field.name))
+      .filter((field) => !INTAKE_METADATA_FIELD_NAMES.includes(field.name))
       .map((field) => `${field.label}：${metadata[field.name] || ''}`);
     const text = [
       `视频名称：${draft.title}`,
       `视频链接：${draft.url}`,
       `视频话题：${formatTopics(metadata)}`,
+      `账号：${metadata[accountMetadataName] || ''}`,
+      `账号链接：${metadata[accountUrlMetadataName] || ''}`,
       ...metadataLines,
     ].join('\n');
     try {
@@ -395,13 +401,14 @@ export function VideoCollectionPanel({ initialAccountId = '', initialVideoId = '
             <div className="video-collection-field"><input ref={titleInputRef} className={`video-collection-title${validationErrors.title ? ' has-error' : ''}`} value={draft.title} onChange={(event) => { setDraft({ ...draft, title: event.target.value }); setValidationErrors((current) => current.title ? { ...current, title: false } : current); }} placeholder={validationErrors.title ? '请填写名称' : '视频名称（必填） 如电梯反转片'} aria-label="视频名称" aria-invalid={validationErrors.title || undefined} maxLength="100" /></div>
             <div className={`video-collection-url-field${validationErrors.url ? ' has-error' : ''}`}><input ref={urlInputRef} type="url" value={draft.url} onChange={(event) => { const url = event.target.value; const isEmpty = !url.trim(); setDraft({ ...draft, url, platform: isEmpty ? '抖音' : getVideoPlatformLabel(url), platformOverride: isEmpty ? '抖音' : '' }); setValidationErrors((current) => current.url ? { ...current, url: false } : current); }} onPaste={(event) => { const text = event.clipboardData.getData('text/plain'); if (applyDouyinShare(text)) event.preventDefault(); }} placeholder="视频链接" aria-label="视频链接" aria-invalid={validationErrors.url || undefined} /><button type="button" onClick={copyDraftUrl} disabled={!draft.url.trim()} title="复制视频链接" aria-label="复制视频链接"><Copy size={17} /><span>复制</span></button></div>
           </div>
-          <label className="video-description-topic"><textarea value={formatTopics(metadata)} onChange={(event) => updateTopics(event.target.value)} placeholder="视频话题" aria-label="视频话题" rows="1" /></label>
-          <BenchmarkVideoDetails video={draft} onChange={setDraft} onNotice={setNotice} excludedFieldNames={BASIC_METADATA_FIELD_NAMES} heading="视频数据" showHeading={false} showMetadataHeading={false} actionsPortalTarget={dataActionTarget} platformPortalTarget={platformTarget} onCopyAll={copyAllVideoInformation} />
+          <div className="video-description-row"><label className="video-description-topic"><textarea value={formatTopics(metadata)} onChange={(event) => updateTopics(event.target.value)} placeholder="视频话题" aria-label="视频话题" rows="1" /></label><div className="video-description-account" role="group" aria-label="账号"><input value={metadata[accountMetadataName] || ''} onChange={(event) => updateDraftMetadata(accountMetadataName, event.target.value)} placeholder="@账号" aria-label="账号名称" /><input value={metadata[accountUrlMetadataName] || ''} onChange={(event) => updateDraftMetadata(accountUrlMetadataName, event.target.value)} placeholder="账号网页链接" aria-label="账号网页链接" inputMode="url" /></div></div>
+          <label className="video-account-field"><span>归属母题</span><select value={draft.topicGroup} onChange={(event) => setDraft({ ...draft, topicGroup: event.target.value })}><option value="">未归类（可稍后整理）</option>{topicGroups.map((name) => <option value={name} key={name}>{name}</option>)}</select></label>
+          <BenchmarkVideoDetails video={draft} onChange={setDraft} onNotice={setNotice} excludedFieldNames={INTAKE_METADATA_FIELD_NAMES} heading="视频数据" showHeading={false} showMetadataHeading={false} actionsPortalTarget={dataActionTarget} platformPortalTarget={platformTarget} onCopyAll={copyAllVideoInformation} />
         </section>
         <section className="video-intake-section video-intake-card" aria-labelledby="video-research-record-title">
           <div className="video-intake-section-heading"><div className="video-basic-title-row"><h2 id="video-research-record-title">② 我的研究记录</h2><HelpPopover label="我的研究记录" text="只记录你的判断和后续检索所需的信息。" /></div></div>
           <div className="video-record-tabs" role="tablist" aria-label="我的研究记录分类">{[['labels', '改编标签'], ['analysis', '分析笔记'], ['feedback', '用户反馈']].map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={recordTab === id} className={recordTab === id ? 'active' : ''} onClick={() => setRecordTab(id)}>{label}</button>)}</div>
-          {recordTab === 'labels' && <div className="video-record-panel" role="tabpanel" aria-label="改编标签"><label className="video-account-field"><span>关联对标账号（可选）</span><select value={draft.accountId} onChange={(event) => setDraft({ ...draft, accountId: event.target.value })}><option value="">不关联账号，单独收录</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.platform} · {account.name}</option>)}</select></label><div className="video-research-type"><span>研究类型</span><ChoiceGroup options={CATEGORIES} value={draft.category} onChange={(category) => setDraft({ ...draft, category })} tone="focus" /></div><label className="video-account-field"><span>题材组（同一核心故事骨架）</span><select value={draft.topicGroup} onChange={(event) => setDraft({ ...draft, topicGroup: event.target.value })} aria-label="题材组"><option value="">暂不归组</option>{topicGroups.map((name) => <option value={name} key={name}>{name}</option>)}</select></label><label className="video-basic-field"><span>改编标签</span><input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="如：开头钩子、身份反转，用 、 分隔" aria-label="改编标签" /></label><label className="video-basic-field"><span>研究备注</span><textarea ref={noteInputRef} className="video-research-note" value={draft.note} onChange={(event) => { setDraft({ ...draft, note: event.target.value }); resizeDraftNote(event.currentTarget); }} placeholder="为什么值得收集 / 我想研究什么（可选）" aria-label="研究备注" rows="2" /></label></div>}
+          {recordTab === 'labels' && <div className="video-record-panel" role="tabpanel" aria-label="改编标签"><label className="video-account-field"><span>关联对标账号（可选）</span><select value={draft.accountId} onChange={(event) => setDraft({ ...draft, accountId: event.target.value })}><option value="">不关联账号，单独收录</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.platform} · {account.name}</option>)}</select></label><div className="video-research-type"><span>研究类型</span><ChoiceGroup options={CATEGORIES} value={draft.category} onChange={(category) => setDraft({ ...draft, category })} tone="focus" /></div><label className="video-basic-field"><span>改编标签</span><input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="如：开头钩子、身份反转，用 、 分隔" aria-label="改编标签" /></label><label className="video-basic-field"><span>研究备注</span><textarea ref={noteInputRef} className="video-research-note" value={draft.note} onChange={(event) => { setDraft({ ...draft, note: event.target.value }); resizeDraftNote(event.currentTarget); }} placeholder="为什么值得收集 / 我想研究什么（可选）" aria-label="研究备注" rows="2" /></label></div>}
           {recordTab === 'labels' && <ResearchProfileEditor profile={draft.researchProfile} onChange={(researchProfile) => setDraft((current) => ({ ...current, researchProfile }))} />}
           {recordTab === 'analysis' && <div className="video-record-panel" role="tabpanel" aria-label="分析笔记"><div className="video-analysis-grid">{[['highlights', '这个版本的亮点', '哪些设计有效？'], ['problems', '存在的问题', '哪些地方不成立或可以改进？'], ['reusable', '可复用点', '哪些方法值得带入自己的改编？']].map(([key, label, placeholder]) => <label className="video-basic-field" key={key}><span>{label}</span><textarea value={draft.analysisNotes?.[key] || ''} onChange={(event) => setDraft({ ...draft, analysisNotes: { ...draft.analysisNotes, [key]: event.target.value } })} placeholder={placeholder} rows="3" maxLength="2000" /></label>)}</div><section className="video-comparison-inputs" aria-labelledby="video-comparison-inputs-title"><div><h3 id="video-comparison-inputs-title">多版本对比笔记</h3><p>归组后即可查看单条视频；同组多条视频会自动并排对比。</p></div><div className="video-comparison-input-grid">{[['opening', '开头钩子', '前 3 秒怎样抓人？'], ['characterConflict', '人物 / 冲突', '谁和谁发生了什么？'], ['twist', '核心反转', '关键的预期变化是什么？'], ['ending', '结局', '最后如何收束或留钩子？'], ['takeaway', '可借鉴改法', '你准备怎样改成自己的版本？']].map(([key, label, placeholder]) => <label key={key}><span>{label}</span><textarea value={draft.comparison?.[key] || ''} onChange={(event) => setDraft({ ...draft, comparison: { ...draft.comparison, [key]: event.target.value } })} placeholder={placeholder} rows="2" maxLength="180" /></label>)}</div></section></div>}
           {recordTab === 'feedback' && <UserFeedbackPanel feedback={draft.feedback} onChange={(feedback) => setDraft((current) => ({ ...current, feedback }))} onNotice={setNotice} />}
@@ -413,9 +420,9 @@ export function VideoCollectionPanel({ initialAccountId = '', initialVideoId = '
     <div ref={comparisonRef}><ComparisonBoard groups={comparisonGroups} activeGroup={activeComparisonGroup} selectedVideoIds={comparisonSelection} onSelectGroup={(name) => { setActiveComparisonGroup(name); setComparisonSelection([]); }} onCreateGroup={createTopicGroup} onRenameGroup={renameTopicGroup} onMergeGroup={mergeTopicGroup} /></div>
 
     <section className="video-library" aria-labelledby="video-library-title">
-      <div className="video-library-head"><div><div className="video-library-title-row"><h2 id="video-library-title">对标视频</h2><span className="video-library-count">{filteredVideos.length} 条</span></div><p>{selectedAccount ? `正在查看「${selectedAccount.name}」已收录的作品。` : '集中检索已收录的视频，并从这里创建改编项目或进入拆解。'}</p></div>{selectedAccount && <button type="button" className="video-library-account-filter" onClick={() => setSelectedAccountId('')}>查看全部账号</button>}</div>
+      <div className="video-library-head"><div><div className="video-library-title-row"><h2 id="video-library-title">{videoScope === 'ungrouped' ? '未归类视频' : '全部对标视频'}</h2><span className="video-library-count">{filteredVideos.length} 条</span></div><p>{selectedAccount ? `正在查看「${selectedAccount.name}」已收录的作品。` : '集中检索已收录的视频，并从这里创建改编项目或进入拆解。'}</p></div>{selectedAccount && <button type="button" className="video-library-account-filter" onClick={() => setSelectedAccountId('')}>查看全部账号</button>}</div>
       <div className="video-library-filter"><label><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索视频、标签、备注…" /></label><div className="video-library-filter-row"><span>标签</span><div className="video-library-filter-tabs category-filter" aria-label="按标签筛选视频">{CATEGORIES.map((category) => <button key={category} type="button" aria-pressed={selectedCategories.includes(category)} className={selectedCategories.includes(category) ? 'active' : ''} onClick={() => setSelectedCategories((current) => current.includes(category) ? current.filter((value) => value !== category) : [...current, category])}>{category}</button>)}</div></div><div className="video-library-filter-row"><span>平台</span><div className="video-library-filter-tabs platform-filter" aria-label="按平台筛选视频">{PLATFORMS.map((platform) => <button key={platform} type="button" aria-pressed={selectedPlatforms.includes(platform)} className={selectedPlatforms.includes(platform) ? 'active' : ''} onClick={() => setSelectedPlatforms((current) => current.includes(platform) ? current.filter((value) => value !== platform) : [...current, platform])}>{platform}</button>)}</div>{(selectedPlatforms.length > 0 || selectedCategories.length > 0) && <button className="video-library-filter-clear" type="button" onClick={() => { setSelectedPlatforms([]); setSelectedCategories([]); }}>清除筛选</button>}</div></div>
-      <div className="video-library-list">{filteredVideos.length ? filteredVideos.map((video) => <VideoCard key={video.id} video={video} account={accounts.find((account) => account.id === video.accountId)} onOpen={() => openBreakdown(video)} onCreateProject={() => onCreateProject?.(video)} onEdit={() => startEdit(video)} onDelete={() => deleteVideo(video)} />) : <p className="video-library-empty">还没有符合条件的对标视频。先从账号近期作品中选择一条加入对标库。</p>}</div>
+      <div className="video-library-list">{filteredVideos.length ? filteredVideos.map((video) => <VideoCard key={video.id} video={video} account={accounts.find((account) => account.id === video.accountId)} onOpen={() => openBreakdown(video)} onCreateProject={() => onCreateProject?.(video)} onEdit={() => startEdit(video)} onDelete={() => deleteVideo(video)} />) : <p className="video-library-empty">{videoScope === 'ungrouped' ? '没有待归类的视频；新收集的视频可以先保存在这里。' : '没有符合条件的视频，可调整筛选或在上方收录新视频。'}</p>}</div>
     </section>
   </section>;
 }

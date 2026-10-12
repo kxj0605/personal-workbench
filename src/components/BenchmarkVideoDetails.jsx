@@ -17,26 +17,35 @@ const promptPlatformOptions = [
   { value: 'other', label: '其他' },
 ];
 
-const defaultPrompts = {
-  youtube: '请根据 YouTube / YouTube Shorts 视频链接，提取公开资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n视频标题：仅保留标题正文，不包含任何 # 标签\n视频标签：去掉 #；剔除与频道名称相同的标签；多项用 、 分隔\n视频链接：原始视频链接\n背景音乐：歌曲或音乐名称；无法确认请写不可用\n视频时长：\n频道名称：使用 @频道 Handle\n频道链接：https://www.youtube.com/@频道Handle\n播放量：\n点赞量：\n评论量：\n\n无法可靠获取的字段请写“不可用”，不要猜测。\n\n视频链接：{{视频链接}}',
-  douyin: '我会提供一段抖音分享链接（可能混有时间、口令、文案和 # 话题）以及一张视频详情截图。请直接提取可导入的完整视频资料，并严格按以下格式逐行输出。不要添加表格、序号、解释、代码块或 Markdown 链接。\n\n先从分享内容中识别真实视频链接；截图优先用于识别发布者、主页链接、视频时长、发布时间、背景音乐和互动数据，只读取清晰可见的信息。\n\n视频标题：优先读取作者昵称下方的视频发布文案第一句，去掉前置口令、时间和后续 # 标签；不要把封面、暂停画面、视频内容字幕或大字当作标题\n视频标签：去掉 #；剔除与发布者名称相同的标签；多项用 、 分隔\n视频链接：仅输出真实抖音视频链接\n发布者：仅保留 @账号昵称\n主页链接：发布者的抖音主页完整链接；无法确认写不可用\n视频时长：如：00:32；无法确认写不可用\n发布时间：如截图或页面可见则提取；看不清写不可用\n背景音乐：歌曲或音乐名称；无法确认写不可用\n点赞量：\n评论量：\n收藏量：\n转发量：\n\n每个字段都必须输出。无法可靠获取或截图中看不清的字段请写“不可用”，不要猜测。',
-  other: '请根据视频链接，提取公开可见的视频资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n视频标题：\n视频标签：\n视频链接：{{视频链接}}\n发布者：\n主页链接：\n视频时长：\n发布时间：\n播放量：\n点赞量：\n评论量：\n\n无法可靠获取的字段请写“不可用”，不要猜测。',
+export const defaultPrompts = {
+  youtube: '请根据 YouTube / YouTube Shorts 视频链接，提取公开资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n视频标题：仅保留标题正文，不包含任何 # 标签\n视频标签：去掉 #；剔除与频道名称相同的标签；多项用 、 分隔\n视频链接：原始视频链接\n账号：使用 @频道 Handle\n账号链接：频道主页的完整网页链接；无法确认则留空\n背景音乐：歌曲或音乐名称；无法确认请写不可用\n视频时长：\n播放量：\n点赞量：\n评论量：\n\n无法可靠获取的字段请写“不可用”，不要猜测。\n\n视频链接：{{视频链接}}',
+  douyin: '我会提供一段抖音分享链接（可能混有时间、口令、文案和 # 话题）以及一张视频详情截图。请直接提取可导入的完整视频资料，并严格按以下格式逐行输出。不要添加表格、序号、解释、代码块或 Markdown 链接。\n\n先从分享内容中识别真实视频链接；截图优先用于识别账号、账号主页链接、视频时长、发布时间、背景音乐和互动数据，只读取清晰可见的信息。\n\n视频标题：优先读取作者昵称下方的视频发布文案第一句，去掉前置口令、时间和后续 # 标签；不要把封面、暂停画面、视频内容字幕或大字当作标题\n视频标签：去掉 #；剔除与账号名称相同的标签；多项用 、 分隔\n视频链接：仅输出真实抖音视频链接\n账号：仅保留 @账号昵称\n账号链接：账号主页的完整网页链接；无法确认则留空\n视频时长：如：00:32；无法确认写不可用\n发布时间：如截图或页面可见则提取；看不清写不可用\n背景音乐：歌曲或音乐名称；无法确认写不可用\n点赞量：\n评论量：\n收藏量：\n转发量：\n\n每个字段都必须输出。账号链接无法确认时留空；其他字段无法可靠获取或截图中看不清时写“不可用”，不要猜测。',
+  other: '请根据视频链接，提取公开可见的视频资料，并严格按以下格式逐行输出。不要添加表格、序号、解释或代码块。\n\n视频标题：\n视频标签：\n视频链接：{{视频链接}}\n账号：\n账号链接：账号主页的完整网页链接；无法确认则留空\n视频时长：\n发布时间：\n播放量：\n点赞量：\n评论量：\n\n除账号链接无法确认时留空外，其他无法可靠获取的字段请写“不可用”，不要猜测。',
 };
 
-const ensureDouyinPromptFields = (prompt) => {
+export const ensureDouyinPromptFields = (prompt) => {
   let normalized = prompt
     .replace(/\n播放量：[^\n]*/g, '')
-    .replace(/\n视频简介：[^\n]*/g, '');
+    .replace(/\n视频简介：[^\n]*/g, '')
+    .replace(/\n主页链接：/g, '\n账号链接：')
+    .replace(/\n发布者：/g, '\n账号：')
+    .replace('发布者、主页链接、', '账号、账号主页链接、')
+    .replace('发布者名称', '账号名称');
   const publishedAtLine = '发布时间：如截图或页面可见则提取；看不清写不可用';
   if (!normalized.includes('发布时间：')) {
     normalized = normalized.includes('\n背景音乐：')
       ? normalized.replace('\n背景音乐：', `\n${publishedAtLine}\n背景音乐：`)
       : `${normalized.trim()}\n${publishedAtLine}`;
   }
-  if (!normalized.includes('主页链接：')) {
-    normalized = normalized.includes('\n发布者：')
-      ? normalized.replace(/\n发布者：[^\n]*/, '\n发布者：仅保留 @账号昵称\n主页链接：https://www.douyin.com/user/...')
-      : `${normalized.trim()}\n发布者：仅保留 @账号昵称\n主页链接：https://www.douyin.com/user/...`;
+  if (!normalized.includes('账号：')) {
+    normalized = normalized.includes('\n视频时长：')
+      ? normalized.replace('\n视频时长：', '\n账号：仅保留 @账号昵称\n视频时长：')
+      : `${normalized.trim()}\n账号：仅保留 @账号昵称`;
+  }
+  if (!normalized.includes('账号链接：')) {
+    normalized = normalized.includes('\n账号：')
+      ? normalized.replace(/\n账号：[^\n]*/, (line) => `${line}\n账号链接：账号主页的完整网页链接；无法确认则留空`)
+      : `${normalized.trim()}\n账号链接：账号主页的完整网页链接；无法确认则留空`;
   }
   if (!normalized.includes('视频时长：')) {
     normalized = normalized.includes('\n发布时间：')
@@ -245,10 +254,15 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
     const importFields = fieldsByPlatform[importPlatform] || fieldsByPlatform.other;
     const parsed = {};
     rawEntries.forEach(([label, rawValue]) => {
-      const field = importFields.find((item) => item.label === label);
+      const accountFieldName = importPlatform === 'youtube' ? 'benchmark-channel-name' : 'benchmark-author';
+      const accountUrlFieldName = importPlatform === 'youtube' ? 'benchmark-channel-url' : 'benchmark-author-url';
+      const field = label === '账号' || label === '账号链接'
+        ? importFields.find((item) => item.name === (label === '账号' ? accountFieldName : accountUrlFieldName))
+        : importFields.find((item) => item.label === label);
       if (field) {
         const value = rawValue;
         if (field.name === 'benchmark-video-url' && !pastedLink) return;
+        if (field.name === accountUrlFieldName && (!value || value === '不可用')) return;
         parsed[field.name] = field.name === 'benchmark-video-tags'
           ? value.split(/[,，、]/).map((tag) => tag.replace(/^#\s*/, '').trim()).filter(Boolean).join('、')
           : value;
@@ -310,7 +324,7 @@ export function BenchmarkVideoDetails({ video, onChange, onNotice, onCollapse = 
     setIsImportDialogOpen(false);
   };
   const importPastePanel = <><textarea value={pasteText} onChange={(event) => setPasteText(event.target.value)} onPaste={(event) => { event.preventDefault(); applyPaste(event.clipboardData.getData('text/plain')); }} rows={6} autoFocus aria-label="粘贴视频资料内容" placeholder="在这里粘贴 AI 提取出的结构化视频资料，识别后会自动填入表单" /><button type="button" onClick={() => applyPaste(pasteText)} disabled={!pasteText.trim()}>识别并回填</button></>;
-  const importDialog = isImportDialogOpen ? createPortal(<div className="video-import-dialog-backdrop" role="presentation" onMouseDown={closeImportDialog}><section className="video-import-dialog" role="dialog" aria-modal="true" aria-labelledby="video-import-dialog-title" onMouseDown={(event) => event.stopPropagation()}><header className="video-import-dialog-head"><div><h2 id="video-import-dialog-title">导入视频资料</h2><p>按步骤提取并粘贴，字段会自动回填到视频信息中。</p></div><button type="button" className="video-import-dialog-close" onClick={closeImportDialog} aria-label="关闭导入视频资料"><X size={18} /></button></header><div className="video-import-dialog-steps"><section><div className="video-import-dialog-step-head"><div><strong>① 复制提取提示词</strong><p>复制后，连同视频链接和截图发送给 AI。</p></div><div className="video-import-dialog-step-actions"><button type="button" className="video-import-copy-prompt" onClick={copyPrompt}><Copy size={16} />复制提示词</button><button type="button" className="video-import-settings-trigger" onClick={() => { setPromptPlatform(promptTemplatePlatform); setIsPromptSettingsOpen((open) => !open); }} aria-label="设置视频资料提示词" aria-expanded={isPromptSettingsOpen} title="设置提示词"><Pencil size={16} /></button></div></div>{isPromptSettingsOpen && promptSettings}</section><section><strong>② 粘贴提取结果</strong><p>粘贴 AI 按提示词返回的字段；标题、链接、话题和视频数据会自动填入。</p><div className="video-import-paste-panel">{importPastePanel}</div></section><section><strong>③ 检查并完成</strong><p>关闭弹窗后，可在第一张卡片继续校对视频信息。</p></section></div><footer className="video-import-dialog-footer"><button type="button" onClick={closeImportDialog}>完成导入</button></footer></section></div>, document.body) : null;
+  const importDialog = isImportDialogOpen ? createPortal(<div className="video-import-dialog-backdrop" role="presentation" onMouseDown={closeImportDialog}><section className="video-import-dialog" role="dialog" aria-modal="true" aria-labelledby="video-import-dialog-title" onMouseDown={(event) => event.stopPropagation()}><header className="video-import-dialog-head"><div><h2 id="video-import-dialog-title">导入视频资料</h2><p>按步骤提取并粘贴，字段会自动回填到视频信息中。</p></div><button type="button" className="video-import-dialog-close" onClick={closeImportDialog} aria-label="关闭导入视频资料"><X size={18} /></button></header><div className="video-import-dialog-steps"><section><div className="video-import-dialog-step-head"><div><strong>① 复制提取提示词</strong><p>复制后，连同视频链接和截图发送给 AI。</p></div><div className="video-import-dialog-step-actions"><button type="button" className="video-import-copy-prompt" onClick={copyPrompt}><Copy size={16} />复制提示词</button><button type="button" className="video-import-settings-trigger" onClick={() => { setPromptPlatform(promptTemplatePlatform); setIsPromptSettingsOpen((open) => !open); }} aria-label="设置视频资料提示词" aria-expanded={isPromptSettingsOpen} title="设置提示词"><Pencil size={16} /></button></div></div>{isPromptSettingsOpen && promptSettings}</section><section><strong>② 粘贴提取结果</strong><p>粘贴 AI 按提示词返回的字段；标题、链接、话题、账号和视频数据会自动填入。</p><div className="video-import-paste-panel">{importPastePanel}</div></section><section><strong>③ 检查并完成</strong><p>关闭弹窗后，可在第一张卡片继续校对视频信息。</p></section></div><footer className="video-import-dialog-footer"><button type="button" onClick={closeImportDialog}>完成导入</button></footer></section></div>, document.body) : null;
   const portalActions = <div className="video-basic-card-actions" aria-label="视频信息操作"><button type="button" className="video-basic-card-copy-all-action" onClick={onCopyAll || copyMetadata} aria-label="复制视频信息" title="复制视频信息"><Copy size={17} /></button><button type="button" className="video-basic-card-import-action" onClick={openImportDialog}><ClipboardPaste size={16} />导入视频资料</button></div>;
   const platformSelector = <PlatformCorrection label={platformLabel} value={video.platformOverride} onChange={(label) => onChange({ ...video, platform: label, platformOverride: label })} />;
 

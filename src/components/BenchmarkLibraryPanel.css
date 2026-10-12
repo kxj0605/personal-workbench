@@ -8,6 +8,27 @@
 .benchmark-account-copy .benchmark-account-name-link:hover, .benchmark-account-copy .benchmark-account-name-link:focus-visible { color: #3976d5; text-decoration: underline; }
 
 .benchmark-library-header { display: grid; justify-items: start; gap: 14px; }.benchmark-library-header h1 { margin: 0; color: #111827; font-size: clamp(26px, 3vw, 32px); letter-spacing: -.6px; }.benchmark-library-header .benchmark-library-tabs { border: 1px solid rgba(17,24,39,.06); background: #fff; box-shadow: 0 3px 10px rgba(52,63,84,.04); }
+.benchmark-library-header { box-sizing: border-box; width: 100%; gap: 18px; border-radius: 24px; padding: 24px; background: linear-gradient(135deg, #eaf3ff, #f8f4ff); }
+.benchmark-layout-tight .benchmark-library-header { gap: 8px; padding: 14px 18px; }
+.benchmark-layout-tight .benchmark-library-hero-content h2 { font-size: clamp(20px, 2.5vw, 24px); }
+.benchmark-layout-tight .benchmark-library-hero-content p { font-size: 12px; }
+.benchmark-layout-tight .benchmark-library-tabs button { min-height: 34px; padding: 0 10px; }
+@media (min-width: 1250px) {
+  .workspace-content:has(> .benchmark-layout-tight) { padding-top: 12px; padding-right: 16px; padding-left: 16px; }
+}
+@media (min-width: 781px) and (max-width: 1249px) {
+  .workspace-content:has(> .benchmark-layout-tight) { padding-top: 16px; padding-right: 16px; padding-left: 16px; }
+}
+@media (min-width: 781px) {
+  .sidebar-hidden .benchmark-layout-tight .benchmark-library-header { padding-left: 56px; }
+}
+.benchmark-library-hero-content { display: grid; width: 100%; gap: 4px; }
+.benchmark-library-title-line { display: flex; min-width: 0; align-items: baseline; flex-wrap: wrap; gap: 4px 24px; }
+.benchmark-library-title-line h2 { flex: none; }
+.benchmark-library-hero-content span { color: #3976d5; font-size: 12px; font-weight: 800; }
+.benchmark-library-hero-content h2 { margin: 0; color: #111827; font-size: clamp(22px, 3vw, 28px); }
+.benchmark-library-hero-content p { margin: 0; color: #667085; font-size: 13px; line-height: 1.6; }
+.benchmark-library-guide-link { display: inline-flex; min-height: 40px; flex: none; align-items: center; gap: 7px; border: 1px solid rgba(57,118,213,.18); border-radius: 12px; padding: 0 14px; background: #fff; color: #3976d5; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .benchmark-account-create { min-width: 0; }.benchmark-add-account-trigger { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(57,118,213,.18); border-radius: 12px; padding: 0 15px; background: #fff; color: #3976d5; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; box-shadow: var(--shadow-sm); }.benchmark-add-account-trigger:hover, .benchmark-add-account-trigger:focus-visible { border-color: rgba(57,118,213,.32); background: #eaf3ff; }
 .benchmark-account-form textarea { min-height: 42px; resize: vertical; }.benchmark-account-form > button[type='submit'] { grid-column: 1 / -1; justify-self: center; }
 @media (max-width: 560px) { .benchmark-library-header .benchmark-library-tabs { width: 100%; }.benchmark-library-header .benchmark-library-tabs button { flex: 1; justify-content: center; } }
@@ -16,6 +37,7 @@
 .benchmark-account-transfer { display: inline-flex; overflow: hidden; border: 1px solid rgba(17,24,39,.08); border-radius: 12px; background: #fff; box-shadow: var(--shadow-sm); }.benchmark-account-transfer button { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; border: 0; border-right: 1px solid rgba(17,24,39,.08); padding: 0 12px; background: transparent; color: #667085; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }.benchmark-account-transfer button:last-of-type { border-right: 0; }.benchmark-account-transfer button:hover, .benchmark-account-transfer button:focus-visible { background: #eaf3ff; color: #3976d5; }.benchmark-account-transfer input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
 @media (max-width: 900px) { .benchmark-account-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .benchmark-library-toolbar { align-items: stretch; }.benchmark-library-toolbar .benchmark-library-tabs, .benchmark-library-actions { width: 100%; }.benchmark-library-toolbar .benchmark-library-tabs, .benchmark-library-actions, .benchmark-library-toolbar .benchmark-add-account-trigger { flex: 1; }.benchmark-library-actions { margin-left: 0; }.benchmark-account-layout { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .benchmark-library-header { padding: 18px; }.benchmark-library-title-line { gap: 4px; } }
 
 .benchmark-account-form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.benchmark-account-form-close { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border: 1px solid rgba(17,24,39,.08); border-radius: 10px; padding: 0; background: #fff; color: #667085; cursor: pointer; }.benchmark-account-form-close:hover, .benchmark-account-form-close:focus-visible { border-color: rgba(217,54,85,.2); background: #ffe8ec; color: #d93655; }
 
@@ -29,3 +51,7 @@
 .benchmark-export-copy { border: 1px solid rgba(57,118,213,.22); background: #fff; color: #3976d5; }
 .benchmark-export-copy:hover, .benchmark-export-copy:focus-visible { background: #eef5ff; }
 @media (max-width: 560px) { .benchmark-library-tabs button { gap: 5px; padding: 0 8px; font-size: 12px; white-space: nowrap; } }
+.benchmark-topic-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.benchmark-topic-navigation button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; max-width: 100%; border: 0; border-radius: 12px; padding: 8px 16px; background: transparent; color: #667085; font: inherit; font-size: 13px; cursor: pointer; overflow-wrap: anywhere; }
+.benchmark-topic-navigation button[aria-current='page'], .benchmark-topic-navigation button:hover { background: #eaf3ff; color: #3976d5; }
+.benchmark-topic-navigation .benchmark-topic-return { margin-left: auto; color: #3976d5; }

@@ -1,0 +1,2552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>短视频创作研究工具 - 对标库</title>
+  <style>
+    :root {
+      --bg-main: #f3f6f9;
+      --bg-card: #ffffff;
+      --bg-subtle: #f8fafc;
+      --border-color: #e2e8f0;
+      --border-focus: #3b82f6;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-subtle: #eff6ff;
+      --accent: #0d9488;
+      --accent-subtle: #f0fdfa;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --danger-subtle: #fef2f2;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      line-height: 1.5;
+      font-size: 14px;
+      padding-bottom: 60px;
+    }
+
+    /* 顶部导航与操作栏 */
+    header {
+      background-color: #fff;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .header-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 20px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--text-main);
+    }
+    .brand-tag {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-main);
+      padding: 3px;
+      border-radius: var(--radius-md);
+    }
+    .nav-tab-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-tab-btn.active {
+      background: #fff;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+      font-weight: 600;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 容器基底 */
+    .container {
+      max-width: 1440px;
+      margin: 20px auto 0;
+      padding: 0 20px;
+    }
+
+    /* 按钮与通用控件 */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: #fff;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--bg-subtle); border-color: #cbd5e1; }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: var(--radius-sm); }
+    .btn-danger { color: var(--danger); border-color: #fecaca; }
+    .btn-danger:hover { background: var(--danger-subtle); }
+
+    /* 筛选与操作面板 */
+    .filter-panel {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .input-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    input, select, textarea {
+      padding: 7px 10px;
+      font-size: 13px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: #fff;
+      color: var(--text-main);
+      outline: none;
+      transition: border 0.15s ease;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--border-focus); }
+    .search-input { min-width: 220px; flex-grow: 1; }
+
+    /* 统计状态条 */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      padding: 0 4px;
+    }
+    .status-badge {
+      background: #e2e8f0;
+      color: var(--text-main);
+      font-size: 12px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 4px;
+      font-weight: 600;
+    }
+
+    /* 网格卡片流 */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+    }
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
+    }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .card-title-wrap {
+      flex: 1;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title:hover { color: var(--primary); }
+    .card-category {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--accent);
+      background: var(--accent-subtle);
+      border: 1px solid #ccfbf1;
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: 54px;
+    }
+    .tag-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 14px;
+    }
+    .tag {
+      font-size: 11px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+    }
+    .card-footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .star-btn {
+      background: transparent;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #cbd5e1;
+      transition: color 0.15s ease;
+    }
+    .star-btn.active { color: #f59e0b; }
+
+    /* 抽屉与全屏模态框 */
+    .drawer-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 50;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+    .drawer-overlay.open { display: block; }
+    .drawer {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 760px;
+      max-width: 95vw;
+      background: #fff;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+      z-index: 51;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-subtle);
+    }
+    .drawer-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .drawer-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-color);
+      background: #fff;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* 结构化研究详情展示块 */
+    .study-section {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .study-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* 表格样式 (视频列表与对比表) */
+    .table-container {
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-top: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: top;
+    }
+    th {
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background-color: #fafbfc; }
+
+    /* 横向对比矩阵专用样式 */
+    .compare-table th:first-child, .compare-table td:first-child {
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 2;
+      font-weight: 600;
+      border-right: 1px solid var(--border-color);
+      min-width: 130px;
+    }
+    .compare-table th:first-child { background: var(--bg-subtle); }
+
+    /* 空状态 */
+    .empty-placeholder {
+      text-align: center;
+      padding: 48px 20px;
+      background: #fff;
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius-lg);
+      color: var(--text-muted);
+    }
+    .empty-placeholder h4 { color: var(--text-main); margin-bottom: 6px; }
+
+    /* 消息浮层 Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      box-shadow: var(--shadow-lg);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* 表单控件布局 */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .form-col-full { grid-column: span 2; }
+    .form-item { display: flex; flex-direction: column; gap: 5px; }
+    .form-item label { font-size: 12px; font-weight: 600; color: var(--text-main); }
+    .form-item .tip { font-size: 11px; color: var(--text-muted); }
+
+    /* 标签与等级徽章 */
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-benchmark { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .badge-grade-S { background: #dcfce7; color: #15803d; }
+    .badge-grade-A { background: #e0f2fe; color: #0369a1; }
+    .badge-grade-B { background: #f1f5f9; color: #475569; }
+    .badge-grade-C { background: #fee2e2; color: #b91c1c; }
+
+    /* 响应式调整 */
+    @media (max-width: 850px) {
+      .header-inner { flex-direction: column; height: auto; padding: 12px 16px; gap: 10px; }
+      .filter-row { flex-direction: column; align-items: stretch; }
+      .card-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-col-full { grid-column: span 1; }
+      .drawer { width: 100vw; }
+    }
+  </style>
+<style>
+body { padding-bottom: 24px; }
+.motif-filter-panel { gap: 16px; }
+.motif-hierarchy-row { display: grid; grid-template-columns: 128px minmax(0, 1fr) 104px; align-items: center; gap: 12px; }
+.motif-hierarchy-row label, .motif-search-row label { color: var(--text-muted); font-size: 13px; }
+.motif-hierarchy-row > label, .motif-hierarchy-title { color: var(--text-main); font-size: 15px; font-weight: 700; }
+.motif-category-options { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.motif-category-options button { border: 1px solid transparent; border-radius: 6px; padding: 3px 8px; background: transparent; color: var(--text-muted); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.motif-category-options button[aria-pressed="true"] { background: var(--primary-subtle); color: var(--primary); font-weight: 600; }
+.motif-category-options button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.motif-hierarchy-row select { width: 100%; }
+.motif-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 160px; align-items: center; gap: 12px; }
+.motif-search-row .search-input { min-width: 0; width: 100%; }
+.motif-quick-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 14px; }
+@media (max-width:560px) {
+  .motif-hierarchy-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .motif-hierarchy-row label, .motif-hierarchy-title { grid-column: 1 / -1; }
+  .motif-search-row { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  .motif-search-row .search-input { grid-column: 1 / -1; }
+}
+.brand { display:none; }
+.header-inner { display:flex; flex-direction:row; align-items:center; justify-content:space-between; height:auto; min-height:60px; flex-wrap:wrap; gap:12px; }
+.header-inner > .nav-tabs { flex:0 1 auto; }
+.header-inner > .header-actions { margin-left:auto; }
+.input-group, .header-actions { flex-wrap:wrap; min-width:0; }
+input,select,textarea { max-width:100%; min-width:0; }
+.card-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); }
+#view-videos table { table-layout:fixed; min-width:780px; }
+#view-videos thead th { vertical-align:middle; }
+#view-videos td { overflow-wrap:anywhere; }
+.video-link-control { display:flex; align-items:center; border:1px solid var(--border-color); border-radius:var(--radius-md); background:#fff; min-width:0; }
+.video-link-control:focus-within { border-color:var(--border-focus); }
+.video-link-control > input { flex:1; width:0; border:0; background:transparent; }
+.video-platform-control { position:relative; display:flex; align-items:center; justify-content:center; flex:0 0 36px; height:32px; }
+.video-platform-control select { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.video-platform-control:focus-within { outline:2px solid var(--border-focus); border-radius:6px; }
+.video-platform-control > span { display:flex; align-items:center; pointer-events:none; }
+@media(max-width:850px) {
+  #view-videos .filter-row { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+  #view-videos .filter-row > .search-input { grid-column:1 / -1; width:100%; }
+  #view-videos .filter-row > .input-group { grid-column:span 2; flex-wrap:nowrap; gap:6px; }
+  #view-videos .filter-row > .input-group select { flex:1; width:0; }
+  #view-videos .filter-row > .btn { grid-column:span 3; }
+}
+@media(max-width:560px) {
+  #view-videos .filter-row > .input-group { flex-direction:column; align-items:stretch; }
+  #view-videos .filter-row > .input-group select { flex:auto; width:100%; }
+.nav-tabs { width:100%; } .nav-tab-btn { flex:1; padding:6px; font-size:12px; justify-content:center; }
+.header-actions { justify-content:center; } .drawer-header { flex-wrap:wrap; gap:10px; }
+.drawer-header>div, .drawer-body div[style*="display:flex"], .drawer-body div[style*="display: flex"] { flex-wrap:wrap; }
+.input-group select { flex:1; width:0; } #recent-visited-tags { flex-wrap:wrap; }
+}
+</style></head>
+<body>
+
+  <!-- 顶部全局导航与功能入口 -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <span>短视频创作研究工具</span>
+        <span class="brand-tag">对标库系统</span>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab-btn active" id="tab-motifs" onclick="App.switchMainTab('motifs')">母题探索与对比</button>
+        <button class="nav-tab-btn" id="tab-videos" onclick="App.switchMainTab('videos')">视频全景管理</button>
+        <button class="nav-tab-btn" id="tab-creators" onclick="App.switchMainTab('creators')">对标账号库</button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-sm" onclick="App.openMethodModal()">使用说明与方法</button>
+        <button class="btn btn-sm" onclick="App.exportFullBackup()">备份数据</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 视图 1：母题库视图 (核心) -->
+    <section id="view-motifs">
+      <div class="filter-panel motif-filter-panel">
+        <div class="motif-hierarchy-row">
+          <span id="motif-category-title" class="motif-hierarchy-title">题材大类（一级）</span>
+          <div><input type="hidden" id="motif-category-filter" value="ALL"><div id="motif-category-options" class="motif-category-options" role="group" aria-labelledby="motif-category-title"></div></div>
+          <button class="btn" onclick="App.openCategoryModal()">大类设置</button>
+        </div>
+        <div class="motif-hierarchy-row">
+          <label for="motif-select-filter">母题（二级）</label>
+          <select id="motif-select-filter" onchange="App.renderMotifs()"><option value="ALL">全部母题</option></select>
+          <button class="btn btn-primary" onclick="App.openMotifEditModal()">新建母题</button>
+        </div>
+        <div class="motif-search-row">
+          <input type="search" id="motif-search" class="search-input" aria-label="搜索母题" placeholder="搜索母题名称、核心故事骨架、改编方向..." oninput="App.renderMotifs()">
+          <label for="motif-sort">排序</label>
+          <select id="motif-sort" onchange="App.renderMotifs()"><option value="updated">最近更新</option><option value="videoCount">视频版本最多</option><option value="name">名称字母序</option></select>
+        </div>
+      </div>
+      <div class="motif-quick-actions">
+        <button class="btn btn-sm" id="motif-fav-toggle" onclick="App.toggleFavFilter()">仅看已收藏</button>
+        <button class="btn btn-sm" onclick="App.resetMotifFilters()">清除筛选</button>
+        <div id="recent-visited-tags" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;"></div>
+      </div>
+
+      <div class="status-bar">
+        <div>
+          筛选出 <span id="motif-match-count" class="status-badge">0</span> 个母题
+          <span style="color:var(--text-light); margin:0 4px;">/</span>
+          库中总计 <span id="motif-total-count">0</span> 个
+        </div>
+      </div>
+
+      <div class="card-grid" id="motif-card-list">
+        <!-- 动态生成母题卡片 -->
+      </div>
+    </section>
+
+    <!-- 视图 2：视频全景管理视图 -->
+    <section id="view-videos" style="display:none;">
+      <div class="filter-panel">
+        <div class="filter-row">
+          <input type="text" id="video-search" class="search-input" placeholder="搜索视频标题、标签、笔记结论..." oninput="App.renderVideos()">
+
+          <div class="input-group">
+            <span class="input-label">平台:</span>
+            <select id="video-platform-filter" onchange="App.renderVideos()">
+              <option value="ALL">全部平台</option>
+              <option value="抖音">抖音</option>
+              <option value="快手">快手</option>
+              <option value="视频号">视频号</option>
+              <option value="小红书">小红书</option>
+              <option value="Bilibili">Bilibili</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <span class="input-label">所属母题:</span>
+            <select id="video-motif-filter" onchange="App.renderVideos()">
+              <option value="ALL">全部母题</option>
+              <option value="UNASSIGNED">尚未归类</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <span class="input-label">关联账号:</span>
+            <select id="video-creator-filter" onchange="App.renderVideos()">
+              <option value="ALL">全部账号</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" onclick="App.openVideoEditModal()">+ 录入新视频</button>
+          <button class="btn" onclick="App.openBatchVideoImport()">批量/文本导入</button>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div>
+          共检索出 <span id="video-match-count" class="status-badge">0</span> 条视频
+          <span id="unassigned-badge-wrap" style="margin-left: 10px; cursor: pointer;" onclick="App.filterUnassignedVideos()"></span>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:17%;">视频标题 / 链接</th>
+              <th style="width:29%;">所属母题</th>
+              <th style="width:10%;">作者账号</th>
+              <th style="width:26%;"><div>点赞量</div><div style="margin-top:4px; white-space:nowrap;">视频个数 / 粉丝量</div></th>
+              <th style="width:7%;">评级</th>
+              <th style="width:11%;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="video-table-body">
+            <!-- 动态渲染 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 视图 3：对标账号库 -->
+    <section id="view-creators" style="display:none;">
+      <div class="filter-panel">
+        <div class="filter-row" style="justify-content: space-between;">
+          <input type="text" id="creator-search" class="search-input" placeholder="搜索账号名称、定位赛道、研究理由..." oninput="App.renderCreators()">
+
+          <div class="header-actions">
+            <button class="btn btn-primary" onclick="App.openCreatorEditModal()">+ 收录对标账号</button>
+            <button class="btn" onclick="App.openCreatorImportModal()">导入 JSON</button>
+            <button class="btn" onclick="App.openCreatorExportModal()">导出数据</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>账号名称</th>
+              <th>主打平台</th>
+              <th>赛道定位</th>
+              <th>值得研究的原因</th>
+              <th>已收录视频</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="creator-table-body">
+            <!-- 动态渲染 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- 模态框 / 抽屉统一容器 -->
+
+  <!-- 1. 母题深度研习与版本对比抽屉 (Drawer) -->
+  <div class="drawer-overlay" id="drawer-motif-overlay" onclick="App.closeMotifDrawer(event)">
+    <div class="drawer" id="drawer-motif">
+      <div class="drawer-header">
+        <div>
+          <span class="card-category" id="dm-category">题材大类</span>
+          <h3 id="dm-name" style="font-size:18px; margin-top:2px;">母题名称</h3>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-sm btn-accent" onclick="App.exportMotifMarkdown()">导出 Markdown 报告</button>
+          <button class="btn btn-sm" onclick="App.editCurrentDrawerMotif()">编辑资料</button>
+          <button class="btn btn-sm" onclick="App.closeMotifDrawerForce()">关闭</button>
+        </div>
+      </div>
+
+      <div class="drawer-body">
+        <div class="study-section">
+          <div class="study-title">核心故事骨架</div>
+          <div id="dm-skeleton" style="color:var(--text-main);"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom:16px;">
+          <div class="study-section" style="margin-bottom:0;">
+            <div class="study-title">角色功能 (Roles)</div>
+            <div id="dm-roles" style="color:var(--text-muted); font-size:13px;"></div>
+          </div>
+          <div class="study-section" style="margin-bottom:0;">
+            <div class="study-title">情节逻辑与冲突</div>
+            <div id="dm-logic" style="color:var(--text-muted); font-size:13px;"></div>
+          </div>
+          <div class="study-section" style="margin-bottom:0;">
+            <div class="study-title">情绪闭环 (Emotional Arch)</div>
+            <div id="dm-emotion" style="color:var(--text-muted); font-size:13px;"></div>
+          </div>
+          <div class="study-section" style="margin-bottom:0;">
+            <div class="study-title">核心主题思想</div>
+            <div id="dm-theme" style="color:var(--text-muted); font-size:13px;"></div>
+          </div>
+        </div>
+
+        <div class="study-section">
+          <div class="study-title">改编方向标签</div>
+          <div id="dm-adapt-tags" class="tag-cloud" style="margin-bottom:0;"></div>
+        </div>
+
+        <!-- 关联视频版本矩阵与对比 -->
+        <div style="margin-top: 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-size:15px; font-weight:700;">关联视频版本矩阵 (<span id="dm-video-count">0</span>)</div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-sm" onclick="App.filterMotifVideos('all')">全部</button>
+              <button class="btn btn-sm" onclick="App.filterMotifVideos('benchmark')">标杆案例</button>
+              <button class="btn btn-sm" onclick="App.filterMotifVideos('low')">低评分参考</button>
+              <button class="btn btn-sm btn-primary" onclick="App.addVideoForCurrentMotif()">+ 为此母题收录视频</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 8px; display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-sm btn-accent" onclick="App.openCompareView()">执行勾选版本对比 (&ge;2个)</button>
+            <span class="tip" style="font-size:12px; color:var(--text-muted);">勾选下方视频以进行横向脚本要素比对</span>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th width="40"><input type="checkbox" id="check-all-compare" onchange="App.toggleAllCompare(this)"></th>
+                  <th>视频名称</th>
+                  <th>创作者</th>
+                  <th>评级</th>
+                  <th>改编标签</th>
+                  <th>标杆</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="dm-videos-tbody">
+                <!-- 关联视频 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 横向版本对比分析展示区 (点击对比后呈现) -->
+        <div id="compare-result-area" style="margin-top:24px; display:none;">
+          <div style="font-size:15px; font-weight:700; margin-bottom:8px; color:var(--accent);">横向版本深度对比矩阵 (Diff)</div>
+          <div class="table-container">
+            <table class="compare-table" id="compare-matrix-table">
+              <!-- 对比矩阵 -->
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 母题新建/编辑 弹窗 -->
+  <div class="drawer-overlay" id="modal-motif-edit" onclick="App.closeOutside(event, 'modal-motif-edit')">
+    <div style="max-width: 650px; background:#fff; margin:40px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg);">
+      <h3 id="motif-modal-title" style="margin-bottom:14px;">编辑母题</h3>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>母题名称 *</label>
+          <input type="text" id="form-motif-name" placeholder="例如：落难受恩，多年后重金酬谢">
+        </div>
+        <div class="form-item">
+          <label>所属题材大类 *</label>
+          <select id="form-motif-category">
+            <!-- 动态填充 -->
+          </select>
+        </div>
+        <div class="form-item">
+          <label>改编方向</label>
+          <input type="text" id="form-motif-adaptation" placeholder="描述具体的改编方向">
+        </div>
+        <div class="form-item">
+          <label>改编方向标签 (逗号分隔)</label>
+          <input type="text" id="form-motif-tags" placeholder="例如：都市反转, 乡村民生, 职场打脸">
+        </div>
+        <div class="form-item form-col-full">
+          <label>核心故事骨架摘要 (与名称区分) *</label>
+          <textarea id="form-motif-skeleton" rows="3" placeholder="清晰叙述核心戏剧性前提、困境与解决过程"></textarea>
+        </div>
+        <div class="form-item">
+          <label>角色功能设定</label>
+          <input type="text" id="form-motif-roles" placeholder="例如：受恩者(卧薪尝胆)、施恩者(心善无求)">
+        </div>
+        <div class="form-item">
+          <label>核心情节逻辑</label>
+          <input type="text" id="form-motif-logic" placeholder="例如：隐姓埋名查访 -> 误会受辱 -> 亮明身份兑现承诺">
+        </div>
+        <div class="form-item">
+          <label>情绪闭环</label>
+          <input type="text" id="form-motif-emotion" placeholder="例如：压抑/同情 -> 悬念 -> 极度爽感/感动">
+        </div>
+        <div class="form-item">
+          <label>核心主题</label>
+          <input type="text" id="form-motif-theme" placeholder="例如：善有善报、因果不虚">
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn" onclick="App.closeModal('modal-motif-edit')">取消</button>
+        <button class="btn btn-primary" onclick="App.saveMotif()">保存母题</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 题材大类管理 弹窗 -->
+  <div class="drawer-overlay" id="modal-category-mgr" onclick="App.closeOutside(event, 'modal-category-mgr')">
+    <div style="max-width: 580px; background:#fff; margin:50px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg);">
+      <h3 style="margin-bottom:12px;">题材大类维护</h3>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <input type="text" id="new-category-name" placeholder="输入新大类名称" style="flex:1;">
+        <button class="btn btn-primary" onclick="App.addNewCategory()">新建大类</button>
+      </div>
+      <div class="table-container" style="max-height:300px; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr><th>大类名称</th><th>下属母题数</th><th>操作</th></tr>
+          </thead>
+          <tbody id="category-mgr-tbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+        <button class="btn" onclick="App.closeModal('modal-category-mgr')">完成并关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 视频录入/编辑 弹窗 -->
+  <div class="drawer-overlay" id="modal-video-edit" onclick="App.closeOutside(event, 'modal-video-edit')">
+    <div style="max-width: 780px; background:#fff; margin:30px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg); max-height:90vh; overflow-y:auto;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+        <h3 id="video-modal-title">收录视频研究资料</h3>
+        <button class="btn" onclick="App.openVideoImport()">导入视频资料</button>
+      </div>
+
+      <div style="font-weight:700; font-size:13px; color:var(--primary); margin-bottom:8px;">基础资料</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>视频标题/主干文案 *</label>
+          <input type="text" id="form-video-title" placeholder="输入视频作品名称">
+        </div>
+        <div class="form-item">
+          <label>视频链接</label>
+          <div class="video-link-control">
+          <div class="video-platform-control" id="video-platform-control">
+          <span id="video-platform-icon" aria-hidden="true"></span>
+          <select id="form-video-platform" aria-label="选择视频平台" onchange="App.selectVideoPlatform(this.value)">
+            <option value="AUTO">自动识别</option>
+            <option value="抖音">抖音</option>
+            <option value="快手">快手</option>
+            <option value="视频号">视频号</option>
+            <option value="小红书">小红书</option>
+            <option value="Bilibili">Bilibili</option>
+            <option value="YouTube">YouTube</option>
+            <option value="其他">其他</option>
+          </select>
+          </div>
+          <input type="text" id="form-video-url" placeholder="https://..." aria-label="视频链接" oninput="App.updateVideoPlatform()">
+          </div>
+        </div>
+        <div class="form-item">
+          <label>归属母题 (可暂不归类)</label>
+          <select id="form-video-motif">
+            <option value="">-- 暂不归类 (进入待整理池) --</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>关联创作者账号 (可选)</label>
+          <select id="form-video-creator">
+            <option value="">-- 不关联任何账号 --</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>话题标签 (逗号分隔)</label>
+          <input type="text" id="form-video-tags" placeholder="#反转 #人性 #情感">
+        </div>
+        <div class="form-item">
+          <label>时长(秒) / 发布时间</label>
+          <input type="text" id="form-video-duration" placeholder="例如：120秒 / 2024-03-01">
+        </div>
+      </div>
+
+      <p id="video-import-extra" style="display:none; font-size:12px; color:var(--text-muted); margin-bottom:12px; overflow-wrap:anywhere;"></p>
+      <div style="font-weight:700; font-size:13px; color:var(--primary); margin: 12px 0 8px;">表现数据 (支持留空，未录入不视作0)</div>
+      <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="form-item">
+          <label>播放量</label>
+          <input type="number" id="form-video-views" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>点赞量</label>
+          <input type="number" id="form-video-likes" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>评论量</label>
+          <input type="number" id="form-video-comments" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>收藏量</label>
+          <input type="number" id="form-video-collects" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>转发量</label>
+          <input type="number" id="form-video-shares" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>数据记录时间</label>
+          <input type="date" id="form-video-metric-date">
+        </div>
+      </div>
+
+      <div style="font-weight:700; font-size:13px; color:var(--primary); margin: 12px 0 8px;">研究资料与解构要素</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>综合评级 / 等级</label>
+          <select id="form-video-grade">
+            <option value="S">S级 (极佳对标示范)</option>
+            <option value="A" selected>A级 (高质量参考)</option>
+            <option value="B">B级 (及格标准模板)</option>
+            <option value="C">C级 (存在明显硬伤/低评分反面教材)</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>标记为母题标杆案例</label>
+          <select id="form-video-is-benchmark">
+            <option value="false">否</option>
+            <option value="true">设为标杆案例</option>
+          </select>
+        </div>
+        <div class="form-item form-col-full">
+          <label>开头设计 (前3秒抓手/Hook)</label>
+          <input type="text" id="form-video-hook" placeholder="分析开头黄金前3秒的听觉/视觉/冲突悬念抓手">
+        </div>
+        <div class="form-item form-col-full">
+          <label>人物与冲突设置</label>
+          <input type="text" id="form-video-conflict" placeholder="核心对立面与人物身份错位机制">
+        </div>
+        <div class="form-item form-col-full">
+          <label>反转方式 / 戏剧弧线</label>
+          <input type="text" id="form-video-twist" placeholder="剧情反转发生节点及逻辑支撑">
+        </div>
+        <div class="form-item form-col-full">
+          <label>结尾落点</label>
+          <input type="text" id="form-video-ending" placeholder="情绪升华、金句、互动引导或留白设计">
+        </div>
+        <div class="form-item form-col-full">
+          <label>可复用做法 / 核心借鉴结论</label>
+          <textarea id="form-video-takeaway" rows="2" placeholder="总结我们自己拍摄改编时可以直接复用的模式"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+        <div style="display:flex; gap:6px;">
+          <!-- 外部模块对接接口 -->
+          <button class="btn btn-sm" onclick="App.triggerExternalModule('deconstruct')">进入拆解学习 &rarr;</button>
+          <button class="btn btn-sm" onclick="App.triggerExternalModule('adapt-project')">根据此视频创建改编项目 &rarr;</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="App.closeModal('modal-video-edit')">取消</button>
+          <button class="btn btn-primary" onclick="App.saveVideo()">保存视频资料</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 创作者账号 编辑弹窗 -->
+  <div class="drawer-overlay" id="modal-creator-edit" onclick="App.closeOutside(event, 'modal-creator-edit')">
+    <div style="max-width: 540px; background:#fff; margin:50px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg);">
+      <h3 id="creator-modal-title" style="margin-bottom:14px;">收录创作者账号</h3>
+      <div class="form-grid">
+        <div class="form-item form-col-full">
+          <label>账号名称 *</label>
+          <input type="text" id="form-creator-name" placeholder="输入创作者对标账号名称">
+        </div>
+        <div class="form-item">
+          <label>主打平台</label>
+          <select id="form-creator-platform">
+            <option value="抖音">抖音</option>
+            <option value="快手">快手</option>
+            <option value="视频号">视频号</option>
+            <option value="小红书">小红书</option>
+            <option value="Bilibili">Bilibili</option>
+            <option value="全网">全网</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>赛道定位</label>
+          <input type="text" id="form-creator-niche" placeholder="例如：乡村情感逆袭短剧">
+        </div>
+        <div class="form-item form-col-full">
+          <label>主页链接</label>
+          <input type="text" id="form-creator-url" placeholder="https://...">
+        </div>
+        <div class="form-item">
+          <label>作品数量</label>
+          <input type="number" id="form-creator-work-count" min="0" step="1" placeholder="待填">
+        </div>
+        <div class="form-item">
+          <label>粉丝量</label>
+          <input type="number" id="form-creator-follower-count" min="0" step="1" placeholder="待填">
+        </div>
+        <div class="form-item form-col-full">
+          <label>值得研究的原因</label>
+          <textarea id="form-creator-reason" rows="3" placeholder="例如：脚本前三秒钩子转化率高，单人演绎多角冲突手法成熟"></textarea>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn" onclick="App.closeModal('modal-creator-edit')">取消</button>
+        <button class="btn btn-primary" onclick="App.saveCreator()">保存账号</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 使用说明与研究方法 弹窗 -->
+  <div class="drawer-overlay" id="modal-methodology" onclick="App.closeOutside(event, 'modal-methodology')">
+    <div style="max-width: 700px; background:#fff; margin:40px auto; border-radius:var(--radius-lg); padding:24px; box-shadow:var(--shadow-lg); max-height:85vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3>研究方法与使用说明</h3>
+        <button class="btn btn-sm btn-accent" onclick="App.exportMethodologyMarkdown()">导出研究方法 Markdown</button>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+        <button class="btn btn-sm active" id="btn-show-guide" onclick="App.toggleMethodSubTab('guide')">功能使用说明</button>
+        <button class="btn btn-sm" id="btn-show-framework" onclick="App.toggleMethodSubTab('framework')">个人研究方法框架 (可编辑)</button>
+      </div>
+
+      <div id="method-content-guide">
+        <div class="study-section">
+          <div class="study-title">三层结构体系</div>
+          <p style="color:var(--text-muted); font-size:13px;">
+            本系统严格按照：<strong>题材大类 (一级) &rarr; 母题 (二级) &rarr; 对标视频/版本 (三级)</strong> 组织。<br>
+            账号为横向资源，可跨母题关联多条视频。删除大类或账号时，均安全保留母题与视频。
+          </p>
+        </div>
+        <div class="study-section">
+          <div class="study-title">推荐研究心流路径</div>
+          <ol style="margin-left:18px; color:var(--text-muted); font-size:13px; line-height:1.7;">
+            <li>录入爆款视频时，若尚不明确母题，可暂存入<strong>未归类待处理池</strong>；</li>
+            <li>提炼出戏剧共性后，创建<strong>母题</strong>并提炼“故事骨架”与“情绪闭环”；</li>
+            <li>在母题详情中选中多个视频版本进行<strong>横向矩阵对比</strong>，挖掘不同创作者在 Hook、反转与结尾的差异；</li>
+            <li>提炼 S 级视频并标记为<strong>标杆案例</strong>，一键导出 Markdown 研习分析报告。</li>
+          </ol>
+        </div>
+      </div>
+
+      <div id="method-content-framework" style="display:none;">
+        <div class="form-item" style="margin-bottom:12px;">
+          <label>自定义研究框架步骤 (支持持续编辑并保存在本地)：</label>
+          <textarea id="methodology-editor" rows="12" style="font-family:monospace; line-height:1.5;"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="App.saveMethodology()">保存方法论设置</button>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+        <button class="btn" onclick="App.closeModal('modal-methodology')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 通用文本导入/批量导入 弹窗 -->
+  <div class="drawer-overlay" id="modal-batch-import" onclick="App.closeOutside(event, 'modal-batch-import')">
+    <div style="max-width: 600px; background:#fff; margin:50px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg);">
+      <h3 style="margin-bottom:10px;">结构化文本辅助录入视频</h3>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+        每行一条视频，格式格式支持：<code>视频标题 | 视频链接 | 平台(可选)</code>
+      </p>
+      <textarea id="batch-import-text" rows="8" placeholder="示例：
+小伙受辱三年突然亮出董事长身份 | https://v.douyin.com/example1/ | 抖音
+外卖员给流浪汉一盒饭，五年后得到一家公司 | https://v.kuaishou.com/example2/ | 快手" style="width:100%; font-family:monospace;"></textarea>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+        <button class="btn" onclick="App.closeModal('modal-batch-import')">取消</button>
+        <button class="btn btn-primary" onclick="App.processBatchVideoImport()">解析并导入视频</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 创作者导入导出弹窗 -->
+  <div class="drawer-overlay" id="modal-creator-io" onclick="App.closeOutside(event, 'modal-creator-io')">
+    <div style="max-width: 600px; background:#fff; margin:50px auto; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-lg);">
+      <h3 id="creator-io-title" style="margin-bottom:10px;">导入 / 导出账号</h3>
+      <div id="creator-io-body">
+        <textarea id="creator-io-textarea" rows="10" style="width:100%; font-family:monospace;" placeholder="JSON 格式数据..."></textarea>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:14px;">
+        <div id="creator-io-extra-actions" style="display:flex; gap:6px;"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="App.closeModal('modal-creator-io')">关闭</button>
+          <button class="btn btn-primary" id="creator-io-submit-btn">确定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer-overlay" id="modal-video-import" style="z-index:60;" onclick="App.closeOutside(event, 'modal-video-import')">
+    <section role="dialog" aria-modal="true" aria-labelledby="video-import-title" style="max-width:620px; margin:30px auto; padding:20px; background:#fff; border-radius:var(--radius-lg); max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-lg);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
+        <h3 id="video-import-title">导入视频资料</h3>
+        <button class="btn btn-sm" aria-label="关闭导入视频资料" onclick="App.closeModal('modal-video-import')">×</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;">
+        <strong>① 复制提取提示词</strong>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-primary" onclick="App.copyVideoPrompt()">复制提示词</button>
+          <button class="btn" aria-label="设置视频资料提示词" title="设置提示词" onclick="App.toggleVideoPromptSettings()">⚙</button>
+        </div>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin:8px 0 12px;">复制后，连同视频链接和截图发送给 AI。</p>
+      <div id="video-prompt-settings" hidden style="margin-bottom:16px;">
+        <label for="video-prompt-platform">提示词平台</label>
+        <select id="video-prompt-platform" onchange="App.loadVideoPrompt()"><option value="douyin">抖音</option><option value="youtube">YouTube</option><option value="other">其他</option></select>
+        <textarea id="video-prompt-editor" aria-label="视频资料提示词内容" rows="9" style="width:100%; margin:8px 0;"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:8px;"><button class="btn" onclick="App.resetVideoPrompt()">恢复默认</button><button class="btn btn-primary" onclick="App.saveVideoPrompt()">保存提示词</button></div>
+      </div>
+      <strong>② 粘贴提取结果</strong>
+      <p style="font-size:12px; color:var(--text-muted); margin:8px 0;">粘贴 AI 返回的字段，自动回填当前视频资料。</p>
+      <textarea id="video-import-text" aria-label="粘贴视频资料内容" rows="6" style="width:100%;" placeholder="视频标题：…&#10;视频链接：…&#10;账号：…&#10;点赞量：…" onpaste="App.pasteVideoImport(event)"></textarea>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0 16px;">
+        <span id="video-import-status" role="status" style="font-size:12px; color:var(--text-muted);"></span>
+        <button class="btn" onclick="App.applyVideoImport()">识别并回填</button>
+      </div>
+      <strong>③ 检查并完成</strong>
+      <p style="font-size:12px; color:var(--text-muted); margin:8px 0;">回到录入窗口核对字段，确认后再保存视频。</p>
+      <div style="display:flex; justify-content:flex-end;"><button class="btn btn-primary" onclick="App.closeModal('modal-video-import')">返回检查</button></div>
+    </section>
+  </div>
+
+  <!-- 全局轻量提示 Toast -->
+  <div id="toast"></div>
+
+  <script>
+    /**
+     * 短视频创作研究工具 - 对标库系统核心逻辑
+     */
+    const DB_KEY = 'sv_benchmark_hub_v1.0';
+
+    // 默认内置初始化种子数据（仅首次无缓存时载入）
+    const INITIAL_DATA = { categories: [], motifs: [], creators: [], videos: [], methodology: '' };
+
+    // 应用单例
+    const App = {
+      state: {
+        activeTab: 'motifs', // motifs | videos | creators
+        currentMotifId: null, // 抽屉中打开的母题
+        editingMotifId: null,
+        editingVideoId: null,
+        editingCreatorId: null,
+        favFilterActive: false,
+        recentMotifIds: [],
+        currentMotifVideoFilter: 'all', // all | benchmark | low
+        data: null
+      },
+
+      init() {
+        this.loadData();
+        this.populateCategoryDropdowns();
+        this.renderMotifs();
+        this.renderVideos();
+        this.renderCreators();
+        this.renderRecentTags();
+        document.getElementById('methodology-editor').value = this.state.data.methodology || '';
+      },
+
+      // 数据持久化
+      loadData() {
+        const stored = localStorage.getItem(DB_KEY);
+        if (stored) {
+          try {
+            this.state.data = JSON.parse(stored);
+          } catch(e) {
+            console.error('读取持久化数据异常，使用内置数据兜底', e);
+            this.state.data = JSON.parse(JSON.stringify(INITIAL_DATA));
+          }
+        } else {
+          this.state.data = JSON.parse(JSON.stringify(INITIAL_DATA));
+          this.persist();
+        }
+        // 确保数组健康
+        if (!this.state.data.categories) this.state.data.categories = [];
+        if (!this.state.data.motifs) this.state.data.motifs = [];
+        if (!this.state.data.videos) this.state.data.videos = [];
+        if (!this.state.data.creators) this.state.data.creators = [];
+      },
+
+      persist() {
+        localStorage.setItem(DB_KEY, JSON.stringify(this.state.data));
+      },
+
+      showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+      },
+
+      // 视图 Tab 切换
+      switchMainTab(tab) {
+        this.state.activeTab = tab;
+        document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+
+        document.getElementById('view-motifs').style.display = tab === 'motifs' ? 'block' : 'none';
+        document.getElementById('view-videos').style.display = tab === 'videos' ? 'block' : 'none';
+        document.getElementById('view-creators').style.display = tab === 'creators' ? 'block' : 'none';
+
+        if (tab === 'videos') this.renderVideos();
+        if (tab === 'creators') this.renderCreators();
+        if (tab === 'motifs') this.renderMotifs();
+      },
+
+      // 大类下拉联动
+      populateCategoryDropdowns() {
+        const cats = this.state.data.categories;
+
+        // 1. 母题筛选大类
+        const filterCat = document.getElementById('motif-category-filter');
+        if (!['ALL', 'UNCLASSIFIED', ...cats.map(c => c.id)].includes(filterCat.value)) filterCat.value = 'ALL';
+        this.renderCategoryButtons();
+
+        // 2. 母题编辑表单大类
+        const formCat = document.getElementById('form-motif-category');
+        formCat.innerHTML = '<option value="">(未分类)</option>' +
+          cats.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+
+        // 3. 联动二级母题下拉选项
+        this.updateMotifSelectFilter();
+        // 4. 视频表单中的母题选项
+        this.updateVideoMotifOptions();
+      },
+
+      updateMotifSelectFilter() {
+        const catVal = document.getElementById('motif-category-filter').value;
+        const motifSelect = document.getElementById('motif-select-filter');
+        let motifs = this.state.data.motifs;
+
+        if (catVal === 'UNCLASSIFIED') {
+          motifs = motifs.filter(m => !m.categoryId);
+        } else if (catVal !== 'ALL') {
+          motifs = motifs.filter(m => m.categoryId === catVal);
+        }
+
+        motifSelect.innerHTML = '<option value="ALL">全部母题</option>' +
+          motifs.map(m => `<option value="${m.id}">${this.escapeHtml(m.name)}</option>`).join('');
+      },
+
+      updateVideoMotifOptions() {
+        const motifs = this.state.data.motifs;
+        const videoFormMotif = document.getElementById('form-video-motif');
+        videoFormMotif.innerHTML = '<option value="">-- 暂不归类 (进入待整理池) --</option>' +
+          motifs.map(m => `<option value="${m.id}">${this.escapeHtml(m.name)}</option>`).join('');
+
+        const videoFilterMotif = document.getElementById('video-motif-filter');
+        videoFilterMotif.innerHTML = '<option value="ALL">全部母题</option><option value="UNASSIGNED">尚未归类 (待整理)</option>' +
+          motifs.map(m => `<option value="${m.id}">${this.escapeHtml(m.name)}</option>`).join('');
+      },
+
+      updateVideoCreatorOptions() {
+        const creators = this.state.data.creators;
+        const videoFormCreator = document.getElementById('form-video-creator');
+        videoFormCreator.innerHTML = '<option value="">-- 不关联任何账号 --</option>' +
+          creators.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)} (${c.platform})</option>`).join('');
+
+        const videoFilterCreator = document.getElementById('video-creator-filter');
+        videoFilterCreator.innerHTML = '<option value="ALL">全部账号</option>' +
+          creators.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+      },
+
+      renderCategoryButtons() {
+        const container = document.getElementById('motif-category-options');
+        const selected = document.getElementById('motif-category-filter').value;
+        container.replaceChildren();
+        [{ id: 'ALL', name: '全部' }, ...this.state.data.categories, { id: 'UNCLASSIFIED', name: '未分类' }].forEach(category => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = category.name;
+          button.setAttribute('aria-pressed', String(category.id === selected));
+          button.onclick = () => {
+            document.getElementById('motif-category-filter').value = category.id;
+            this.onCategoryFilterChange();
+          };
+          container.appendChild(button);
+        });
+      },
+
+      onCategoryFilterChange() {
+        this.renderCategoryButtons();
+        this.updateMotifSelectFilter();
+        this.renderMotifs();
+      },
+
+      resetMotifFilters() {
+        document.getElementById('motif-search').value = '';
+        document.getElementById('motif-category-filter').value = 'ALL';
+        this.renderCategoryButtons();
+        this.updateMotifSelectFilter();
+        document.getElementById('motif-select-filter').value = 'ALL';
+        this.state.favFilterActive = false;
+        document.getElementById('motif-fav-toggle').classList.remove('btn-primary');
+        this.renderMotifs();
+      },
+
+      toggleFavFilter() {
+        this.state.favFilterActive = !this.state.favFilterActive;
+        const btn = document.getElementById('motif-fav-toggle');
+        if (this.state.favFilterActive) {
+          btn.classList.add('btn-primary');
+        } else {
+          btn.classList.remove('btn-primary');
+        }
+        this.renderMotifs();
+      },
+
+      toggleFavoriteMotif(id, e) {
+        if (e) e.stopPropagation();
+        const m = this.state.data.motifs.find(item => item.id === id);
+        if (m) {
+          m.isFavorite = !m.isFavorite;
+          this.persist();
+          this.renderMotifs();
+          this.showToast(m.isFavorite ? '已加入收藏' : '已取消收藏');
+        }
+      },
+
+      recordMotifVisit(id) {
+        this.state.recentMotifIds = this.state.recentMotifIds.filter(x => x !== id);
+        this.state.recentMotifIds.unshift(id);
+        if (this.state.recentMotifIds.length > 5) this.state.recentMotifIds.pop();
+        this.persist();
+        this.renderRecentTags();
+      },
+
+      renderRecentTags() {
+        const container = document.getElementById('recent-visited-tags');
+        if (this.state.recentMotifIds.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+        const html = '<span style="font-size:12px; color:var(--text-light);">最近访问:</span>' +
+          this.state.recentMotifIds.map(id => {
+            const m = this.state.data.motifs.find(x => x.id === id);
+            if (!m) return '';
+            return `<button class="btn btn-sm" style="font-size:11px; padding:2px 6px;" onclick="App.openMotifDrawer('${m.id}')">${this.escapeHtml(m.name.substring(0, 8))}...</button>`;
+          }).join('');
+        container.innerHTML = html;
+      },
+
+      // 渲染母题卡片流
+      renderMotifs() {
+        const query = document.getElementById('motif-search').value.trim().toLowerCase();
+        const catFilter = document.getElementById('motif-category-filter').value;
+        const motifSpecific = document.getElementById('motif-select-filter').value;
+        const sortMode = document.getElementById('motif-sort').value;
+
+        let list = [...this.state.data.motifs];
+        const totalCount = list.length;
+        document.getElementById('motif-total-count').innerText = totalCount;
+
+        // 筛选
+        if (this.state.favFilterActive) {
+          list = list.filter(m => m.isFavorite);
+        }
+
+        if (catFilter === 'UNCLASSIFIED') {
+          list = list.filter(m => !m.categoryId);
+        } else if (catFilter !== 'ALL') {
+          list = list.filter(m => m.categoryId === catFilter);
+        }
+
+        if (motifSpecific !== 'ALL') {
+          list = list.filter(m => m.id === motifSpecific);
+        }
+
+        if (query) {
+          list = list.filter(m => {
+            const n = (m.name || '').toLowerCase();
+            const s = (m.skeleton || '').toLowerCase();
+            const t = (m.tags || []).join(' ').toLowerCase();
+            return n.includes(query) || s.includes(query) || t.includes(query);
+          });
+        }
+
+        // 计算关联视频数
+        const countMap = {};
+        this.state.data.videos.forEach(v => {
+          if (v.motifId) {
+            countMap[v.motifId] = (countMap[v.motifId] || 0) + 1;
+          }
+        });
+
+        // 排序
+        if (sortMode === 'updated') {
+          list.sort((a,b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        } else if (sortMode === 'videoCount') {
+          list.sort((a,b) => (countMap[b.id] || 0) - (countMap[a.id] || 0));
+        } else if (sortMode === 'name') {
+          list.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'zh-CN'));
+        }
+
+        document.getElementById('motif-match-count').innerText = list.length;
+        const container = document.getElementById('motif-card-list');
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="empty-placeholder" style="grid-column: 1 / -1;">
+              <h4>没有找到匹配的母题</h4>
+              <p>可以尝试调整筛选条件、重置关键词，或者立即新建一个全新母题进行研究。</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = list.map(m => {
+          const vCount = countMap[m.id] || 0;
+          const cat = this.state.data.categories.find(c => c.id === m.categoryId);
+          const catName = cat ? cat.name : '未分类大类';
+          const tags = Array.isArray(m.tags) ? m.tags : [];
+
+          return `
+            <div class="card" onclick="App.openMotifDrawer('${m.id}')">
+              <div>
+                <div class="card-header">
+                  <div class="card-title-wrap">
+                    <span class="card-category">${this.escapeHtml(catName)}</span>
+                    <div class="card-title" title="查看研习详情">
+                      ${this.escapeHtml(m.name)}
+                    </div>
+                  </div>
+                  <button class="star-btn ${m.isFavorite ? 'active' : ''}" title="收藏母题" onclick="App.toggleFavoriteMotif('${m.id}', event)">
+                    ★
+                  </button>
+                </div>
+
+                <div class="card-desc" title="${this.escapeHtml(m.skeleton || '')}">
+                  ${this.escapeHtml(m.skeleton || '暂未录入故事骨架摘要...')}
+                </div>
+
+                <div class="tag-cloud">
+                  ${tags.map(t => `<span class="tag">${this.escapeHtml(t)}</span>`).join('')}
+                </div>
+              </div>
+
+              <div class="card-footer" onclick="event.stopPropagation()">
+                <span style="font-size:12px; color:var(--text-muted);">
+                  关联视频: <strong style="color:var(--text-main);">${vCount}</strong> 个版本
+                </span>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn btn-sm btn-primary" onclick="App.openMotifDrawer('${m.id}')">详情研习</button>
+                  <button class="btn btn-sm" onclick="App.openMotifEditModal('${m.id}')">编辑</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      // 母题抽屉逻辑
+      openMotifDrawer(id) {
+        const m = this.state.data.motifs.find(x => x.id === id);
+        if (!m) return;
+        this.state.currentMotifId = id;
+        this.recordMotifVisit(id);
+
+        const cat = this.state.data.categories.find(c => c.id === m.categoryId);
+        document.getElementById('dm-category').innerText = cat ? cat.name : '未分类';
+        document.getElementById('dm-name').innerText = m.name;
+        document.getElementById('dm-skeleton').innerText = m.skeleton || '（未填写故事骨架摘要）';
+        document.getElementById('dm-roles').innerText = m.roles || '待补充';
+        document.getElementById('dm-logic').innerText = m.logic || '待补充';
+        document.getElementById('dm-emotion').innerText = m.emotion || '待补充';
+        document.getElementById('dm-theme').innerText = m.theme || '待补充';
+
+        const tags = Array.isArray(m.tags) ? m.tags : [];
+        document.getElementById('dm-adapt-tags').innerHTML = tags.length > 0
+          ? tags.map(t => `<span class="tag" style="background:#e0e7ff; color:#3730a3; border-color:#c7d2fe;">${this.escapeHtml(t)}</span>`).join('')
+          : '<span style="color:var(--text-light); font-size:12px;">暂无改编标签</span>';
+
+        // 隐藏对比表
+        document.getElementById('compare-result-area').style.display = 'none';
+        this.state.currentMotifVideoFilter = 'all';
+
+        this.renderMotifDrawerVideos();
+
+        document.getElementById('drawer-motif-overlay').classList.add('open');
+        document.getElementById('drawer-motif').classList.add('open');
+      },
+
+      closeMotifDrawerForce() {
+        document.getElementById('drawer-motif-overlay').classList.remove('open');
+        document.getElementById('drawer-motif').classList.remove('open');
+      },
+
+      closeMotifDrawer(e) {
+        if (e.target.id === 'drawer-motif-overlay') {
+          this.closeMotifDrawerForce();
+        }
+      },
+
+      filterMotifVideos(type) {
+        this.state.currentMotifVideoFilter = type;
+        this.renderMotifDrawerVideos();
+      },
+
+      renderMotifDrawerVideos() {
+        const motifId = this.state.currentMotifId;
+        let vids = this.state.data.videos.filter(v => v.motifId === motifId);
+        document.getElementById('dm-video-count').innerText = vids.length;
+
+        if (this.state.currentMotifVideoFilter === 'benchmark') {
+          vids = vids.filter(v => v.isBenchmark === true);
+        } else if (this.state.currentMotifVideoFilter === 'low') {
+          vids = vids.filter(v => v.grade === 'C' || v.grade === 'B');
+        }
+
+        const tbody = document.getElementById('dm-videos-tbody');
+        if (vids.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">当前筛选下暂无关联视频</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = vids.map(v => {
+          const crt = this.state.data.creators.find(c => c.id === v.creatorId);
+          const crtName = crt ? crt.name : (v.creatorName || '未关联');
+          const gradeClass = `badge-grade-${v.grade || 'B'}`;
+
+          return `
+            <tr>
+              <td><input type="checkbox" class="compare-checkbox" value="${v.id}"></td>
+              <td>
+                <div style="font-weight:600; color:var(--text-main);">${this.escapeHtml(v.title)}</div>
+                ${v.url ? `<a href="${v.url}" target="_blank" style="font-size:11px; color:var(--primary); text-decoration:none;">打开播放链接 &nearr;</a>` : ''}
+              </td>
+              <td>${this.escapeHtml(crtName)}</td>
+              <td><span class="badge ${gradeClass}">${v.grade || 'B'}级</span></td>
+              <td><span style="font-size:12px; color:var(--text-muted);">${this.escapeHtml(v.tags || '-')}</span></td>
+              <td>
+                <button class="btn btn-sm ${v.isBenchmark ? 'badge-benchmark' : ''}" style="font-size:11px; padding:2px 6px;" onclick="App.toggleVideoBenchmark('${v.id}')">
+                  ${v.isBenchmark ? '★ 标杆' : '设为标杆'}
+                </button>
+              </td>
+              <td>
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-sm" onclick="App.openVideoEditModal('${v.id}')">编辑</button>
+                  <button class="btn btn-sm btn-danger" onclick="App.deleteVideo('${v.id}')">删除</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      },
+
+      toggleVideoBenchmark(videoId) {
+        const v = this.state.data.videos.find(x => x.id === videoId);
+        if (v) {
+          v.isBenchmark = !v.isBenchmark;
+          this.persist();
+          this.renderMotifDrawerVideos();
+          this.renderVideos();
+          this.showToast(v.isBenchmark ? '已标记为标杆案例' : '已移出标杆案例');
+        }
+      },
+
+      toggleAllCompare(master) {
+        document.querySelectorAll('.compare-checkbox').forEach(cb => {
+          cb.checked = master.checked;
+        });
+      },
+
+      // 横向版本对比执行
+      openCompareView() {
+        const checkedBoxes = Array.from(document.querySelectorAll('.compare-checkbox:checked'));
+        if (checkedBoxes.length < 2) {
+          alert('请至少勾选 2 个视频版本进行横向解构对比！');
+          return;
+        }
+        const ids = checkedBoxes.map(b => b.value);
+        const selectedVideos = this.state.data.videos.filter(v => ids.includes(v.id));
+
+        const table = document.getElementById('compare-matrix-table');
+
+        // 维度定义
+        const dimensions = [
+          { key: 'title', label: '视频名称 / 链接', render: (v) => `<strong>${this.escapeHtml(v.title)}</strong><br>${v.url ? `<a href="${v.url}" target="_blank" style="font-size:11px; color:var(--primary);">平台源链接</a>` : ''}` },
+          { key: 'creator', label: '创作者与平台', render: (v) => {
+            const crt = this.state.data.creators.find(c => c.id === v.creatorId);
+            return `${crt ? this.escapeHtml(crt.name) : '独立创作者'} <span class="badge">${v.platform || '全网'}</span>`;
+          }},
+          { key: 'hook', label: '开头设计 (Hook)', render: (v) => v.hook || '<span style="color:var(--text-light)">待补充</span>' },
+          { key: 'conflict', label: '人物与冲突', render: (v) => v.conflict || '<span style="color:var(--text-light)">待补充</span>' },
+          { key: 'twist', label: '反转方式', render: (v) => v.twist || '<span style="color:var(--text-light)">待补充</span>' },
+          { key: 'ending', label: '结尾落点', render: (v) => v.ending || '<span style="color:var(--text-light)">待补充</span>' },
+          { key: 'metrics', label: '表现数据', render: (v) => {
+            const views = v.views !== null && v.views !== undefined ? `${v.views.toLocaleString()} 播放` : '播放待填';
+            const likes = v.likes !== null && v.likes !== undefined ? `${v.likes.toLocaleString()} 点赞` : '点赞待填';
+            return `${views}<br>${likes}`;
+          }},
+          { key: 'takeaway', label: '可借鉴之处', render: (v) => `<div style="background:#f0fdf4; padding:6px; border-radius:4px; color:#166534; font-size:12px;">${this.escapeHtml(v.takeaway || '待补充')}</div>` }
+        ];
+
+        let headerHtml = `<thead><tr><th>对比维度</th>` + selectedVideos.map(v => `<th>${this.escapeHtml(v.title.substring(0, 16))}...</th>`).join('') + `</tr></thead>`;
+        let bodyHtml = `<tbody>` + dimensions.map(d => {
+          return `<tr>
+            <td>${d.label}</td>
+            ${selectedVideos.map(v => `<td>${d.render(v)}</td>`).join('')}
+          </tr>`;
+        }).join('') + `</tbody>`;
+
+        table.innerHTML = headerHtml + bodyHtml;
+        const resArea = document.getElementById('compare-result-area');
+        resArea.style.display = 'block';
+        resArea.scrollIntoView({ behavior: 'smooth' });
+      },
+
+      // 导出母题 Markdown 报告
+      exportMotifMarkdown() {
+        const m = this.state.data.motifs.find(x => x.id === this.state.currentMotifId);
+        if (!m) return;
+        const cat = this.state.data.categories.find(c => c.id === m.categoryId);
+        const vids = this.state.data.videos.filter(v => v.motifId === m.id);
+
+        let md = `# 短视频母题研习报告：${m.name}\n\n`;
+        md += `- **所属题材大类**：${cat ? cat.name : '未分类'}\n`;
+        md += `- **生成时间**：${new Date().toLocaleString()}\n`;
+        md += `- **改编方向**：${(m.tags || []).join(', ') || '未标注'}\n\n`;
+        md += `## 一、核心戏剧模型\n`;
+        md += `### 1. 故事骨架摘要\n${m.skeleton || '无'}\n\n`;
+        md += `### 2. 角色功能配置\n${m.roles || '无'}\n\n`;
+        md += `### 3. 情节逻辑与冲突机制\n${m.logic || '无'}\n\n`;
+        md += `### 4. 情绪闭环\n${m.emotion || '无'}\n\n`;
+        md += `### 5. 主题思想\n${m.theme || '无'}\n\n`;
+        md += `## 二、收录视频版本清单 (${vids.length} 个)\n\n`;
+
+        vids.forEach((v, idx) => {
+          md += `### 版本 ${idx+1}: ${v.title} (${v.isBenchmark ? '【标杆案例】' : ''}${v.grade || 'B'}级)\n`;
+          md += `- **平台**：${v.platform} | **链接**：${v.url || '暂无'}\n`;
+          md += `- **开头抓手 (Hook)**：${v.hook || '待补充'}\n`;
+          md += `- **冲突设置**：${v.conflict || '待补充'}\n`;
+          md += `- **反转方式**：${v.twist || '待补充'}\n`;
+          md += `- **结尾落点**：${v.ending || '待补充'}\n`;
+          md += `- **可复用借鉴结论**：${v.takeaway || '待补充'}\n\n`;
+        });
+
+        this.downloadFile(`${m.name}_母题研究报告.md`, md);
+        this.showToast('母题分析报告已导出为 Markdown');
+      },
+
+      // 母题表单
+      openMotifEditModal(motifId) {
+        this.state.editingMotifId = motifId || null;
+        this.populateCategoryDropdowns();
+        const modal = document.getElementById('modal-motif-edit');
+        const title = document.getElementById('motif-modal-title');
+
+        if (motifId) {
+          const m = this.state.data.motifs.find(x => x.id === motifId);
+          if (!m) return;
+          title.innerText = '编辑母题';
+          document.getElementById('form-motif-name').value = m.name || '';
+          document.getElementById('form-motif-category').value = m.categoryId || '';
+          document.getElementById('form-motif-skeleton').value = m.skeleton || '';
+          document.getElementById('form-motif-roles').value = m.roles || '';
+          document.getElementById('form-motif-logic').value = m.logic || '';
+          document.getElementById('form-motif-emotion').value = m.emotion || '';
+          document.getElementById('form-motif-theme').value = m.theme || '';
+          document.getElementById('form-motif-tags').value = (m.tags || []).join(', ');
+          document.getElementById('form-motif-adaptation').value = m.adaptationDirection || '';
+        } else {
+          title.innerText = '建立新母题';
+          document.getElementById('form-motif-name').value = '';
+          // 若当前筛选了大类，则自动带入
+          const curCat = document.getElementById('motif-category-filter').value;
+          document.getElementById('form-motif-category').value = (curCat !== 'ALL' && curCat !== 'UNCLASSIFIED') ? curCat : '';
+          document.getElementById('form-motif-skeleton').value = '';
+          document.getElementById('form-motif-roles').value = '';
+          document.getElementById('form-motif-logic').value = '';
+          document.getElementById('form-motif-emotion').value = '';
+          document.getElementById('form-motif-theme').value = '';
+          document.getElementById('form-motif-tags').value = '';
+          document.getElementById('form-motif-adaptation').value = '';
+        }
+        modal.classList.add('open');
+      },
+
+      editCurrentDrawerMotif() {
+        this.openMotifEditModal(this.state.currentMotifId);
+      },
+
+      saveMotif() {
+        const name = document.getElementById('form-motif-name').value.trim();
+        const skeleton = document.getElementById('form-motif-skeleton').value.trim();
+        const categoryId = document.getElementById('form-motif-category').value;
+        const roles = document.getElementById('form-motif-roles').value.trim();
+        const logic = document.getElementById('form-motif-logic').value.trim();
+        const emotion = document.getElementById('form-motif-emotion').value.trim();
+        const theme = document.getElementById('form-motif-theme').value.trim();
+        const tagStr = document.getElementById('form-motif-tags').value.trim();
+        const adaptationDirection = document.getElementById('form-motif-adaptation').value.trim();
+        const tags = tagStr ? tagStr.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
+
+        if (!name) { alert('请输入母题名称！'); return; }
+        if (!skeleton) { alert('请输入核心故事骨架摘要！'); return; }
+
+        if (this.state.editingMotifId) {
+          const m = this.state.data.motifs.find(x => x.id === this.state.editingMotifId);
+          if (m) {
+            m.name = name;
+            m.skeleton = skeleton;
+            m.categoryId = categoryId;
+            m.roles = roles;
+            m.logic = logic;
+            m.emotion = emotion;
+            m.theme = theme;
+            m.tags = tags;
+            m.adaptationDirection = adaptationDirection;
+            m.updatedAt = new Date().toISOString();
+          }
+          this.showToast('母题资料已更新');
+        } else {
+          const newMotif = {
+            id: 'mot-' + Date.now(),
+            name,
+            skeleton,
+            categoryId,
+            roles,
+            logic,
+            emotion,
+            theme,
+            tags,
+            adaptationDirection,
+            isFavorite: false,
+            updatedAt: new Date().toISOString()
+          };
+          this.state.data.motifs.unshift(newMotif);
+          this.showToast('新母题已创建');
+        }
+
+        this.persist();
+        this.closeModal('modal-motif-edit');
+        this.populateCategoryDropdowns();
+        this.renderMotifs();
+
+        if (this.state.currentMotifId && this.state.currentMotifId === this.state.editingMotifId) {
+          this.openMotifDrawer(this.state.currentMotifId);
+        }
+      },
+
+      // 大类维护
+      openCategoryModal() {
+        this.renderCategoryMgrList();
+        document.getElementById('modal-category-mgr').classList.add('open');
+      },
+
+      renderCategoryMgrList() {
+        const tbody = document.getElementById('category-mgr-tbody');
+        const cats = this.state.data.categories;
+
+        tbody.innerHTML = cats.map(c => {
+          const count = this.state.data.motifs.filter(m => m.categoryId === c.id).length;
+          return `
+            <tr>
+              <td><strong>${this.escapeHtml(c.name)}</strong></td>
+              <td>${count} 个母题</td>
+              <td>
+                <button class="btn btn-sm" onclick="App.renameCategory('${c.id}')">重命名</button>
+                <button class="btn btn-sm btn-danger" onclick="App.deleteCategory('${c.id}')">删除</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      },
+
+      addNewCategory() {
+        const input = document.getElementById('new-category-name');
+        const name = input.value.trim();
+        if (!name) { alert('大类名称不能为空！'); return; }
+        if (this.state.data.categories.some(c => c.name === name)) {
+          alert('已存在同名题材大类！');
+          return;
+        }
+
+        const newCat = { id: 'cat-' + Date.now(), name };
+        this.state.data.categories.push(newCat);
+        this.persist();
+        input.value = '';
+        this.renderCategoryMgrList();
+        this.populateCategoryDropdowns();
+        this.renderMotifs();
+        this.showToast('已新增大类：' + name);
+      },
+
+      renameCategory(id) {
+        const c = this.state.data.categories.find(x => x.id === id);
+        if (!c) return;
+        const newName = prompt('请输入大类的新名称：', c.name);
+        if (newName === null) return;
+        const trimmed = newName.trim();
+        if (!trimmed) { alert('名称不能为空！'); return; }
+        if (this.state.data.categories.some(x => x.id !== id && x.name === trimmed)) {
+          alert('与其他大类名称重复！');
+          return;
+        }
+
+        c.name = trimmed;
+        this.persist();
+        this.renderCategoryMgrList();
+        this.populateCategoryDropdowns();
+        this.renderMotifs();
+        this.showToast('大类名称已更新');
+      },
+
+      deleteCategory(id) {
+        const c = this.state.data.categories.find(x => x.id === id);
+        if (!c) return;
+        const attachedMotifs = this.state.data.motifs.filter(m => m.categoryId === id);
+
+        if (attachedMotifs.length > 0) {
+          const opt = confirm(
+            `大类【${c.name}】下包含 ${attachedMotifs.length} 个母题！\n` +
+            `删除后，这些母题将被转入【未分类】状态（不会连带删除母题及视频）。\n确定要继续删除吗？`
+          );
+          if (!opt) return;
+
+          attachedMotifs.forEach(m => {
+            m.categoryId = '';
+          });
+        } else {
+          if (!confirm(`确定删除大类【${c.name}】吗？`)) return;
+        }
+
+        this.state.data.categories = this.state.data.categories.filter(x => x.id !== id);
+        this.persist();
+        this.renderCategoryMgrList();
+        this.populateCategoryDropdowns();
+        this.renderMotifs();
+        this.showToast('大类已删除，关联母题已转入未分类');
+      },
+
+      // 视频库渲染与管理
+      renderVideos() {
+        const query = document.getElementById('video-search').value.trim().toLowerCase();
+        const plat = document.getElementById('video-platform-filter').value;
+        const motifF = document.getElementById('video-motif-filter').value;
+        const creatorF = document.getElementById('video-creator-filter').value;
+
+        this.updateVideoCreatorOptions();
+
+        let list = [...this.state.data.videos];
+        const unassignedCount = list.filter(v => !v.motifId).length;
+        const unassignedBadge = document.getElementById('unassigned-badge-wrap');
+        if (unassignedCount > 0) {
+          unassignedBadge.innerHTML = `<span class="badge" style="background:#fee2e2; color:#b91c1c;">⚠️ ${unassignedCount} 条视频尚未归入母题 (点击速查)</span>`;
+        } else {
+          unassignedBadge.innerHTML = `<span class="badge" style="background:#f1f5f9; color:var(--text-muted);">全部视频已归类</span>`;
+        }
+
+        if (plat !== 'ALL') {
+          list = list.filter(v => v.platform === plat);
+        }
+
+        if (motifF === 'UNASSIGNED') {
+          list = list.filter(v => !v.motifId);
+        } else if (motifF !== 'ALL') {
+          list = list.filter(v => v.motifId === motifF);
+        }
+
+        if (creatorF !== 'ALL') {
+          list = list.filter(v => v.creatorId === creatorF);
+        }
+
+        if (query) {
+          list = list.filter(v => {
+            const t = (v.title || '').toLowerCase();
+            const tags = (v.tags || '').toLowerCase();
+            const take = (v.takeaway || '').toLowerCase();
+            return t.includes(query) || tags.includes(query) || take.includes(query);
+          });
+        }
+
+        document.getElementById('video-match-count').innerText = list.length;
+        const tbody = document.getElementById('video-table-body');
+
+        if (list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">没有检索到符合条件的视频版本</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list.map(v => {
+          const m = this.state.data.motifs.find(x => x.id === v.motifId);
+          const crt = this.state.data.creators.find(x => x.id === v.creatorId);
+          const count = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+            ? Number(value).toLocaleString('zh-CN') : '<span style="color:var(--text-light)">待填</span>';
+
+          return `
+            <tr>
+              <td>
+                <div style="font-weight:600; color:var(--text-main); max-width:320px;">${this.escapeHtml(v.title)}</div>
+                <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
+                  ${v.url ? `<a href="${v.url}" target="_blank" style="font-size:11px; color:var(--primary); text-decoration:none;">播放链接 &nearr;</a>` : ''}
+                  <button class="btn btn-sm" style="width:24px; height:24px; padding:0;" aria-label="复制资料" title="复制资料" onclick="App.copyVideoInfo('${v.id}')"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>
+                  ${v.isBenchmark ? '<span class="badge badge-benchmark">标杆案例</span>' : ''}
+                </div>
+              </td>
+              <td>
+                <div>${m ? `<a href="javascript:void(0)" onclick="App.openMotifDrawer('${m.id}')" style="color:var(--primary); font-weight:500; text-decoration:none;">${this.escapeHtml(m.name)}</a>` : '<span style="color:var(--danger); font-size:12px; font-weight:600;">[未归类待整理]</span>'}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px; overflow-wrap:anywhere;">${this.escapeHtml(m?.adaptationDirection || '未填写改编方向')}</div>
+              </td>
+              <td>
+                <div>${crt ? this.escapeHtml(crt.name) : v.creatorName ? this.escapeHtml(v.creatorName) : '<span style="color:var(--text-light)">无关联</span>'}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${this.escapeHtml(crt?.platform || v.platform || '待填')}</div>
+              </td>
+              <td>
+                <div style="font-size:12px; line-height:1.7;">
+                  <div>点赞量：${count(v.likes)}</div>
+                  <div style="white-space:nowrap;">作：${count(crt?.workCount)} / 粉：${count(crt?.followerCount)}</div>
+                </div>
+              </td>
+              <td><span class="badge badge-grade-${v.grade || 'B'}">${v.grade || 'B'}级</span></td>
+              <td>
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-sm" style="width:30px; height:30px; padding:0;" aria-label="编辑" title="编辑" onclick="App.openVideoEditModal('${v.id}')"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 5 5-13 13H3v-5L16 3Z"/><path d="m14 5 5 5"/></svg></button>
+                  <button class="btn btn-sm btn-danger" style="width:30px; height:30px; padding:0;" aria-label="删除" title="删除" onclick="App.deleteVideo('${v.id}')"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      },
+
+      filterUnassignedVideos() {
+        document.getElementById('video-motif-filter').value = 'UNASSIGNED';
+        this.renderVideos();
+      },
+
+      addVideoForCurrentMotif() {
+        this.openVideoEditModal(null, this.state.currentMotifId);
+      },
+
+      openVideoImport() {
+        const platform = document.getElementById('form-video-platform').value;
+        document.getElementById('video-prompt-platform').value = platform === '抖音' ? 'douyin' : platform === 'YouTube' ? 'youtube' : 'other';
+        document.getElementById('video-prompt-settings').hidden = true;
+        document.getElementById('video-import-text').value = '';
+        document.getElementById('video-import-status').textContent = '';
+        this.loadVideoPrompt();
+        document.getElementById('modal-video-import').classList.add('open');
+      },
+      loadVideoPrompt() {
+        document.getElementById('video-prompt-editor').value = window.parent[window.name].getVideoPrompt(document.getElementById('video-prompt-platform').value);
+      },
+      toggleVideoPromptSettings() {
+        const settings = document.getElementById('video-prompt-settings');
+        settings.hidden = !settings.hidden;
+      },
+      saveVideoPrompt() {
+        window.parent[window.name].saveVideoPrompt(document.getElementById('video-prompt-platform').value, document.getElementById('video-prompt-editor').value);
+        this.showToast('视频资料提示词已保存');
+      },
+      resetVideoPrompt() {
+        document.getElementById('video-prompt-editor').value = window.parent[window.name].resetVideoPrompt(document.getElementById('video-prompt-platform').value);
+        this.showToast('已恢复默认提示词');
+      },
+      async copyVideoPrompt() {
+        let prompt = document.getElementById('video-prompt-editor').value;
+        const url = document.getElementById('form-video-url').value.trim();
+        if (prompt.includes('{{视频链接}}')) prompt = prompt.replaceAll('{{视频链接}}', url);
+        else if (url) prompt += '\n\n视频链接：' + url;
+        try { await navigator.clipboard.writeText(prompt); this.showToast('提示词已复制，连同视频链接和截图发送给 AI'); }
+        catch { document.getElementById('video-prompt-settings').hidden = false; this.showToast('复制失败，请手动复制提示词'); }
+      },
+      pasteVideoImport(event) {
+        event.preventDefault();
+        document.getElementById('video-import-text').value = event.clipboardData.getData('text/plain');
+        this.applyVideoImport();
+      },
+      applyVideoImport() {
+        const text = document.getElementById('video-import-text').value;
+        const { metadata } = window.parent[window.name].parseVideoImport(text, document.getElementById('form-video-url').value);
+        const status = document.getElementById('video-import-status');
+        if (!Object.keys(metadata).length) { status.textContent = '未识别到有效字段，请按“字段名：内容”格式粘贴。'; return; }
+        this.state.videoImportedMetadata = { ...this.state.videoImportedMetadata, ...metadata };
+        const fields = { 'benchmark-video-title':'form-video-title', 'benchmark-video-url':'form-video-url', 'benchmark-video-tags':'form-video-tags', 'benchmark-video-duration':'form-video-duration' };
+        for (const [key, id] of Object.entries(fields)) if (metadata[key]) document.getElementById(id).value = metadata[key];
+        const metrics = { 'benchmark-view-count':'form-video-views', 'benchmark-like-count':'form-video-likes', 'benchmark-comment-count':'form-video-comments', 'benchmark-favorite-count':'form-video-collects', 'benchmark-share-count':'form-video-shares' };
+        for (const [key, id] of Object.entries(metrics)) {
+          if (!metadata[key]) continue;
+          const match = metadata[key].replace(/,/g,'').match(/^([\d.]+)\s*(万|亿|[kKmMwW])?$/);
+          if (match) document.getElementById(id).value = Number(match[1]) * ({万:10000,亿:1e8,k:1000,m:1e6,w:10000}[match[2]?.toLowerCase()] || 1);
+        }
+        this.updateVideoPlatform();
+        this.showVideoImportExtra();
+        status.textContent = `已回填 ${Object.keys(metadata).length} 个字段，请返回检查。`;
+      },
+      showVideoImportExtra() {
+        const meta = this.state.videoImportedMetadata || {};
+        const values = [ ['账号',meta['benchmark-author'] || meta['benchmark-channel-name']], ['账号链接',meta['benchmark-author-url'] || meta['benchmark-channel-url']], ['发布时间',meta['benchmark-published-at']], ['背景音乐',meta['benchmark-background-music']] ].filter(([,value]) => value);
+        const element = document.getElementById('video-import-extra');
+        element.style.display = values.length ? 'block' : 'none';
+        element.textContent = values.map(([label,value]) => `${label}：${value}`).join(' · ');
+      },
+
+      detectLinkPlatform(value) {
+        try {
+          const host = new URL(value.trim()).hostname.toLowerCase();
+          const matches = domain => host === domain || host.endsWith('.' + domain);
+          if (matches('douyin.com') || matches('iesdouyin.com')) return '抖音';
+          if (matches('kuaishou.com') || matches('gifshow.com')) return '快手';
+          if (matches('xiaohongshu.com') || matches('xhslink.com')) return '小红书';
+          if (matches('bilibili.com') || matches('b23.tv')) return 'Bilibili';
+          if (matches('youtube.com') || matches('youtu.be')) return 'YouTube';
+          if (matches('channels.weixin.qq.com')) return '视频号';
+        } catch { /* Incomplete or unrecognized URLs use the generic icon. */ }
+        return '其他';
+      },
+
+      selectVideoPlatform(platform) {
+        this.state.videoPlatformOverride = platform === 'AUTO' ? '' : platform;
+        this.updateVideoPlatform();
+      },
+
+      updateVideoPlatform() {
+        const platform = this.state.videoPlatformOverride || this.detectLinkPlatform(document.getElementById('form-video-url').value);
+        const select = document.getElementById('form-video-platform');
+        if (!Array.from(select.options).some(option => option.value === platform)) select.add(new Option(platform, platform));
+        select.value = platform;
+        const icons = {
+          '抖音': ['#111827', '<path d="M13 4v11a4 4 0 1 1-3-3.9M13 4c1 4 4 5 7 5"/>'],
+          '快手': ['#f97316', '<rect x="3" y="5" width="13" height="14" rx="4"/><path d="m16 10 5-3v10l-5-3M7 9h5M7 13h5"/>'],
+          '视频号': ['#d99023', '<circle cx="8" cy="9" r="5"/><circle cx="16" cy="15" r="5"/>'],
+          '小红书': ['#e11d48', '<path d="M4 5h16v14H4zM8 8v8M12 8v8M16 8v8"/>'],
+          'Bilibili': ['#ec4899', '<rect x="3" y="7" width="18" height="14" rx="3"/><path d="m7 3 4 4m6-4-4 4M8 12v3m8-3v3"/>'],
+          'B站': ['#ec4899', '<rect x="3" y="7" width="18" height="14" rx="3"/><path d="m7 3 4 4m6-4-4 4M8 12v3m8-3v3"/>'],
+          'YouTube': ['#ef4444', '<rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 6 3-6 3z"/>'],
+          '其他': ['#64748b', '<path d="m10 13 4-4m-7 2-2 2a4 4 0 0 0 6 6l2-2m0-4 2-2a4 4 0 0 0-6-6L7 7"/>'],
+        };
+        const [color, paths] = icons[platform] || icons['其他'];
+        document.getElementById('video-platform-icon').innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+        const hint = `当前平台：${platform}，点击切换（${this.state.videoPlatformOverride ? '手动选择' : '自动识别'}）`;
+        select.title = hint;
+        select.setAttribute('aria-label', hint);
+        document.getElementById('video-platform-control').title = hint;
+      },
+
+      openVideoEditModal(videoId, defaultMotifId) {
+        this.state.videoImportedMetadata = {};
+        this.state.editingVideoId = videoId || null;
+        this.updateVideoMotifOptions();
+        this.updateVideoCreatorOptions();
+
+        const title = document.getElementById('video-modal-title');
+        const modal = document.getElementById('modal-video-edit');
+
+        if (videoId) {
+          const v = this.state.data.videos.find(x => x.id === videoId);
+          if (!v) return;
+          this.state.videoImportedMetadata = { ...v.importedMetadata };
+          title.innerText = '编辑视频资料';
+          document.getElementById('form-video-title').value = v.title || '';
+          document.getElementById('form-video-url').value = v.url || '';
+          document.getElementById('form-video-platform').value = v.platform || '抖音';
+          this.state.videoPlatformOverride = v.platformOverride ?? (v.platform && v.platform !== this.detectLinkPlatform(v.url || '') ? v.platform : '');
+          document.getElementById('form-video-motif').value = v.motifId || '';
+          document.getElementById('form-video-creator').value = v.creatorId || '';
+          document.getElementById('form-video-tags').value = v.tags || '';
+          document.getElementById('form-video-duration').value = v.duration || '';
+
+          document.getElementById('form-video-views').value = v.views !== null && v.views !== undefined ? v.views : '';
+          document.getElementById('form-video-likes').value = v.likes !== null && v.likes !== undefined ? v.likes : '';
+          document.getElementById('form-video-comments').value = v.comments !== null && v.comments !== undefined ? v.comments : '';
+          document.getElementById('form-video-shares').value = v.shares !== null && v.shares !== undefined ? v.shares : '';
+          document.getElementById('form-video-collects').value = v.collects !== null && v.collects !== undefined ? v.collects : '';
+          document.getElementById('form-video-metric-date').value = v.metricDate || '';
+
+          document.getElementById('form-video-grade').value = v.grade || 'A';
+          document.getElementById('form-video-is-benchmark').value = v.isBenchmark ? 'true' : 'false';
+          document.getElementById('form-video-hook').value = v.hook || '';
+          document.getElementById('form-video-conflict').value = v.conflict || '';
+          document.getElementById('form-video-twist').value = v.twist || '';
+          document.getElementById('form-video-ending').value = v.ending || '';
+          document.getElementById('form-video-takeaway').value = v.takeaway || '';
+        } else {
+          title.innerText = '收录新视频';
+          document.getElementById('form-video-title').value = '';
+          document.getElementById('form-video-url').value = '';
+          document.getElementById('form-video-platform').value = '抖音';
+          this.state.videoPlatformOverride = '';
+          document.getElementById('form-video-motif').value = defaultMotifId || '';
+          document.getElementById('form-video-creator').value = '';
+          document.getElementById('form-video-tags').value = '';
+          document.getElementById('form-video-duration').value = '';
+
+          document.getElementById('form-video-views').value = '';
+          document.getElementById('form-video-likes').value = '';
+          document.getElementById('form-video-comments').value = '';
+          document.getElementById('form-video-shares').value = '';
+          document.getElementById('form-video-collects').value = '';
+          document.getElementById('form-video-metric-date').value = new Date().toISOString().substring(0, 10);
+
+          document.getElementById('form-video-grade').value = 'A';
+          document.getElementById('form-video-is-benchmark').value = 'false';
+          document.getElementById('form-video-hook').value = '';
+          document.getElementById('form-video-conflict').value = '';
+          document.getElementById('form-video-twist').value = '';
+          document.getElementById('form-video-ending').value = '';
+          document.getElementById('form-video-takeaway').value = '';
+        }
+
+        this.showVideoImportExtra();
+        this.updateVideoPlatform();
+        modal.classList.add('open');
+      },
+
+      saveVideo() {
+        const title = document.getElementById('form-video-title').value.trim();
+        if (!title) { alert('请输入视频标题！'); return; }
+
+        const parseNum = (val) => val === '' ? null : Number(val);
+
+        const videoObj = {
+          title,
+          url: document.getElementById('form-video-url').value.trim(),
+          platform: document.getElementById('form-video-platform').value,
+          platformOverride: this.state.videoPlatformOverride || '',
+          importedMetadata: this.state.videoImportedMetadata || {},
+          creatorName: this.state.videoImportedMetadata?.['benchmark-author'] || this.state.videoImportedMetadata?.['benchmark-channel-name'] || '',
+          motifId: document.getElementById('form-video-motif').value,
+          creatorId: document.getElementById('form-video-creator').value,
+          tags: document.getElementById('form-video-tags').value.trim(),
+          duration: document.getElementById('form-video-duration').value.trim(),
+
+          views: parseNum(document.getElementById('form-video-views').value),
+          likes: parseNum(document.getElementById('form-video-likes').value),
+          comments: parseNum(document.getElementById('form-video-comments').value),
+          shares: parseNum(document.getElementById('form-video-shares').value),
+          collects: parseNum(document.getElementById('form-video-collects').value),
+          metricDate: document.getElementById('form-video-metric-date').value,
+
+          grade: document.getElementById('form-video-grade').value,
+          isBenchmark: document.getElementById('form-video-is-benchmark').value === 'true',
+          hook: document.getElementById('form-video-hook').value.trim(),
+          conflict: document.getElementById('form-video-conflict').value.trim(),
+          twist: document.getElementById('form-video-twist').value.trim(),
+          ending: document.getElementById('form-video-ending').value.trim(),
+          takeaway: document.getElementById('form-video-takeaway').value.trim()
+        };
+
+        if (this.state.editingVideoId) {
+          const v = this.state.data.videos.find(x => x.id === this.state.editingVideoId);
+          if (v) Object.assign(v, videoObj);
+          this.showToast('视频资料已保存同步');
+        } else {
+          videoObj.id = 'vid-' + Date.now();
+          this.state.data.videos.unshift(videoObj);
+          this.showToast('新视频已收录');
+        }
+
+        this.persist();
+        this.closeModal('modal-video-edit');
+        this.renderVideos();
+        this.renderMotifs();
+        if (this.state.currentMotifId) this.renderMotifDrawerVideos();
+      },
+
+      deleteVideo(id) {
+        if (!confirm('确定要删除这条视频对标资料吗？此操作无法撤销。')) return;
+        this.state.data.videos = this.state.data.videos.filter(x => x.id !== id);
+        this.persist();
+        this.renderVideos();
+        this.renderMotifs();
+        if (this.state.currentMotifId) this.renderMotifDrawerVideos();
+        this.showToast('视频已删除');
+      },
+
+      copyVideoInfo(id) {
+        const v = this.state.data.videos.find(x => x.id === id);
+        if (!v) return;
+        const text = `【对标视频】${v.title}\n平台：${v.platform}\n链接：${v.url || '无'}\nHook：${v.hook || '无'}\n反转：${v.twist || '无'}\n核心借鉴：${v.takeaway || '无'}`;
+        navigator.clipboard.writeText(text).then(() => {
+          this.showToast('视频完整资料已复制到剪贴板');
+        }).catch(() => {
+          alert(text);
+        });
+      },
+
+      // 批量/快速导入
+      openBatchVideoImport() {
+        document.getElementById('batch-import-text').value = '';
+        document.getElementById('modal-batch-import').classList.add('open');
+      },
+
+      processBatchVideoImport() {
+        const text = document.getElementById('batch-import-text').value.trim();
+        if (!text) { alert('请输入待解析的内容'); return; }
+
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        let count = 0;
+        lines.forEach(line => {
+          const parts = line.split('|').map(p => p.trim());
+          if (parts[0]) {
+            this.state.data.videos.unshift({
+              id: 'vid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              title: parts[0],
+              url: parts[1] || '',
+              platform: parts[2] || '抖音',
+              motifId: '', // 归入待整理池
+              creatorId: '',
+              tags: '',
+              grade: 'B',
+              isBenchmark: false,
+              hook: '', conflict: '', twist: '', ending: '', takeaway: ''
+            });
+            count++;
+          }
+        });
+
+        this.persist();
+        this.closeModal('modal-batch-import');
+        this.renderVideos();
+        this.renderMotifs();
+        this.showToast(`成功辅助录入 ${count} 条视频（已加入未归类待处理池）`);
+      },
+
+      // 对标账号库
+      renderCreators() {
+        const query = document.getElementById('creator-search').value.trim().toLowerCase();
+        let list = [...this.state.data.creators];
+
+        if (query) {
+          list = list.filter(c => {
+            const n = (c.name || '').toLowerCase();
+            const nc = (c.niche || '').toLowerCase();
+            const r = (c.reason || '').toLowerCase();
+            return n.includes(query) || nc.includes(query) || r.includes(query);
+          });
+        }
+
+        const tbody = document.getElementById('creator-table-body');
+        if (list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">暂无匹配的对标创作者账号</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list.map(c => {
+          const vCount = this.state.data.videos.filter(v => v.creatorId === c.id).length;
+          return `
+            <tr>
+              <td>
+                <strong>${this.escapeHtml(c.name)}</strong>
+                ${c.url ? `<br><a href="${c.url}" target="_blank" style="font-size:11px; color:var(--primary); text-decoration:none;">打开主页 &nearr;</a>` : ''}
+              </td>
+              <td><span class="badge">${c.platform}</span></td>
+              <td>${this.escapeHtml(c.niche || '-')}</td>
+              <td style="max-width:320px; font-size:12px; color:var(--text-muted);">${this.escapeHtml(c.reason || '-')}</td>
+              <td><strong>${vCount}</strong> 支作品</td>
+              <td>
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-sm" onclick="App.openCreatorEditModal('${c.id}')">编辑</button>
+                  <button class="btn btn-sm btn-danger" onclick="App.deleteCreator('${c.id}')">删除</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      },
+
+      openCreatorEditModal(id) {
+        this.state.editingCreatorId = id || null;
+        const modal = document.getElementById('modal-creator-edit');
+        const title = document.getElementById('creator-modal-title');
+
+        if (id) {
+          const c = this.state.data.creators.find(x => x.id === id);
+          if (!c) return;
+          title.innerText = '编辑对标账号';
+          document.getElementById('form-creator-name').value = c.name || '';
+          document.getElementById('form-creator-platform').value = c.platform || '抖音';
+          document.getElementById('form-creator-niche').value = c.niche || '';
+          document.getElementById('form-creator-url').value = c.url || '';
+          document.getElementById('form-creator-reason').value = c.reason || '';
+          document.getElementById('form-creator-work-count').value = c.workCount ?? '';
+          document.getElementById('form-creator-follower-count').value = c.followerCount ?? '';
+        } else {
+          title.innerText = '收录创作者账号';
+          document.getElementById('form-creator-name').value = '';
+          document.getElementById('form-creator-platform').value = '抖音';
+          document.getElementById('form-creator-niche').value = '';
+          document.getElementById('form-creator-url').value = '';
+          document.getElementById('form-creator-reason').value = '';
+          document.getElementById('form-creator-work-count').value = '';
+          document.getElementById('form-creator-follower-count').value = '';
+        }
+        modal.classList.add('open');
+      },
+
+      saveCreator() {
+        const name = document.getElementById('form-creator-name').value.trim();
+        if (!name) { alert('请输入账号名称！'); return; }
+        const parseCount = id => {
+          const value = document.getElementById(id).value.trim();
+          return value === '' ? null : Number(value);
+        };
+        const workCount = parseCount('form-creator-work-count');
+        const followerCount = parseCount('form-creator-follower-count');
+        if ([workCount, followerCount].some(value => value !== null && (!Number.isSafeInteger(value) || value < 0))) {
+          alert('作品数量和粉丝量请输入非负整数，或留空。'); return;
+        }
+
+        const creatorObj = {
+          name,
+          workCount,
+          followerCount,
+          platform: document.getElementById('form-creator-platform').value,
+          niche: document.getElementById('form-creator-niche').value.trim(),
+          url: document.getElementById('form-creator-url').value.trim(),
+          reason: document.getElementById('form-creator-reason').value.trim()
+        };
+
+        if (this.state.editingCreatorId) {
+          const c = this.state.data.creators.find(x => x.id === this.state.editingCreatorId);
+          if (c) Object.assign(c, creatorObj);
+          this.showToast('账号信息已更新');
+        } else {
+          creatorObj.id = 'crt-' + Date.now();
+          this.state.data.creators.push(creatorObj);
+          this.showToast('账号收录成功');
+        }
+
+        this.persist();
+        this.closeModal('modal-creator-edit');
+        this.renderCreators();
+        this.updateVideoCreatorOptions();
+      },
+
+      deleteCreator(id) {
+        const c = this.state.data.creators.find(x => x.id === id);
+        if (!c) return;
+        const count = this.state.data.videos.filter(v => v.creatorId === id).length;
+        if (!confirm(`确定删除账号【${c.name}】吗？\n该账号关联的 ${count} 个视频将完整保留，仅解除其关联。`)) return;
+
+        // 保留视频，解除账号绑定
+        this.state.data.videos.forEach(v => {
+          if (v.creatorId === id) v.creatorId = '';
+        });
+
+        this.state.data.creators = this.state.data.creators.filter(x => x.id !== id);
+        this.persist();
+        this.renderCreators();
+        this.renderVideos();
+        this.updateVideoCreatorOptions();
+        this.showToast('账号已移除，关联视频已解除绑定');
+      },
+
+      // 账号导入导出
+      openCreatorImportModal() {
+        document.getElementById('creator-io-title').innerText = '导入账号 JSON 数据';
+        document.getElementById('creator-io-textarea').value = '';
+        document.getElementById('creator-io-extra-actions').innerHTML = '';
+        const submitBtn = document.getElementById('creator-io-submit-btn');
+        submitBtn.innerText = '确认导入';
+        submitBtn.onclick = () => this.processCreatorImport();
+        document.getElementById('modal-creator-io').classList.add('open');
+      },
+
+      processCreatorImport() {
+        const val = document.getElementById('creator-io-textarea').value.trim();
+        if (!val) { alert('请输入 JSON 格式的创作者列表！'); return; }
+
+        try {
+          const parsed = JSON.parse(val);
+          if (!Array.isArray(parsed)) throw new Error('根对象必须为数组');
+
+          let added = 0;
+          let skipped = 0;
+
+          parsed.forEach(item => {
+            if (!item.name) { skipped++; return; }
+            const exists = this.state.data.creators.some(c => c.name === item.name);
+            if (exists) { skipped++; return; }
+
+            this.state.data.creators.push({
+              id: 'crt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              name: item.name,
+              platform: item.platform || '全网',
+              niche: item.niche || '',
+              url: item.url || '',
+              reason: item.reason || ''
+            });
+            added++;
+          });
+
+          this.persist();
+          this.closeModal('modal-creator-io');
+          this.renderCreators();
+          this.updateVideoCreatorOptions();
+          alert(`导入完毕！成功导入: ${added} 条，跳过无效/同名重复: ${skipped} 条。`);
+        } catch(e) {
+          alert('解析 JSON 失败：' + e.message);
+        }
+      },
+
+      openCreatorExportModal() {
+        document.getElementById('creator-io-title').innerText = '导出创作者账号';
+        const jsonStr = JSON.stringify(this.state.data.creators, null, 2);
+        document.getElementById('creator-io-textarea').value = jsonStr;
+
+        const extra = document.getElementById('creator-io-extra-actions');
+        extra.innerHTML = `
+          <button class="btn btn-sm" onclick="App.downloadFile('creators.json', document.getElementById('creator-io-textarea').value)">下载 JSON</button>
+          <button class="btn btn-sm" onclick="App.exportCreatorsCSV()">下载 CSV</button>
+          <button class="btn btn-sm" onclick="App.copyCreatorExport()">复制全部内容</button>
+        `;
+
+        const submitBtn = document.getElementById('creator-io-submit-btn');
+        submitBtn.innerText = '完成';
+        submitBtn.onclick = () => this.closeModal('modal-creator-io');
+        document.getElementById('modal-creator-io').classList.add('open');
+      },
+
+      copyCreatorExport() {
+        const val = document.getElementById('creator-io-textarea').value;
+        navigator.clipboard.writeText(val).then(() => {
+          this.showToast('导出数据已成功复制');
+        });
+      },
+
+      exportCreatorsCSV() {
+        const header = ['名称', '平台', '赛道定位', '主页链接', '值得研究原因'];
+        const rows = this.state.data.creators.map(c => [
+          `"${(c.name || '').replace(/"/g, '""')}"`,
+          `"${(c.platform || '').replace(/"/g, '""')}"`,
+          `"${(c.niche || '').replace(/"/g, '""')}"`,
+          `"${(c.url || '').replace(/"/g, '""')}"`,
+          `"${(c.reason || '').replace(/"/g, '""')}"`
+        ]);
+        const csvContent = '\uFEFF' + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+        this.downloadFile('creators.csv', csvContent);
+      },
+
+      // 研究方法论与说明
+      openMethodModal() {
+        document.getElementById('modal-methodology').classList.add('open');
+      },
+
+      toggleMethodSubTab(type) {
+        document.getElementById('btn-show-guide').classList.toggle('active', type === 'guide');
+        document.getElementById('btn-show-framework').classList.toggle('active', type === 'framework');
+        document.getElementById('method-content-guide').style.display = type === 'guide' ? 'block' : 'none';
+        document.getElementById('method-content-framework').style.display = type === 'framework' ? 'block' : 'none';
+      },
+
+      saveMethodology() {
+        const val = document.getElementById('methodology-editor').value;
+        this.state.data.methodology = val;
+        this.persist();
+        this.showToast('个人研究方法框架已保存');
+      },
+
+      exportMethodologyMarkdown() {
+        const val = document.getElementById('methodology-editor').value;
+        this.downloadFile('短视频母题研究方法论SOP.md', val);
+      },
+
+      // 全库数据备份导出
+      exportFullBackup() {
+        const json = JSON.stringify(this.state.data, null, 2);
+        this.downloadFile(`短视频对标库备份_${new Date().toISOString().substring(0,10)}.json`, json);
+      },
+
+      // 外部模块对接占位与明确交互说明
+      triggerExternalModule(action) {
+        if (action === 'deconstruct') {
+          alert('【对接提示】即将连接「剧情拆解学习工作台」系统。\n\n当前状态：外部拆解模块数据路由接口已就绪 (Target: /study/deconstruct)，正在等待接入外部工程。');
+        } else if (action === 'adapt-project') {
+          alert('【对接提示】即将根据本视频戏剧要素建立「改编创作项目」。\n\n当前状态：外部创作模块 API 规范已适配 (Target: /project/create-from-motif)，正在等待业务线容器挂载。');
+        }
+      },
+
+      // 辅助函数
+      closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+      },
+
+      closeOutside(e, modalId) {
+        if (e.target.id === modalId) {
+          this.closeModal(modalId);
+        }
+      },
+
+      downloadFile(filename, content) {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+
+      escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+    };
+
+    // Host adapter is installed by the React container before initialization.
+    const host = window.parent[window.name];
+    App.loadData = function() { this.state.data = host.load(); this.state.recentMotifIds = this.state.data.recentMotifIds || []; };
+    App.persist = function() { this.state.data.recentMotifIds = this.state.recentMotifIds; host.save(this.state.data); };
+    App.triggerExternalModule = function(action) {
+      if (!this.state.editingVideoId) { this.showToast('请先保存视频，再进入后续创作。'); return; }
+      host.open(action, this.state.editingVideoId, this.state.data);
+    };
+    // Preserve legacy platforms when editing existing records.
+    ['video-platform-filter','form-video-platform','form-creator-platform'].forEach(id => {
+      const select = document.getElementById(id);
+      ['YouTube','B站','其他'].forEach(name => { if (select && !Array.from(select.options).some(o => o.value === name)) select.add(new Option(name,name)); });
+    });
+    window.addEventListener('error', event => { host.error(event.message); });
+    // 启动系统
+    window.addEventListener('DOMContentLoaded', () => {
+      App.init();
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,6 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Columns3, Download, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CircleHelp, Columns3, Download, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
 import { CONTENT_DIMENSIONS, getVideoCoreTags, getVideoIndicators, matchesTopicVideoFilters, TOPIC_VIDEO_FILTERS, autoPairByDimension } from '../utils/topicAnalysis';
-import { TOPIC_CATEGORIES } from '../utils/topicLibrary';
 import './TopicDetailPanel.css';
 
 const FILTER_SECTIONS = [
@@ -10,15 +9,24 @@ const FILTER_SECTIONS = [
   { title: '基础属性', keys: ['followerScale', 'publishWindow', 'durationRange', 'isSeries'] },
 ];
 const FILTER_BY_KEY = Object.fromEntries(TOPIC_VIDEO_FILTERS.map((field) => [field.key, field]));
+const TOPIC_INFO_HELP_KEY = 'benchmark-topic-info-help-v1';
+const DEFAULT_TOPIC_INFO_HELP = '这张卡片用来记录同一母题所有改编版本共享的故事骨架，避免把版本差异误当成母题本身。先写不变的核心基本盘，再补充角色功能、核心命题、核心情节逻辑和情绪闭环；题材大类与改编方向用于母题库首页导航。填写后点击“保存母题信息”。';
+const FRAMEWORK_FIELDS = [
+  ['roleFunction', '角色功能', '故事里各类角色分别起什么作用？', 1],
+  ['coreTheme', '核心命题', '这个故事最终回答或表达什么？', 1],
+  ['plotLogic', '核心情节逻辑', '起因、冲突、行动、反转与结果如何相连？', 6],
+  ['emotionClosure', '情绪闭环', '观众的情绪从哪里出发，最终得到什么回应？', 1],
+];
 const percent = (rate) => rate === null ? '—' : `${(rate * 100).toFixed(2)}%`;
 const scoreText = (video) => video.researchProfile?.score === '' || video.researchProfile?.score === undefined ? '—' : `${video.researchProfile.score}`;
 const gradeText = (video) => video.researchProfile?.grade || '未评';
 
-function exportReport(name, summary, videos) {
+function exportReport(name, summary, videos, framework) {
   const lines = [
     `# ${name}｜母题分析报告`, '',
     `生成时间：${new Date().toLocaleString('zh-CN')}`,
     `核心基本盘：${summary || '待补充'}`,
+    ...FRAMEWORK_FIELDS.map(([key, label]) => `${label}：${framework[key] || '待补充'}`),
     `总版本数：${videos.length}`, '',
     '## 版本数据', '',
     '| 视频 | 等级 | 综合分 | 播放量 | 评论率 | 转发率 | 核心改编标签 |',
@@ -53,7 +61,30 @@ function TagList({ video }) {
   return <div className="topic-detail-tags">{tags.length ? tags.map((tag, index) => <span key={`${tag}-${index}`}>{tag}</span>) : <span>未标注</span>}</div>;
 }
 
-export function TopicDetailPanel({ name, videos, meta, summaryDraft, onSummaryChange, categoryDraft, onCategoryChange, directionsDraft, onDirectionsChange, onSaveInfo, notice, onBack, onOpenVideo, onAddVideo, onOpenComparison, initialBenchmarkOnly = false, onToggleBenchmark }) {
+export function TopicDetailPanel({ name, videos, meta, categories, summaryDraft, onSummaryChange, frameworkDraft, onFrameworkChange, categoryDraft, onCategoryChange, directionsDraft, onDirectionsChange, onSaveInfo, notice, onBack, onOpenVideo, onAddVideo, onOpenComparison, focusInfo = false, initialBenchmarkOnly = false, onToggleBenchmark }) {
+  const summaryInputRef = React.useRef(null);
+  const [isHelpOpen, setIsHelpOpen] = React.useState(false);
+  const [isHelpEditing, setIsHelpEditing] = React.useState(false);
+  const [helpText, setHelpText] = React.useState(() => {
+    try { return window.localStorage.getItem(TOPIC_INFO_HELP_KEY) || DEFAULT_TOPIC_INFO_HELP; }
+    catch { return DEFAULT_TOPIC_INFO_HELP; }
+  });
+  const [helpDraft, setHelpDraft] = React.useState(helpText);
+  const saveHelp = () => {
+    const next = helpDraft.trim() || DEFAULT_TOPIC_INFO_HELP;
+    window.localStorage.setItem(TOPIC_INFO_HELP_KEY, next);
+    setHelpText(next);
+    setHelpDraft(next);
+    setIsHelpEditing(false);
+  };
+  React.useEffect(() => {
+    if (!focusInfo) return;
+    const frame = window.requestAnimationFrame(() => {
+      summaryInputRef.current?.scrollIntoView({ block: 'center' });
+      summaryInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusInfo]);
   const [filters, setFilters] = React.useState({});
   const [viewMode, setViewMode] = React.useState('list');
   const [selectedIds, setSelectedIds] = React.useState([]);
@@ -99,8 +130,17 @@ export function TopicDetailPanel({ name, videos, meta, summaryDraft, onSummaryCh
   const selectedCount = selectedIds.length;
   return <div className="topic-detail-page">
     <button type="button" className="topic-library-back" onClick={onBack}><ArrowLeft size={16} />返回母题库</button>
-    <header className="topic-detail-overview"><div><span>{meta.category || '未分类'} · 母题详情</span><h2>{name}</h2><p><b>核心基本盘：</b>{summaryDraft || '尚未填写；请在下方补充一句话核心设定。'}</p><strong>{videos.length} 个版本</strong></div><div className="topic-detail-overview-actions"><button type="button" onClick={() => onAddVideo(name)}><Plus size={16} />新增版本</button><button type="button" onClick={compareSelected}><Columns3 size={16} />批量对比</button><button type="button" onClick={() => exportReport(name, summaryDraft, videos)}><Download size={16} />导出分析报告</button></div></header>
-    <form className="topic-library-summary" onSubmit={onSaveInfo}><label htmlFor="topic-summary">母题基本信息</label><p>核心基本盘只记录所有版本都不能改变的故事设定。</p><div><textarea id="topic-summary" value={summaryDraft} onChange={(event) => onSummaryChange(event.target.value)} placeholder="例如：善恶有报 + 身份反转 + 恩人得回馈" rows="2" maxLength="300" /></div><div className="topic-library-detail-fields"><label>题材主类<select value={categoryDraft} onChange={(event) => onCategoryChange(event.target.value)}><option value="">未分类</option>{TOPIC_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label><label>改编方向（首页最多显示 3 个）<input value={directionsDraft} onChange={(event) => onDirectionsChange(event.target.value)} placeholder="如：单亲妈妈、总裁报恩、开场砸店" maxLength="300" /></label><button type="submit">保存母题信息</button></div></form>
+    <header className="topic-detail-overview"><div><span>{meta.category || '未分类'} · 母题详情</span><h2>{name}</h2><p><b>核心基本盘：</b>{summaryDraft || '尚未填写；请在下方补充一句话核心设定。'}</p><strong>{videos.length} 个版本</strong></div><div className="topic-detail-overview-actions"><button type="button" onClick={() => onAddVideo(name)}><Plus size={16} />新增版本</button><button type="button" onClick={compareSelected}><Columns3 size={16} />批量对比</button><button type="button" onClick={() => exportReport(name, summaryDraft, videos, frameworkDraft)}><Download size={16} />导出分析报告</button></div></header>
+    <form className="topic-library-summary" onSubmit={onSaveInfo}>
+      <header className="topic-library-summary-heading"><span>母题基本信息</span><button type="button" className="topic-library-help-trigger" aria-label="查看母题基本信息说明" aria-expanded={isHelpOpen} aria-controls="topic-library-info-help" onClick={() => setIsHelpOpen((open) => !open)}><CircleHelp size={17} /></button></header>
+      {isHelpOpen && <section className="topic-library-info-help" id="topic-library-info-help" aria-label="母题基本信息使用说明">
+        {isHelpEditing ? <><textarea aria-label="编辑母题基本信息说明" value={helpDraft} onChange={(event) => setHelpDraft(event.target.value)} rows="5" /><div className="topic-library-help-actions"><button type="button" onClick={() => { setHelpDraft(helpText); setIsHelpEditing(false); }}>取消</button><button type="button" onClick={saveHelp}>保存说明</button></div></> : <><p>{helpText}</p><div className="topic-library-help-actions"><span>说明保存在当前浏览器，适用于所有母题。</span><button type="button" onClick={() => setIsHelpEditing(true)}>编辑说明</button></div></>}
+      </section>}
+      <p>核心基本盘只记录所有版本都不能改变的故事设定。</p>
+      <div className="topic-library-core-row"><label>题材大类（一级）<select value={categoryDraft} onChange={(event) => onCategoryChange(event.target.value)}><option value="">未分类</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label>母题（二级）<textarea ref={summaryInputRef} id="topic-summary" value={summaryDraft} onChange={(event) => onSummaryChange(event.target.value)} placeholder="例如：善恶有报 + 身份反转 + 恩人得回馈" rows="1" maxLength="300" /></label></div>
+      <div className="topic-library-framework-grid">{FRAMEWORK_FIELDS.map(([key, label, placeholder, rows]) => <label className={`topic-library-framework-${key}`} key={key}>{label}{key === 'roleFunction' ? <input type="text" value={frameworkDraft[key] || ''} onChange={(event) => onFrameworkChange(key, event.target.value)} placeholder={placeholder} maxLength="300" /> : <textarea value={frameworkDraft[key] || ''} onChange={(event) => onFrameworkChange(key, event.target.value)} placeholder={placeholder} rows={rows} maxLength="1000" />}</label>)}</div>
+      <div className="topic-library-detail-fields"><label>改编方向（首页最多显示 3 个）<input value={directionsDraft} onChange={(event) => onDirectionsChange(event.target.value)} placeholder="如：单亲妈妈、总裁报恩、开场砸店" maxLength="300" /></label><button type="submit">保存母题信息</button></div>
+    </form>
     {notice && <p className="topic-library-message" role="status">{notice}</p>}
     <section className="topic-detail-filters" aria-labelledby="topic-detail-filter-title"><header><div><h3 id="topic-detail-filter-title">筛选版本</h3><p>组合多个下拉条件；旧视频需在单视频详情补齐结构化标签。</p></div><button type="button" onClick={() => { setFilters({}); setBenchmarkOnly(false); setSelectedIds([]); setPairs([]); }}>清除筛选</button></header><div className="topic-detail-filter-groups">{FILTER_SECTIONS.map(({ title, keys }) => <fieldset key={title}><legend>{title}</legend><div>{keys.map((key) => { const field = FILTER_BY_KEY[key]; return <label key={key}>{field.label}<select value={filters[key] || ''} onChange={(event) => changeFilter(key, event.target.value)}><option value="">全部</option>{field.options.map((option) => typeof option === 'string' ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>; })}</div></fieldset>)}</div></section>
     <section className="topic-detail-pinned" aria-label="固定置顶极端样本">{[['S', 'S 级标杆', sVideos], ['C', 'C 级踩坑', cVideos]].map(([grade, label, items]) => <div key={grade} className={`topic-detail-pin topic-detail-pin-${grade.toLowerCase()}`}><header><h3>{label}</h3><span>{items.length} 条</span></header>{items.length ? items.slice(0, 3).map((video) => <button type="button" key={video.id} onClick={() => onOpenVideo(video.id)}>{video.title || '未命名视频'}<ArrowRight size={14} /></button>) : <p>暂无 {grade} 级视频；可在单视频详情手动设置等级。</p>}</div>)}</section>

@@ -4,6 +4,7 @@ export const TOPIC_METADATA_KEY = 'benchmark-topic-metadata-v1';
 export const TOPIC_FAVORITES_KEY = 'benchmark-topic-favorites-v1';
 export const TOPIC_RECENTS_KEY = 'benchmark-topic-recents-v1';
 export const TOPIC_GUIDE_KEY = 'benchmark-topic-guide-v1';
+export const TOPIC_CATEGORIES_KEY = 'benchmark-topic-categories-v1';
 export const TOPIC_CATEGORIES = ['报恩', '逆袭', '爽文', '情感', '其他'];
 
 export const topicKey = (value = '') => String(value).trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN');
@@ -31,6 +32,37 @@ export function loadTopicSummaries() {
 }
 
 export const loadTopicMetadata = () => loadObject(TOPIC_METADATA_KEY);
+export function loadTopicCategories() {
+  const saved = window.localStorage.getItem(TOPIC_CATEGORIES_KEY);
+  if (saved !== null) {
+    try {
+      const values = JSON.parse(saved);
+      if (Array.isArray(values)) return [...new Set(values.filter((value) => typeof value === 'string').map((value) => value.trim()).filter((value) => value && value !== '未分类'))];
+    } catch { /* Fall back to the original categories. */ }
+  }
+  return [...new Set([...TOPIC_CATEGORIES, ...Object.values(loadTopicMetadata()).map((meta) => meta?.category)].filter((value) => typeof value === 'string' && value.trim() && value !== '未分类'))];
+}
+export function saveTopicCategories(categories) {
+  window.localStorage.setItem(TOPIC_CATEGORIES_KEY, JSON.stringify(categories));
+  return categories;
+}
+function reassignTopicCategory(source, target) {
+  const metadata = loadTopicMetadata();
+  const updatedAt = new Date().toISOString();
+  for (const [key, meta] of Object.entries(metadata)) {
+    if (meta?.category === source) metadata[key] = { ...meta, category: target, updatedAt };
+  }
+  window.localStorage.setItem(TOPIC_METADATA_KEY, JSON.stringify(metadata));
+  return metadata;
+}
+export function renameTopicCategory(source, target) {
+  const categories = saveTopicCategories(loadTopicCategories().map((name) => name === source ? target : name));
+  return { categories, metadata: reassignTopicCategory(source, target) };
+}
+export function deleteTopicCategory(source, target = '') {
+  const categories = saveTopicCategories(loadTopicCategories().filter((name) => name !== source));
+  return { categories, metadata: reassignTopicCategory(source, target) };
+}
 export const loadTopicFavorites = () => loadArray(TOPIC_FAVORITES_KEY);
 export const loadTopicRecents = () => loadArray(TOPIC_RECENTS_KEY);
 export const loadTopicGuide = () => loadObject(TOPIC_GUIDE_KEY);

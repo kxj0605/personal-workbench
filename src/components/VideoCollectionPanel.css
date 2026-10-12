@@ -15,8 +15,13 @@
 .video-research-type > .video-choice-group { padding-top: 1px; }
 .video-data-collapsed { flex-wrap: wrap; }
 .video-data-collapsed small { width: 100%; color: #98a2b3; font-size: 12px; }
-.video-description-topic { display: block; }
-.video-description-topic > textarea { min-height: 40px; resize: vertical; }
+.video-description-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.video-description-topic, .video-description-account { display: block; min-width: 0; }
+.video-collection-form .video-description-topic > textarea { display: block; height: 52px; min-height: 52px; max-height: 52px; overflow-y: auto; resize: none; }
+.video-description-account { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); height: 52px; overflow: hidden; border: 1px solid rgba(17, 24, 39, .10); border-radius: 16px; background: #f9fafb; }
+.video-description-account:focus-within { border-color: #8db5ed; box-shadow: 0 0 0 3px rgba(57, 118, 213, .10); background: #fff; }
+.video-collection-form .video-description-account > input, .video-collection-form .video-description-account > input:focus { min-width: 0; height: 100%; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.video-collection-form .video-description-account > input + input { border-left: 1px solid rgba(17, 24, 39, .10); }
 .video-extraction-section .video-draft-details { margin-top: 4px; }
 .benchmark-metadata-panel .benchmark-metadata-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .video-collection-primary-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }.video-collection-url-field { display: flex; min-width: 0; overflow: hidden; border: 1px solid rgba(17, 24, 39, .10); border-radius: 16px; background: #f9fafb; }.video-collection-url-field:focus-within { border-color: #8db5ed; box-shadow: 0 0 0 3px rgba(57, 118, 213, .10); background: #fff; }.video-collection-url-field input, .video-collection-url-field input:focus { min-width: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; text-overflow: ellipsis; }.video-collection-url-field button { display: inline-flex; flex: none; min-width: 58px; align-items: center; justify-content: center; gap: 4px; border: 0; border-left: 1px solid rgba(17, 24, 39, .08); padding: 0 10px; background: transparent; color: #3976d5; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }.video-collection-url-field button:hover:not(:disabled) { background: #eaf3ff; }.video-collection-url-field button:disabled { color: #98a2b3; cursor: not-allowed; }

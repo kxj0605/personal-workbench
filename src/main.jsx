@@ -62,7 +62,7 @@ import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
-import { BenchmarkLibraryPanel } from './components/BenchmarkLibraryPanel';
+import { IntegratedBenchmarkLibrary as BenchmarkLibraryPanel } from './components/IntegratedBenchmarkLibrary';
 import { ViralResearchPanel } from './components/ViralResearchPanel';
 import { ImageGenerationPanel } from './components/ImageGenerationPanel';
 import { loadBenchmarkAccounts, loadBenchmarkVideos } from './utils/benchmarkLibrary';
