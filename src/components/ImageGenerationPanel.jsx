@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Copy, ImagePlus, Layers3, Pencil, Sparkles, X } from 'lucide-react';
+import { Check, Copy, Pencil, X } from 'lucide-react';
 import './ImageGenerationPanel.css';
 
 const EDIT_METHODS = [
@@ -265,6 +265,25 @@ function loadPrompts() {
   }
 }
 
+function PromptPreview({ text }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [overflowing, setOverflowing] = React.useState(false);
+  const textRef = React.useRef(null);
+  const contentId = React.useId();
+  React.useLayoutEffect(() => {
+    const element = textRef.current;
+    const measure = () => setOverflowing(element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 3 + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text]);
+  return <div className={`image-prompt-template${expanded ? ' is-expanded' : ''}`}>
+    <p ref={textRef} id={contentId}>{text}</p>
+    <div className="image-prompt-preview-footer">{overflowing && <button type="button" className="image-prompt-expand" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}>{expanded ? '收起 ▴' : '展开全文 ▾'}</button>}</div>
+  </div>;
+}
+
 export function ImageGenerationPanel() {
   const [copiedId, setCopiedId] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState('all');
@@ -310,20 +329,6 @@ export function ImageGenerationPanel() {
 
   return (
     <section className="image-generation-page" aria-label="图片改图模板">
-      <header className="image-generation-hero">
-        <div className="image-generation-hero-copy">
-          <span className="image-generation-kicker"><Sparkles size={16} /> 提示词库</span>
-          <h1>图片改图模板</h1>
-          <p>先选一种常见改图需求，复制中文模板后补全方括号里的内容即可使用。</p>
-        </div>
-        <div className="image-generation-hero-icon" aria-hidden="true"><ImagePlus size={30} /></div>
-      </header>
-
-      <section className="image-generation-guide" aria-label="使用提示">
-        <Layers3 size={19} aria-hidden="true" />
-        <div><strong>首版只沉淀改图方式</strong><span>本地图片查看、重命名和生成进度将在后续图片资产管理模块中再接入。</span></div>
-      </section>
-
       <nav className="image-generation-filters image-generation-primary-filters" aria-label="筛选改图方式">
         {[{ id: 'all', title: '全部' }, ...EDIT_GROUPS.map(({ id, title }) => ({ id, title }))].map((filter) => (
           <button className={activeFilter === filter.id ? 'active' : ''} type="button" aria-pressed={activeFilter === filter.id} key={filter.id} onClick={() => { setActiveFilter(filter.id); setActiveSubcategory('all'); }}>
@@ -362,7 +367,7 @@ export function ImageGenerationPanel() {
                   <article className="image-edit-method-card" key={method.id}>
                     <header className="image-edit-method-heading">
                       <span className="image-method-number">{String(methodIndex + 1).padStart(2, '0')}</span>
-                      <div><h3>{method.title}</h3></div>
+                      <div><h3 title={method.title}>{method.title}</h3></div>
                       {editingId === method.id ? (
                         <div className="image-edit-actions">
                           <button className="image-prompt-action image-prompt-save" type="button" onClick={() => savePrompt(method.id)}>保存</button>
@@ -377,11 +382,11 @@ export function ImageGenerationPanel() {
                         </div>
                       )}
                     </header>
-                    <p className="image-method-description">{method.description}</p>
+                    <p className="image-method-description" title={method.description}>{method.description}</p>
                     {editingId === method.id ? (
                       <textarea className="image-prompt-editor" aria-label={`修改提示词：${method.title}`} value={editDraft} onChange={(event) => setEditDraft(event.target.value)} />
                     ) : (
-                      <div className="image-prompt-template"><p>{prompts[method.id]}</p></div>
+                      <PromptPreview text={prompts[method.id]} />
                     )}
                   </article>
                 );

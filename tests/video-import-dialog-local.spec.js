@@ -32,18 +32,48 @@ test('旧提示词与导入流程接入，粘贴回填后检查保存，未知�
   await expect(frame.locator('#form-video-collects')).toHaveValue('320');
   await expect(frame.locator('#form-video-shares')).toHaveValue('20');
   await expect(frame.locator('#form-video-platform')).toHaveValue('抖音');
+  await expect(frame.locator('#form-video-duration')).toHaveValue('0:32');
+  await expect(frame.locator('#form-video-published-at')).toHaveValue('2026-10-12');
+  await frame.locator('#form-video-duration').fill('320');
+  await frame.locator('#form-video-published-at').click();
+  await expect(frame.locator('#form-video-duration')).toHaveValue('3:20');
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date());
+  await expect(frame.locator('#form-video-metric-date')).toHaveValue(today);
   await expect(frame.locator('#video-import-extra')).toContainText('@导入作者');
   await page.screenshot({ path: 'test-results/video-import-intake.png', fullPage: true });
+  await frame.locator('#form-video-tags').fill('#报恩 重逢,逆袭，温情、成长');
   await frame.locator('#modal-video-edit').getByRole('button', { name: /保存/ }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('video-collection-v1'))[0].tags)).toEqual(['报恩', '重逢', '逆袭', '温情', '成长']);
   await page.reload();
   await frame.getByRole('button', { name: '视频全景管理', exact: true }).click();
   await expect(frame.locator('#video-table-body')).toContainText('@导入作者');
   await frame.locator('#video-table-body').getByRole('button', { name: '编辑', exact: true }).click();
   await expect(frame.locator('#video-import-extra')).toContainText('测试音乐');
+  await expect(frame.locator('#form-video-duration')).toHaveValue('3:20');
+  await expect(frame.locator('#form-video-published-at')).toHaveValue('2026-10-12');
   await frame.getByRole('button', { name: '导入视频资料', exact: true }).click();
-  await frame.locator('#video-import-text').fill('账号链接：不可用\n视频链接：不可用\n点赞量：10');
+  await frame.locator('#video-import-text').fill('账号链接：不可用\n视频链接：不可用\n点赞量：10\n视频时长：230');
   await frame.getByRole('button', { name: '识别并回填', exact: true }).click();
   await frame.getByRole('button', { name: '返回检查', exact: true }).click();
   await expect(frame.locator('#form-video-url')).toHaveValue('https://v.douyin.com/import/');
   await expect(frame.locator('#video-import-extra')).toContainText('https://www.douyin.com/user/test');
+  await expect(frame.locator('#form-video-duration')).toHaveValue('2:30');
+});
+
+test('旧时长与日期拆分，编辑日期默认上海当天，秒数导入正确格式化', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-12T18:00:00Z') });
+  await page.goto('/?workspace-preview&workspace-tab=creator-benchmark');
+  await page.evaluate(() => localStorage.setItem('video-collection-v1', JSON.stringify([{ id: 'old-duration', title: '旧时长视频', details: { metadata: { 'benchmark-video-duration': '120秒 / 2024-03-01' } } }])));
+  await page.reload();
+  const frame = page.frameLocator('iframe[title="对标库工作区"]');
+  await frame.getByRole('button', { name: '视频全景管理', exact: true }).click();
+  await frame.locator('#video-table-body').getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(frame.locator('#form-video-duration')).toHaveValue('2:00');
+  await expect(frame.locator('#form-video-published-at')).toHaveValue('2024-03-01');
+  await expect(frame.locator('#form-video-metric-date')).toHaveValue('2026-10-13');
+  for (const [input, output] of [['025', '0:25'], ['02:30', '2:30'], ['2：30', '2:30'], ['2分30秒', '2:30'], ['120秒', '2:00'], ['1230', '12:30']]) {
+    await frame.locator('#form-video-duration').fill(input);
+    await frame.locator('#form-video-published-at').click();
+    await expect(frame.locator('#form-video-duration')).toHaveValue(output);
+  }
 });

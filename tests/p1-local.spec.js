@@ -36,7 +36,7 @@ test.describe('P1 本地桌面质量巡检', () => {
     });
 
     for (const [url, ready] of [
-      ['/?workspace-preview&workspace-tab=creator-collection', page.getByRole('heading', { name: '收录视频' })],
+      ['/?workspace-preview&workspace-tab=creator-collection', page.getByRole('heading', { name: '加入对标视频' })],
       ['/?workspace-preview&workspace-tab=breakdown', page.getByRole('heading', { name: '脚本拆解' })],
       ['/?workspace-preview&workspace-tab=subscriptions', page.getByRole('heading', { name: '订阅' })],
     ]) {
@@ -53,7 +53,7 @@ test.describe('P1 本地桌面质量巡检', () => {
 
   for (const [name, url, heading] of [
     ['访客工作台', '/', '个人工作台'],
-    ['灵感视频', '/?workspace-preview&workspace-tab=creator-collection', '收录视频'],
+    ['灵感视频', '/?workspace-preview&workspace-tab=creator-collection', '加入对标视频'],
     ['脚本拆解', '/?workspace-preview&workspace-tab=breakdown', '脚本拆解'],
   ]) {
     test(`${name}通过自动无障碍扫描`, async ({ page }) => {
@@ -71,14 +71,15 @@ test.describe('P1 本地桌面质量巡检', () => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.addInitScript(() => {
+      if (window !== window.top) return;
       window.localStorage.setItem('video-collection-v1', '{not-json');
       window.localStorage.setItem('script-breakdown-draft-v1', '{not-json');
       window.localStorage.setItem('creator-growth-dashboard-v1', '{not-json');
     });
 
     await page.goto('/?workspace-preview&workspace-tab=creator-collection');
-    await expect(page.getByRole('heading', { name: '收录视频' })).toBeVisible();
-    await expect(page.getByText('收录完成的视频会保存在这里，可按标签查找并进入拆解学习。')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '加入对标视频' })).toBeVisible();
+    await expect(page.locator('.video-library-empty')).toBeVisible();
     await page.goto('/?workspace-preview&workspace-tab=breakdown');
     await expect(page.getByRole('heading', { name: '脚本拆解' })).toBeVisible();
     expect(pageErrors, `损坏存储导致页面异常：\n${pageErrors.join('\n')}`).toEqual([]);
@@ -102,7 +103,7 @@ test.describe('P1 本地桌面质量巡检', () => {
     await page.screenshot({ path: testInfo.outputPath('desktop-dashboard.png'), fullPage: true });
 
     await page.goto('/?workspace-preview&workspace-tab=creator-collection');
-    await expect(page.getByRole('heading', { name: '收录视频' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '加入对标视频' })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('desktop-creator-collection.png'), fullPage: true });
 
     await page.goto('/?workspace-preview&workspace-tab=breakdown');

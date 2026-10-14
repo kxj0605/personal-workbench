@@ -11,6 +11,7 @@ export const pages = {
 export const tabs = {
   dashboard: 'dashboard',
   imageGeneration: 'image-generation',
+  scriptPrompts: 'script-prompts',
   creator: 'creator',
   creatorProjects: 'creator-projects',
   creatorBenchmark: 'creator-benchmark',

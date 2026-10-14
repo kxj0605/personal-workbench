@@ -63,6 +63,7 @@ import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
 import { IntegratedBenchmarkLibrary as BenchmarkLibraryPanel } from './components/IntegratedBenchmarkLibrary';
+import { PromptLibraryGuide } from './components/PromptLibraryGuide';
 import { ViralResearchPanel } from './components/ViralResearchPanel';
 import { ImageGenerationPanel } from './components/ImageGenerationPanel';
 import { loadBenchmarkAccounts, loadBenchmarkVideos } from './utils/benchmarkLibrary';
@@ -501,9 +502,13 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const importantTodayTasks = todayTasks.filter(
     (task) => task.status !== 'completed' && task.matrix_category.startsWith('important_'),
   );
-  const creatorTabs = [tabs.imageGeneration, tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorResearch, tabs.creatorMaterials, tabs.creatorReview];
+  const creatorTabs = [tabs.imageGeneration, tabs.scriptPrompts, tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorResearch, tabs.creatorMaterials, tabs.creatorReview];
   const isCreatorTab = creatorTabs.includes(activeTab);
-  const isPromptLibraryTab = activeTab === tabs.creatorMaterials || activeTab === tabs.imageGeneration;
+  const isPromptLibraryTab = activeTab === tabs.creatorMaterials || activeTab === tabs.imageGeneration || activeTab === tabs.scriptPrompts;
+  const promptLibraryTitle = activeTab === tabs.creatorMaterials ? '我的提示词' : activeTab === tabs.scriptPrompts ? '脚本' : '图片修改';
+  const promptLibraryDescription = activeTab === tabs.creatorMaterials ? '保存和整理自己的提示词，按素材类型与来源分类，随时复制复用。' : activeTab === tabs.scriptPrompts ? '整理脚本分析、骨架提取与改编创作的提示词，随时复制使用。' : '按改图需求选择模板，复制后补全方括号中的内容，配合原图使用。';
+  const [isPromptGuideOpen, setIsPromptGuideOpen] = React.useState(false);
+  const [isPromptCreateOpen, setIsPromptCreateOpen] = React.useState(false);
   const workspaceTitle = {
     [tabs.imageGeneration]: '提示词库',
     [tabs.creator]: '创作概览',
@@ -544,6 +549,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
       return;
     }
     setTaskViewRequest(tab === tabs.tasks ? taskViews.list : null);
+    setIsPromptCreateOpen(false);
     setActiveTab(tab);
     setIsUserMenuOpen(false);
   };
@@ -640,7 +646,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
               <SidebarButton icon={Flag} label="改编项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
               <SidebarButton icon={Sparkles} label="爆款研究" active={activeTab === tabs.creatorResearch} onClick={() => navigateTo(tabs.creatorResearch)} />
               <SidebarButton icon={PanelsTopLeft} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => navigateTo(tabs.breakdown)} />
-              <SidebarButton icon={LibraryBig} label="提示词库" active={isPromptLibraryTab} onClick={() => navigateTo(tabs.creatorMaterials)} />
+              <SidebarButton icon={LibraryBig} label="提示词" active={isPromptLibraryTab} onClick={() => navigateTo(tabs.creatorMaterials)} />
               <SidebarButton icon={Clock3} label="复盘" active={activeTab === tabs.creatorReview} onClick={() => navigateTo(tabs.creatorReview)} />
               <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
             </nav>
@@ -716,10 +722,15 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         )}
 
         {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && activeTab !== tabs.breakdown && (
-          <header className="workspace-heading compact-heading">
+          <header className={`workspace-heading compact-heading${isPromptLibraryTab ? ' workspace-prompt-library-hero' : ''}`}>
             <div>
-              <h1>{workspaceTitle}</h1>
-              {workspaceDescription && <p className="auth-state">{workspaceDescription}</p>}
+              <div className={isPromptLibraryTab ? 'prompt-library-title-row' : undefined}><h1>{isPromptLibraryTab ? promptLibraryTitle : workspaceTitle}</h1>{isPromptLibraryTab && <button type="button" className="prompt-library-guide-trigger" onClick={() => setIsPromptGuideOpen(true)}>使用教程</button>}</div>
+              {(isPromptLibraryTab || workspaceDescription) && <p className="auth-state">{isPromptLibraryTab ? promptLibraryDescription : workspaceDescription}</p>}
+              {isPromptLibraryTab && <div className="prompt-library-navigation"><nav className="prompt-library-tabs" aria-label="提示词库分类">
+                <button className={activeTab === tabs.creatorMaterials ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)}>我的提示词</button>
+                <button className={activeTab === tabs.imageGeneration ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.imageGeneration} onClick={() => navigateTo(tabs.imageGeneration)}>图片修改</button>
+                <button className={activeTab === tabs.scriptPrompts ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.scriptPrompts} onClick={() => navigateTo(tabs.scriptPrompts)}>脚本</button>
+              </nav>{activeTab !== tabs.imageGeneration && <button type="button" className="prompt-library-add-trigger" aria-haspopup="dialog" onClick={() => setIsPromptCreateOpen(true)}><Plus size={16} />添加提示词</button>}</div>}
             </div>
           </header>
         )}
@@ -738,11 +749,9 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         )}
         {isPromptLibraryTab && (
           <section className="prompt-library-content" aria-label="提示词库内容">
-            <nav className="prompt-library-tabs" aria-label="提示词库分类">
-              <button className={activeTab === tabs.creatorMaterials ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)}>我的提示词</button>
-              <button className={activeTab === tabs.imageGeneration ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.imageGeneration} onClick={() => navigateTo(tabs.imageGeneration)}>图片改图模板</button>
-            </nav>
-            {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" />}
+            {isPromptGuideOpen && <PromptLibraryGuide onClose={() => setIsPromptGuideOpen(false)} />}
+            {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
+            {activeTab === tabs.scriptPrompts && <CreatorDashboard key="script-prompts" view="materials" materialTypeFilter="script" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
             {activeTab === tabs.imageGeneration && <ImageGenerationPanel />}
           </section>
         )}
@@ -3516,6 +3525,7 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
   const [layoutNotice, setLayoutNotice] = React.useState('');
   const [dashboardGridMode, setDashboardGridMode] = React.useState(() => window.innerWidth <= 600 ? 'mobile' : window.innerWidth <= 900 ? 'compact' : 'desktop');
   const dashboardGridRef = React.useRef(null);
+  const [packedCardPositions, setPackedCardPositions] = React.useState({});
   const dragStateRef = React.useRef(null);
   const today = getToday();
   const ordinaryTasks = tasks.filter((task) => !isLongTermTask(task));
@@ -3540,6 +3550,29 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
   const weekday = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][todayDate.getDay()];
 
   React.useEffect(() => { window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dashboardCards)); }, [dashboardCards]);
+  React.useLayoutEffect(() => {
+    if (isLayoutEditing || dashboardGridMode === 'mobile') return;
+    const grid = dashboardGridRef.current;
+    if (!grid) return;
+    const elements = [...grid.querySelectorAll(':scope > .dashboard-card')];
+    const pack = () => {
+      const heights = Object.fromEntries(elements.map(element => [element.dataset.cardId, Math.ceil(element.getBoundingClientRect().height)]));
+      const placed = [];
+      const positions = {};
+      for (const card of dashboardCards.filter(item => item.visible).sort((a,b) => a.y-b.y || a.x-b.x)) {
+        const above = placed.filter(item => card.x < item.x + item.width && card.x + card.width > item.x);
+        const y = Math.max(0, ...above.map(item => item.y + item.pixelHeight + 16));
+        const pixelHeight = heights[card.id] || card.height * 124 - 16;
+        positions[card.id] = { y, pixelHeight };
+        placed.push({ ...card, y, pixelHeight });
+      }
+      setPackedCardPositions(current => JSON.stringify(current) === JSON.stringify(positions) ? current : positions);
+    };
+    pack();
+    const observer = new ResizeObserver(pack);
+    elements.forEach(element => observer.observe(element));
+    return () => observer.disconnect();
+  }, [dashboardCards, isLayoutEditing, dashboardGridMode]);
   React.useEffect(() => {
     const updateGridMode = () => setDashboardGridMode(window.innerWidth <= 600 ? 'mobile' : window.innerWidth <= 900 ? 'compact' : 'desktop');
     window.addEventListener('resize', updateGridMode);
@@ -3638,6 +3671,15 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
     if (dashboardGridMode === 'mobile') return size;
     const position = draggedCardId === card.id && dragTarget ? dragTarget : card;
     const scale = dashboardGridMode === 'compact' ? 1 : 2;
+    if (!isLayoutEditing) {
+      const packed = packedCardPositions[card.id];
+      return {
+        ...size,
+        height: card.id === 'notes' && card.sizeMode !== 'custom' ? 'auto' : `${card.height * 124 - 16}px`,
+        gridColumn: `${card.x * scale + 1} / span ${card.width * scale}`,
+        gridRow: `${(packed?.y ?? card.y * 124) + 1} / span ${packed?.pixelHeight ?? card.height * 124 - 16}`,
+      };
+    }
     return {
       ...size,
       gridColumn: `${position.x * scale + 1} / span ${card.width * scale}`,
@@ -3701,7 +3743,7 @@ function Dashboard({ notes, tasks, onOpenTasks, onOpenSchedule, onOpenNotes, onO
           </div>
         </section>
       )}
-      <div className={isLayoutEditing ? 'dashboard-card-grid is-editing' : 'dashboard-card-grid'} ref={dashboardGridRef}>{isLayoutEditing && <div className="dashboard-grid-dots" aria-hidden="true">{Array.from({ length: dashboardGridRows * 6 }, (_, index) => <span className="dashboard-grid-dot" style={getDashboardDotStyle(index)} key={index} />)}</div>}{dashboardCards.filter((card) => card.visible).map((card) => <article className={`${draggedCardId === card.id ? 'dashboard-card is-dragging' : 'dashboard-card'} dashboard-card-${card.id}${card.id === 'notes' && card.sizeMode !== 'custom' ? ' dashboard-card-auto-size' : ''}${card.width === 1 && card.height === 1 ? ' dashboard-card-compact' : ''}`} key={card.id} style={getDashboardCardStyle(card)}>{isLayoutEditing && <button className="dashboard-card-drag-handle" type="button" aria-label={`拖动 ${card.label}`} title="按住并拖动卡片" onPointerDown={(event) => startDashboardDrag(event, card)} onPointerMove={previewDashboardDrag} onPointerUp={finishDashboardDrag} onPointerCancel={finishDashboardDrag}><GripVertical size={18} strokeWidth={2.5} aria-hidden="true" /></button>}{cards[card.id]}</article>)}</div>
+      <div className={isLayoutEditing ? 'dashboard-card-grid is-editing' : dashboardGridMode === 'mobile' ? 'dashboard-card-grid' : 'dashboard-card-grid is-auto-packed'} ref={dashboardGridRef}>{isLayoutEditing && <div className="dashboard-grid-dots" aria-hidden="true">{Array.from({ length: dashboardGridRows * 6 }, (_, index) => <span className="dashboard-grid-dot" style={getDashboardDotStyle(index)} key={index} />)}</div>}{dashboardCards.filter((card) => card.visible).map((card) => <article className={`${draggedCardId === card.id ? 'dashboard-card is-dragging' : 'dashboard-card'} dashboard-card-${card.id}${card.id === 'notes' && card.sizeMode !== 'custom' ? ' dashboard-card-auto-size' : ''}${card.width === 1 && card.height === 1 ? ' dashboard-card-compact' : ''}`} key={card.id} data-card-id={card.id} style={getDashboardCardStyle(card)}>{isLayoutEditing && <button className="dashboard-card-drag-handle" type="button" aria-label={`拖动 ${card.label}`} title="按住并拖动卡片" onPointerDown={(event) => startDashboardDrag(event, card)} onPointerMove={previewDashboardDrag} onPointerUp={finishDashboardDrag} onPointerCancel={finishDashboardDrag}><GripVertical size={18} strokeWidth={2.5} aria-hidden="true" /></button>}{cards[card.id]}</article>)}</div>
     </div>
   );
 }

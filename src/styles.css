@@ -4004,6 +4004,36 @@ button {
   gap: 24px;
 }
 
+.prompt-library-navigation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.workspace-prompt-library-hero .prompt-library-navigation .prompt-library-tabs { margin-top: 0; }
+
+.prompt-library-add-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(118, 71, 200, .18);
+  border-radius: 12px;
+  padding: 0 16px;
+  background: #f0eaff;
+  color: #6840b3;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prompt-library-add-trigger:hover { background: #e8dffc; }
+.prompt-library-add-trigger:focus-visible { outline: 2px solid #7647c8; outline-offset: 3px; }
+
 .prompt-library-tabs {
   display: flex;
   align-items: center;
@@ -12748,3 +12778,60 @@ button.calendar-range-event:focus-visible,
     flex-direction: column;
   }
 }
+
+.workspace-content .workspace-heading.workspace-prompt-library-hero {
+  display: flex;
+  min-height: 188px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 30px 32px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 24px;
+  background: linear-gradient(135deg, #f0eaff 0%, #f8f4ff 56%, #eaf3ff 100%);
+  box-shadow: 0 14px 34px rgba(52,63,84,.065);
+}
+.workspace-content .workspace-prompt-library-hero > div { min-width: 0; }
+.workspace-content .workspace-heading.workspace-prompt-library-hero h1 {
+  margin: 0;
+  color: #29203d;
+  font-size: clamp(26px, 3vw, 34px);
+  letter-spacing: -.6px;
+}
+.workspace-content .workspace-prompt-library-hero .auth-state { margin: 10px 0 0; color: #655d78; line-height: 1.7; }
+.workspace-prompt-library-hero-icon {
+  display: grid;
+  width: 78px;
+  height: 78px;
+  flex: 0 0 78px;
+  place-items: center;
+  border-radius: 24px;
+  background: rgba(255,255,255,.66);
+  color: #7647c8;
+  box-shadow: 0 10px 24px rgba(118,71,200,.12);
+}
+@media (max-width: 520px) {
+  .workspace-content .workspace-heading.workspace-prompt-library-hero { padding: 22px 20px; gap: 16px; }
+  .workspace-prompt-library-hero-icon { width: 56px; height: 56px; flex-basis: 56px; border-radius: 18px; }
+  .workspace-prompt-library-hero-icon svg { width: 24px; }
+}
+
+.prompt-library-title-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.prompt-library-guide-trigger { border:1px solid rgba(118,71,200,.2); border-radius:10px; background:rgba(255,255,255,.8); color:#6840b3; padding:7px 12px; font:inherit; font-size:13px; cursor:pointer; }
+.workspace-content .workspace-prompt-library-hero .auth-state { margin-top:4px; font-size:16px; font-family:inherit; font-weight:400; color:#655d78; line-height:1.7; }
+.workspace-prompt-library-hero .prompt-library-tabs { margin-top:12px; }
+.prompt-library-guide-dialog { width:min(640px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); border:1px solid rgba(17,24,39,.08); border-radius:24px; padding:0; background:#fff; color:#344054; box-shadow:0 24px 80px rgba(17,24,39,.22); overflow:auto; }
+.prompt-library-guide-dialog::backdrop { background:rgba(15,23,42,.42); backdrop-filter:blur(4px); }
+.prompt-library-guide-body { padding:24px; }
+.prompt-library-guide-body header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.prompt-library-guide-body h2 { margin:0; font-size:22px; color:#29203d; }
+.prompt-library-guide-body h3 { margin:20px 0 8px; font-size:16px; }
+.prompt-library-guide-body p,.prompt-library-guide-body li { font-size:14px; line-height:1.75; }
+.prompt-library-guide-body ol { padding-left:22px; }
+.prompt-library-guide-body li + li { margin-top:6px; }
+.prompt-library-guide-body header button { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; border:1px solid #e4e7ec; border-radius:10px; background:#fff; color:#667085; cursor:pointer; }
+.prompt-library-guide-note { padding:12px; border-radius:12px; background:#f4f7fb; color:#667085; }
+.prompt-library-guide-body footer { display:flex; justify-content:flex-end; margin-top:16px; }
+.prompt-library-guide-body footer button { border:0; border-radius:10px; padding:9px 18px; background:#7647c8; color:#fff; font:inherit; cursor:pointer; }
+
+.dashboard-card-grid.is-auto-packed { grid-auto-rows:1px; row-gap:0; align-items:start; }

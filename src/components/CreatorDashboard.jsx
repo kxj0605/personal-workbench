@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, CalendarDays, Check, ChevronRight, Copy, Film, Flame, Plus, Sparkles, Target, Trash2 } from 'lucide-react';
+import { BarChart3, CalendarDays, Check, ChevronRight, Copy, Film, Flame, Plus, Sparkles, Target, Trash2, X } from 'lucide-react';
 import { FOCUS_TIMER_RECORDS_KEY } from '../utils/focusTimerRecords';
 import './CreatorDashboard.css';
 
@@ -150,7 +150,7 @@ function getProjectStage(project) {
   return PROJECT_STAGES.find((stage) => unfinishedTasks.some((title) => stageMatchers[stage.id].test(title)))?.id || 'publish';
 }
 
-export function CreatorDashboard({ view = 'overview', projectSeed = null, onProjectSeedHandled, onOpenResearch, onOpenBreakdown }) {
+export function CreatorDashboard({ view = 'overview', projectSeed = null, onProjectSeedHandled, onOpenResearch, onOpenBreakdown, materialTypeFilter = '', isPromptCreateOpen = false, onPromptCreateClose }) {
   const [data, setData] = React.useState(loadData);
   const [archives, setArchives] = React.useState(loadArchives);
   const [timerRecords, setTimerRecords] = React.useState(loadTimerRecords);
@@ -288,6 +288,7 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
     const materialType = promptDraft.materialType === 'custom' && !promptDraft.customMaterialType.trim() ? 'custom' : promptDraft.materialType;
     updateData((current) => ({ ...current, prompts: [{ id: uid(), ...promptDraft, materialType, customMaterialType: promptDraft.customMaterialType.trim(), sourceCategory: promptDraft.sourceCategory.trim(), tags: promptDraft.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), createdAt: new Date().toISOString() }, ...current.prompts] }));
     setPromptDraft(blankPromptDraft());
+    onPromptCreateClose?.();
     setNotice('提示词已保存到素材库。');
   };
   const addManualActivity = (type) => {
@@ -329,6 +330,7 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
   const showOverview = view === 'overview';
   const showProjects = view === 'projects';
   const showMaterials = view === 'materials';
+  const displayedPrompts = materialTypeFilter ? data.prompts.filter(prompt => prompt.materialType === materialTypeFilter) : data.prompts;
   const showReview = view === 'review';
   const overviewMonth = new Date();
   const overviewMonthLabel = `${overviewMonth.getFullYear()} 年 ${overviewMonth.getMonth() + 1} 月`;
@@ -352,7 +354,7 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
 
       {showProjects && <section className="creator-single-column"><article className="creator-card"><div className="creator-card-head"><div><h3>改编项目</h3><p>优先从对标视频创建项目，依次完成研究、拆解、素材、剪辑与发布。</p></div><Film size={19} /></div><form className="creator-add-row" onSubmit={addProject}><input value={projectDraft} onChange={(event) => setProjectDraft(event.target.value)} placeholder="手动录入一个改编项目" maxLength="80" /><button type="submit"><Plus size={16} />录入</button></form><div className="creator-project-list">{data.projects.length ? data.projects.map((project) => <ProjectCard key={project.id} project={project} timerRecords={timerRecords.filter((record) => record.projectId === project.id)} onToggle={toggleTask} onAddTask={addTask} onUpdateTask={updateTaskTitle} onRemoveTask={removeTask} onUpdateRecord={updateProjectRecord} onUpdateStage={updateProjectStage} onUpdateTimerRecord={updateTimerRecord} onOpenResearch={onOpenResearch} onOpenBreakdown={onOpenBreakdown} onCopy={() => copyProjectMarkdown(project)} />) : <Empty copy="先到对标库选中一条视频，再点击“创建改编项目”。" />}</div></article></section>}
 
-      {showMaterials && <section className="creator-single-column creator-materials-stack"><article className="creator-card creator-materials-save"><div className="creator-card-head"><div><h3>保存新提示词</h3><p>用素材类型与来源分类整理，保留标签、参考链接和作品关联。</p></div><Sparkles size={19} /></div><form className="creator-prompt-form" onSubmit={addPrompt}><div className="creator-input-grid"><label>素材类型<select value={promptDraft.materialType} onChange={(event) => setPromptDraft({ ...promptDraft, materialType: event.target.value })}>{materialTypeOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{promptDraft.materialType === 'custom' && <label>自定义类型<input value={promptDraft.customMaterialType} onChange={(event) => setPromptDraft({ ...promptDraft, customMaterialType: event.target.value })} placeholder="例如：分镜、音频、模板" maxLength="30" /></label>}<label>来源分类<input value={promptDraft.sourceCategory} onChange={(event) => setPromptDraft({ ...promptDraft, sourceCategory: event.target.value })} placeholder="可自定义：抖音、课程、自己整理…" maxLength="40" /></label><input value={promptDraft.tags} onChange={(event) => setPromptDraft({ ...promptDraft, tags: event.target.value })} placeholder="标签，用逗号分隔" /><select value={promptDraft.projectId} onChange={(event) => setPromptDraft({ ...promptDraft, projectId: event.target.value })}><option value="">不关联作品</option>{data.projects.map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}</select><input value={promptDraft.reference} onChange={(event) => setPromptDraft({ ...promptDraft, reference: event.target.value })} placeholder="可选：参考图或视频链接" /></div><textarea value={promptDraft.body} onChange={(event) => setPromptDraft({ ...promptDraft, body: event.target.value })} placeholder="保存可直接复用的 AI 绘图 / AI 视频提示词" required /><button className="creator-save-prompt" type="submit"><Sparkles size={16} />保存提示词</button></form></article><article className="creator-card creator-materials-library"><div className="creator-card-head"><div><h3>已保存的提示词</h3><p>直接浏览提示词卡片，并一键复制正文。</p></div><span className="creator-materials-count">{data.prompts.length} 条</span></div><div className="creator-prompt-list">{data.prompts.length ? data.prompts.map((prompt) => <PromptCard prompt={prompt} projects={data.projects} key={prompt.id} onDelete={() => updateData((current) => ({ ...current, prompts: current.prompts.filter((item) => item.id !== prompt.id) }))} onCopy={async () => { try { await copyText(prompt.body); setNotice('提示词已复制。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); } }} />) : <Empty copy="保存后的提示词会直接显示在这里。" />}</div></article></section>}
+      {showMaterials && <section className="creator-single-column creator-materials-stack">{isPromptCreateOpen && <PromptCreateDialog onClose={onPromptCreateClose}><article className="creator-card creator-materials-save"><div className="creator-card-head"><div><h3 id="creator-prompt-dialog-title">保存新提示词</h3><p>用素材类型与来源分类整理，保留标签、参考链接和作品关联。</p></div><button className="creator-prompt-dialog-close" type="button" aria-label="关闭添加提示词" onClick={onPromptCreateClose}><X size={20} /></button></div><form className="creator-prompt-form" onSubmit={addPrompt}><div className="creator-input-grid"><label>素材类型<select disabled={Boolean(materialTypeFilter)} value={promptDraft.materialType} onChange={(event) => setPromptDraft({ ...promptDraft, materialType: event.target.value })}>{materialTypeOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{promptDraft.materialType === 'custom' && <label>自定义类型<input value={promptDraft.customMaterialType} onChange={(event) => setPromptDraft({ ...promptDraft, customMaterialType: event.target.value })} placeholder="例如：分镜、音频、模板" maxLength="30" /></label>}<label>来源分类<input value={promptDraft.sourceCategory} onChange={(event) => setPromptDraft({ ...promptDraft, sourceCategory: event.target.value })} placeholder="可自定义：抖音、课程、自己整理…" maxLength="40" /></label><input value={promptDraft.tags} onChange={(event) => setPromptDraft({ ...promptDraft, tags: event.target.value })} placeholder="标签，用逗号分隔" /><select value={promptDraft.projectId} onChange={(event) => setPromptDraft({ ...promptDraft, projectId: event.target.value })}><option value="">不关联作品</option>{data.projects.map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}</select><input value={promptDraft.reference} onChange={(event) => setPromptDraft({ ...promptDraft, reference: event.target.value })} placeholder="可选：参考图或视频链接" /></div><textarea value={promptDraft.body} onChange={(event) => setPromptDraft({ ...promptDraft, body: event.target.value })} placeholder={materialTypeFilter === 'script' ? '保存脚本分析、骨架提取或改编创作的提示词' : '保存可直接复用的 AI 绘图 / AI 视频提示词'} required /><button className="creator-save-prompt" type="submit"><Sparkles size={16} />保存提示词</button></form></article></PromptCreateDialog>}<article className="creator-card creator-materials-library"><div className="creator-card-head"><div><h3>已保存的提示词</h3><p>直接浏览提示词卡片，并一键复制正文。</p></div><span className="creator-materials-count">{displayedPrompts.length} 条</span></div><div className="creator-prompt-list">{displayedPrompts.length ? displayedPrompts.map((prompt) => <PromptCard prompt={prompt} projects={data.projects} key={prompt.id} onDelete={() => updateData((current) => ({ ...current, prompts: current.prompts.filter((item) => item.id !== prompt.id) }))} onCopy={async () => { try { await copyText(prompt.body); setNotice('提示词已复制。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); } }} />) : <Empty copy="保存后的提示词会直接显示在这里。" />}</div></article></section>}
 
       {showReview && <section className="creator-page-stack">
         <ReviewFocus counts={recentReviewCounts} onAddActivity={addManualActivity} />
@@ -361,6 +363,18 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
       </section>}
     </section>
   );
+}
+
+function PromptCreateDialog({ children, onClose }) {
+  const dialogRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, []);
+  return <dialog ref={dialogRef} className="creator-prompt-dialog" aria-labelledby="creator-prompt-dialog-title" onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    {children}
+  </dialog>;
 }
 
 function GoalCard({ period, counts, onPeriodChange }) {

@@ -503,6 +503,24 @@ input,select,textarea { max-width:100%; min-width:0; }
 .video-platform-control select { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
 .video-platform-control:focus-within { outline:2px solid var(--border-focus); border-radius:6px; }
 .video-platform-control > span { display:flex; align-items:center; pointer-events:none; }
+.video-metrics-row { grid-template-columns:repeat(5,minmax(0,1fr)) 150px; gap:10px; }
+.video-metrics-row .form-item { min-width:0; }
+.video-metrics-row input { width:100%; }
+.video-account-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.65fr) 142px; gap:10px; min-width:0; }
+.video-account-fields .form-item { min-width:0; }
+.video-account-fields label { font-size:11px; }
+.video-account-fields input, .video-account-fields select { width:100%; padding-left:6px; padding-right:6px; }
+@media(max-width:420px) {
+  .video-account-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .video-account-fields .form-item:last-child { grid-column:1 / -1; }
+}
+@media(max-width:650px) {
+  .video-metrics-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:420px) {
+  .video-metrics-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .video-metrics-row .form-item:last-child { grid-column:1 / -1; }
+}
 @media(max-width:850px) {
   #view-videos .filter-row { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
   #view-videos .filter-row > .search-input { grid-column:1 / -1; width:100%; }
@@ -883,30 +901,36 @@ input,select,textarea { max-width:100%; min-width:0; }
           </div>
         </div>
         <div class="form-item">
-          <label>归属母题 (可暂不归类)</label>
+          <label>归属母题</label>
           <select id="form-video-motif">
             <option value="">-- 暂不归类 (进入待整理池) --</option>
           </select>
         </div>
+        <div class="video-account-fields">
         <div class="form-item">
-          <label>关联创作者账号 (可选)</label>
+          <label>关联作者账号</label>
           <select id="form-video-creator">
             <option value="">-- 不关联任何账号 --</option>
           </select>
         </div>
         <div class="form-item">
-          <label>话题标签 (逗号分隔)</label>
-          <input type="text" id="form-video-tags" placeholder="#反转 #人性 #情感">
+          <label>时长</label>
+          <input type="text" id="form-video-duration" placeholder="2:30" onblur="this.value=App.formatVideoDuration(this.value)">
         </div>
         <div class="form-item">
-          <label>时长(秒) / 发布时间</label>
-          <input type="text" id="form-video-duration" placeholder="例如：120秒 / 2024-03-01">
+          <label>数据记录时间</label>
+          <input type="date" id="form-video-metric-date">
+        </div>
+        </div>
+        <div class="form-item">
+          <label>话题标签 (空格或逗号分隔)</label>
+          <input type="text" id="form-video-tags" placeholder="#反转 #人性 #情感">
         </div>
       </div>
 
       <p id="video-import-extra" style="display:none; font-size:12px; color:var(--text-muted); margin-bottom:12px; overflow-wrap:anywhere;"></p>
-      <div style="font-weight:700; font-size:13px; color:var(--primary); margin: 12px 0 8px;">表现数据 (支持留空，未录入不视作0)</div>
-      <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div style="font-weight:700; font-size:13px; color:var(--primary); margin: 12px 0 8px;">表现数据 (未录入不视作0)</div>
+      <div class="form-grid video-metrics-row">
         <div class="form-item">
           <label>播放量</label>
           <input type="number" id="form-video-views" placeholder="待填">
@@ -928,8 +952,8 @@ input,select,textarea { max-width:100%; min-width:0; }
           <input type="number" id="form-video-shares" placeholder="待填">
         </div>
         <div class="form-item">
-          <label>数据记录时间</label>
-          <input type="date" id="form-video-metric-date">
+          <label>发布时间</label>
+          <input type="text" id="form-video-published-at" placeholder="2026-10-13">
         </div>
       </div>
 
@@ -952,7 +976,7 @@ input,select,textarea { max-width:100%; min-width:0; }
           </select>
         </div>
         <div class="form-item form-col-full">
-          <label>开头设计 (前3秒抓手/Hook)</label>
+          <label>开头设计</label>
           <input type="text" id="form-video-hook" placeholder="分析开头黄金前3秒的听觉/视觉/冲突悬念抓手">
         </div>
         <div class="form-item form-col-full">
@@ -1958,6 +1982,25 @@ input,select,textarea { max-width:100%; min-width:0; }
         this.openVideoEditModal(null, this.state.currentMotifId);
       },
 
+      currentRecordDate() {
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+        const get = type => parts.find(part => part.type === type).value;
+        return `${get('year')}-${get('month')}-${get('day')}`;
+      },
+      formatVideoDuration(value) {
+        const text = String(value || '').split('/')[0].trim().replace(/：/g, ':').replace(/\s+/g, '');
+        if (!text) return '';
+        let seconds;
+        let match;
+        if ((match = text.match(/^(\d+):(\d{1,2})$/))) seconds = Number(match[1])*60 + Number(match[2]);
+        else if ((match = text.match(/^(\d+):(\d{1,2}):(\d{1,2})$/))) seconds = Number(match[1])*3600 + Number(match[2])*60 + Number(match[3]);
+        else if ((match = text.match(/^(\d+)秒$/))) seconds = Number(match[1]);
+        else if ((match = text.match(/^(\d+)(?:分|分钟)(?:(\d+)(?:秒)?)?$/))) seconds = Number(match[1])*60 + Number(match[2] || 0);
+        else if (/^\d+$/.test(text)) seconds = Number(text.slice(0,-2) || 0)*60 + Number(text.slice(-2));
+        if (!Number.isSafeInteger(seconds) || seconds < 0) return value;
+        return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+      },
+
       openVideoImport() {
         const platform = document.getElementById('form-video-platform').value;
         document.getElementById('video-prompt-platform').value = platform === '抖音' ? 'douyin' : platform === 'YouTube' ? 'youtube' : 'other';
@@ -2001,8 +2044,9 @@ input,select,textarea { max-width:100%; min-width:0; }
         const status = document.getElementById('video-import-status');
         if (!Object.keys(metadata).length) { status.textContent = '未识别到有效字段，请按“字段名：内容”格式粘贴。'; return; }
         this.state.videoImportedMetadata = { ...this.state.videoImportedMetadata, ...metadata };
-        const fields = { 'benchmark-video-title':'form-video-title', 'benchmark-video-url':'form-video-url', 'benchmark-video-tags':'form-video-tags', 'benchmark-video-duration':'form-video-duration' };
+        const fields = { 'benchmark-video-title':'form-video-title', 'benchmark-video-url':'form-video-url', 'benchmark-video-tags':'form-video-tags', 'benchmark-video-duration':'form-video-duration', 'benchmark-published-at':'form-video-published-at' };
         for (const [key, id] of Object.entries(fields)) if (metadata[key]) document.getElementById(id).value = metadata[key];
+        document.getElementById('form-video-duration').value = this.formatVideoDuration(document.getElementById('form-video-duration').value);
         const metrics = { 'benchmark-view-count':'form-video-views', 'benchmark-like-count':'form-video-likes', 'benchmark-comment-count':'form-video-comments', 'benchmark-favorite-count':'form-video-collects', 'benchmark-share-count':'form-video-shares' };
         for (const [key, id] of Object.entries(metrics)) {
           if (!metadata[key]) continue;
@@ -2015,7 +2059,7 @@ input,select,textarea { max-width:100%; min-width:0; }
       },
       showVideoImportExtra() {
         const meta = this.state.videoImportedMetadata || {};
-        const values = [ ['账号',meta['benchmark-author'] || meta['benchmark-channel-name']], ['账号链接',meta['benchmark-author-url'] || meta['benchmark-channel-url']], ['发布时间',meta['benchmark-published-at']], ['背景音乐',meta['benchmark-background-music']] ].filter(([,value]) => value);
+        const values = [ ['账号',meta['benchmark-author'] || meta['benchmark-channel-name']], ['账号链接',meta['benchmark-author-url'] || meta['benchmark-channel-url']], ['背景音乐',meta['benchmark-background-music']] ].filter(([,value]) => value);
         const element = document.getElementById('video-import-extra');
         element.style.display = values.length ? 'block' : 'none';
         element.textContent = values.map(([label,value]) => `${label}：${value}`).join(' · ');
@@ -2084,14 +2128,15 @@ input,select,textarea { max-width:100%; min-width:0; }
           document.getElementById('form-video-motif').value = v.motifId || '';
           document.getElementById('form-video-creator').value = v.creatorId || '';
           document.getElementById('form-video-tags').value = v.tags || '';
-          document.getElementById('form-video-duration').value = v.duration || '';
+          document.getElementById('form-video-duration').value = this.formatVideoDuration(v.duration);
+          document.getElementById('form-video-published-at').value = v.importedMetadata?.['benchmark-published-at'] || (v.duration || '').split('/')[1]?.trim() || '';
 
           document.getElementById('form-video-views').value = v.views !== null && v.views !== undefined ? v.views : '';
           document.getElementById('form-video-likes').value = v.likes !== null && v.likes !== undefined ? v.likes : '';
           document.getElementById('form-video-comments').value = v.comments !== null && v.comments !== undefined ? v.comments : '';
           document.getElementById('form-video-shares').value = v.shares !== null && v.shares !== undefined ? v.shares : '';
           document.getElementById('form-video-collects').value = v.collects !== null && v.collects !== undefined ? v.collects : '';
-          document.getElementById('form-video-metric-date').value = v.metricDate || '';
+          document.getElementById('form-video-metric-date').value = this.currentRecordDate();
 
           document.getElementById('form-video-grade').value = v.grade || 'A';
           document.getElementById('form-video-is-benchmark').value = v.isBenchmark ? 'true' : 'false';
@@ -2110,13 +2155,14 @@ input,select,textarea { max-width:100%; min-width:0; }
           document.getElementById('form-video-creator').value = '';
           document.getElementById('form-video-tags').value = '';
           document.getElementById('form-video-duration').value = '';
+          document.getElementById('form-video-published-at').value = '';
 
           document.getElementById('form-video-views').value = '';
           document.getElementById('form-video-likes').value = '';
           document.getElementById('form-video-comments').value = '';
           document.getElementById('form-video-shares').value = '';
           document.getElementById('form-video-collects').value = '';
-          document.getElementById('form-video-metric-date').value = new Date().toISOString().substring(0, 10);
+          document.getElementById('form-video-metric-date').value = this.currentRecordDate();
 
           document.getElementById('form-video-grade').value = 'A';
           document.getElementById('form-video-is-benchmark').value = 'false';
@@ -2143,12 +2189,12 @@ input,select,textarea { max-width:100%; min-width:0; }
           url: document.getElementById('form-video-url').value.trim(),
           platform: document.getElementById('form-video-platform').value,
           platformOverride: this.state.videoPlatformOverride || '',
-          importedMetadata: this.state.videoImportedMetadata || {},
+          importedMetadata: { ...this.state.videoImportedMetadata, 'benchmark-published-at': document.getElementById('form-video-published-at').value.trim() },
           creatorName: this.state.videoImportedMetadata?.['benchmark-author'] || this.state.videoImportedMetadata?.['benchmark-channel-name'] || '',
           motifId: document.getElementById('form-video-motif').value,
           creatorId: document.getElementById('form-video-creator').value,
           tags: document.getElementById('form-video-tags').value.trim(),
-          duration: document.getElementById('form-video-duration').value.trim(),
+          duration: this.formatVideoDuration(document.getElementById('form-video-duration').value.trim()),
 
           views: parseNum(document.getElementById('form-video-views').value),
           likes: parseNum(document.getElementById('form-video-likes').value),

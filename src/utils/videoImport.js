@@ -41,7 +41,7 @@ export function parseVideoImport(text, currentUrl) {
     const key = aliases[label] || fields.find(field => field.label === label)?.name;
     if (!key) continue;
     if (key.endsWith('-url')) { const url = safeUrl(value); if (url) metadata[key] = url; }
-    else metadata[key] = key === 'benchmark-video-tags' ? value.split(/[,，、]/).map(tag => tag.replace(/^#\s*/, '').trim()).filter(Boolean).join('、') : value;
+    else metadata[key] = key === 'benchmark-video-tags' ? value.split(/[\s,，、]+/).map(tag => tag.replace(/^#/, '').trim()).filter(Boolean).join('、') : value;
   }
   return { metadata };
 }
