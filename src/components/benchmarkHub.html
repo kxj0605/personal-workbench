@@ -601,6 +601,10 @@ input,select,textarea { max-width:100%; min-width:0; }
 
     <!-- 视图 2：视频全景管理视图 -->
     <section id="view-videos" style="display:none;">
+      <nav aria-label="视频全景管理类型" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+        <button class="btn btn-primary" type="button" aria-pressed="true">对标视频</button>
+        <button class="btn" type="button" aria-pressed="false" onclick="host.openMaterials()">素材视频</button>
+      </nav>
       <div class="filter-panel">
         <div class="filter-row">
           <input type="text" id="video-search" class="search-input" placeholder="搜索视频标题、标签、笔记结论..." oninput="App.renderVideos()">

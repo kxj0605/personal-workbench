@@ -61,6 +61,7 @@ import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from '
 import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
+import { usePromptCategories } from './utils/promptCategories';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
 import { IntegratedBenchmarkLibrary as BenchmarkLibraryPanel } from './components/IntegratedBenchmarkLibrary';
 import { PromptLibraryGuide } from './components/PromptLibraryGuide';
@@ -505,10 +506,23 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const creatorTabs = [tabs.imageGeneration, tabs.scriptPrompts, tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorResearch, tabs.creatorMaterials, tabs.creatorReview];
   const isCreatorTab = creatorTabs.includes(activeTab);
   const isPromptLibraryTab = activeTab === tabs.creatorMaterials || activeTab === tabs.imageGeneration || activeTab === tabs.scriptPrompts;
-  const promptLibraryTitle = activeTab === tabs.creatorMaterials ? '我的提示词' : activeTab === tabs.scriptPrompts ? '脚本' : '图片修改';
-  const promptLibraryDescription = activeTab === tabs.creatorMaterials ? '保存和整理自己的提示词，按素材类型与来源分类，随时复制复用。' : activeTab === tabs.scriptPrompts ? '整理脚本分析、骨架提取与改编创作的提示词，随时复制使用。' : '按改图需求选择模板，复制后补全方括号中的内容，配合原图使用。';
+  const [promptCategories] = usePromptCategories();
+  const [customPromptCategory, setCustomPromptCategory] = React.useState('');
+  const selectedCustomCategory = promptCategories.find(item => item.value === customPromptCategory);
+  React.useEffect(() => {
+    if (customPromptCategory && !selectedCustomCategory) setCustomPromptCategory('');
+  }, [customPromptCategory, selectedCustomCategory]);
+  const activePromptCategory = activeTab === tabs.imageGeneration ? 'image-edit' : activeTab === tabs.scriptPrompts ? 'script' : customPromptCategory || 'personal';
+  const promptLibraryTitle = promptCategories.find(item => item.value === activePromptCategory)?.label || '全部提示词';
+  const promptLibraryDescription = activeTab === tabs.creatorMaterials ? '保存和整理自己的提示词，按提示词类型与来源分类，随时复制复用。' : activeTab === tabs.scriptPrompts ? '整理脚本分析、骨架提取与改编创作的提示词，随时复制使用。' : '按改图需求选择模板，复制后补全方括号中的内容，配合原图使用。';
   const [isPromptGuideOpen, setIsPromptGuideOpen] = React.useState(false);
   const [isPromptCreateOpen, setIsPromptCreateOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (!isPromptLibraryTab || isPromptCreateOpen || promptCategories.some(item => item.value === activePromptCategory)) return;
+    const fallback = promptCategories[0].value;
+    setActiveTab(fallback === 'image-edit' ? tabs.imageGeneration : fallback === 'script' ? tabs.scriptPrompts : tabs.creatorMaterials);
+    setCustomPromptCategory(fallback.startsWith('category-') ? fallback : '');
+  }, [isPromptLibraryTab, isPromptCreateOpen, promptCategories, activePromptCategory]);
   const workspaceTitle = {
     [tabs.imageGeneration]: '提示词库',
     [tabs.creator]: '创作概览',
@@ -544,6 +558,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const accountEmail = isGuest ? '登录后开始使用' : session.user.email ?? '';
   const profileAvatarUrl = profile?.avatar_url;
   const navigateTo = (tab) => {
+    setCustomPromptCategory('');
     if (isGuest && tab !== tabs.dashboard && tab !== tabs.publicNotes) {
       onLogin();
       return;
@@ -727,10 +742,11 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
               <div className={isPromptLibraryTab ? 'prompt-library-title-row' : undefined}><h1>{isPromptLibraryTab ? promptLibraryTitle : workspaceTitle}</h1>{isPromptLibraryTab && <button type="button" className="prompt-library-guide-trigger" onClick={() => setIsPromptGuideOpen(true)}>使用教程</button>}</div>
               {(isPromptLibraryTab || workspaceDescription) && <p className="auth-state">{isPromptLibraryTab ? promptLibraryDescription : workspaceDescription}</p>}
               {isPromptLibraryTab && <div className="prompt-library-navigation"><nav className="prompt-library-tabs" aria-label="提示词库分类">
-                <button className={activeTab === tabs.creatorMaterials ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.creatorMaterials} onClick={() => navigateTo(tabs.creatorMaterials)}>我的提示词</button>
-                <button className={activeTab === tabs.imageGeneration ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.imageGeneration} onClick={() => navigateTo(tabs.imageGeneration)}>图片修改</button>
-                <button className={activeTab === tabs.scriptPrompts ? 'active' : ''} type="button" aria-pressed={activeTab === tabs.scriptPrompts} onClick={() => navigateTo(tabs.scriptPrompts)}>脚本</button>
-              </nav>{activeTab !== tabs.imageGeneration && <button type="button" className="prompt-library-add-trigger" aria-haspopup="dialog" onClick={() => setIsPromptCreateOpen(true)}><Plus size={16} />添加提示词</button>}</div>}
+{promptCategories.map(item => <button key={item.value} type="button" className={activePromptCategory === item.value ? 'active' : ''} aria-pressed={activePromptCategory === item.value} onClick={() => {
+                  navigateTo(item.value === 'image-edit' ? tabs.imageGeneration : item.value === 'script' ? tabs.scriptPrompts : tabs.creatorMaterials);
+                  if (item.value.startsWith('category-')) setCustomPromptCategory(item.value);
+                }}>{item.label}</button>)}
+              </nav>{<button type="button" className="prompt-library-add-trigger" aria-haspopup="dialog" onClick={() => setIsPromptCreateOpen(true)}><Plus size={16} />提示词管理</button>}</div>}
             </div>
           </header>
         )}
@@ -750,9 +766,9 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
         {isPromptLibraryTab && (
           <section className="prompt-library-content" aria-label="提示词库内容">
             {isPromptGuideOpen && <PromptLibraryGuide onClose={() => setIsPromptGuideOpen(false)} />}
-            {activeTab === tabs.creatorMaterials && <CreatorDashboard view="materials" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
+            {activeTab === tabs.creatorMaterials && <CreatorDashboard key="personal-prompts" view="materials" materialTypeFilter={selectedCustomCategory?.value || ""} isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
             {activeTab === tabs.scriptPrompts && <CreatorDashboard key="script-prompts" view="materials" materialTypeFilter="script" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
-            {activeTab === tabs.imageGeneration && <ImageGenerationPanel />}
+            {activeTab === tabs.imageGeneration && <><ImageGenerationPanel /><CreatorDashboard key="image-edit-prompts" view="materials" materialTypeFilter="image-edit" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} /></>}
           </section>
         )}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}

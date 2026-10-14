@@ -2,6 +2,10 @@ import React from 'react';
 import { BarChart3, CalendarDays, Check, ChevronRight, Copy, Film, Flame, Plus, Sparkles, Target, Trash2, X } from 'lucide-react';
 import { FOCUS_TIMER_RECORDS_KEY } from '../utils/focusTimerRecords';
 import './CreatorDashboard.css';
+import { DEFAULT_PROMPT_CATEGORIES, loadPromptCategories, usePromptCategories } from '../utils/promptCategories';
+import { PromptCategoryManager } from './PromptCategoryManager';
+import { MaterialVideosPanel } from './MaterialVideosPanel';
+import { loadMaterialVideos, PROJECTS_CHANGED_EVENT } from '../utils/materialVideos';
 
 export const CREATOR_DASHBOARD_STORAGE_KEY = 'creator-growth-dashboard-v1';
 const BREAKDOWN_ARCHIVE_KEY = 'script-breakdown-archives-v1';
@@ -51,8 +55,9 @@ const periodStart = (kind) => {
 const formatDay = (value) => new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(value));
 const blankGoals = () => ({ week: { script: 2, storyboard: 2, video: 1 }, month: { script: 8, storyboard: 8, video: 4 }, quarter: { script: 24, storyboard: 24, video: 12 } });
 const emptyData = () => ({ goals: blankGoals(), projects: [], prompts: [], events: [], milestones: [] });
+const promptTypeOptions = DEFAULT_PROMPT_CATEGORIES;
 const materialTypeOptions = [
-  { value: 'script', label: '脚本' },
+  ...promptTypeOptions,
   { value: 'text', label: '文本' },
   { value: 'short-prompt', label: '简短提示词' },
   { value: 'image', label: '图片' },
@@ -65,10 +70,10 @@ const normalizePrompt = (prompt) => ({
   customMaterialType: prompt.customMaterialType || (prompt.materialType ? '' : (prompt.category || '未分类')),
   sourceCategory: prompt.sourceCategory || '',
 });
-const blankPromptDraft = () => ({ materialType: 'script', customMaterialType: '', sourceCategory: '', tags: '', body: '', reference: '', projectId: '' });
+const blankPromptDraft = (materialType = 'personal') => ({ materialType, title: '', description: '', subcategoryId: '', customMaterialType: '', sourceCategory: '', tags: '', body: '', reference: '', projectId: '' });
 const getMaterialTypeLabel = (prompt) => prompt.materialType === 'custom'
   ? (prompt.customMaterialType || '未分类')
-  : materialTypeOptions.find((option) => option.value === prompt.materialType)?.label || '未分类';
+  : [...loadPromptCategories(), ...materialTypeOptions].find((option) => option.value === prompt.materialType)?.label || '未分类';
 
 function loadData() {
   try {
@@ -156,12 +161,27 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
   const [timerRecords, setTimerRecords] = React.useState(loadTimerRecords);
   const [notice, setNotice] = React.useState('');
   const [projectDraft, setProjectDraft] = React.useState('');
-  const [promptDraft, setPromptDraft] = React.useState(blankPromptDraft);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = React.useState(false);
+  const [isSubcategoryManagerOpen, setIsSubcategoryManagerOpen] = React.useState(false);
+  const [subcategoryFilter, setSubcategoryFilter] = React.useState('');
+  const [promptCategories, savePromptCategories] = usePromptCategories();
+  const [promptDraft, setPromptDraft] = React.useState(() => blankPromptDraft(materialTypeFilter || 'personal'));
+  const draftSubcategories = promptCategories.find(item => item.value === promptDraft.materialType)?.subcategories || [];
+  const filterSubcategories = materialTypeFilter ? promptCategories.find(item => item.value === materialTypeFilter)?.subcategories || [] : promptCategories.flatMap(item => (item.subcategories || []).map(child => ({ ...child, label: `${item.label} / ${child.label}` })));
+  React.useEffect(() => { setSubcategoryFilter(''); }, [materialTypeFilter]);
+  React.useEffect(() => {
+    if (subcategoryFilter && subcategoryFilter !== 'unclassified' && !filterSubcategories.some(item => item.value === subcategoryFilter)) setSubcategoryFilter('');
+  }, [promptCategories, subcategoryFilter, materialTypeFilter]);
   const [customMilestone, setCustomMilestone] = React.useState('');
   const [goalPeriod, setGoalPeriod] = React.useState('month');
   const handledProjectSeedId = React.useRef('');
 
-  React.useEffect(() => { window.localStorage.setItem(CREATOR_DASHBOARD_STORAGE_KEY, JSON.stringify(data)); }, [data]);
+  React.useEffect(() => {
+    if (!isPromptCreateOpen) setPromptDraft(blankPromptDraft(promptCategories.some(item => item.value === materialTypeFilter) ? materialTypeFilter : promptCategories[0].value));
+    else if (!promptCategories.some(item => item.value === promptDraft.materialType)) setPromptDraft(current => ({ ...current, materialType: promptCategories[0].value }));
+  }, [materialTypeFilter, isPromptCreateOpen, promptCategories]);
+
+  React.useEffect(() => { window.localStorage.setItem(CREATOR_DASHBOARD_STORAGE_KEY, JSON.stringify(data)); window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT)); }, [data]);
   React.useEffect(() => {
     const refreshArchives = () => setArchives(loadArchives());
     window.addEventListener('storage', refreshArchives);
@@ -286,10 +306,10 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
     event.preventDefault();
     if (!promptDraft.body.trim()) return;
     const materialType = promptDraft.materialType === 'custom' && !promptDraft.customMaterialType.trim() ? 'custom' : promptDraft.materialType;
-    updateData((current) => ({ ...current, prompts: [{ id: uid(), ...promptDraft, materialType, customMaterialType: promptDraft.customMaterialType.trim(), sourceCategory: promptDraft.sourceCategory.trim(), tags: promptDraft.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), createdAt: new Date().toISOString() }, ...current.prompts] }));
-    setPromptDraft(blankPromptDraft());
+    updateData((current) => ({ ...current, prompts: [{ id: uid(), ...promptDraft, title: promptDraft.title.trim(), description: promptDraft.description.trim(), materialType, customMaterialType: promptDraft.customMaterialType.trim(), sourceCategory: promptDraft.sourceCategory.trim(), tags: promptDraft.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), createdAt: new Date().toISOString() }, ...current.prompts] }));
+    setPromptDraft(blankPromptDraft(materialTypeFilter || 'personal'));
     onPromptCreateClose?.();
-    setNotice('提示词已保存到素材库。');
+    setNotice(`提示词已保存，可在「${promptCategories.find(option => option.value === materialType)?.label || '我的提示词'}」中查看。`);
   };
   const addManualActivity = (type) => {
     const today = dateKey();
@@ -309,6 +329,9 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
   };
   const toggleMilestone = (id) => updateData((current) => ({ ...current, milestones: current.milestones.map((item) => item.id === id ? { ...item, done: !item.done } : item) }));
   const copyProjectMarkdown = async (project) => {
+    let linkedMaterials;
+    try { linkedMaterials = loadMaterialVideos().filter(video => (video.assignments || []).some(item => item.projectId === project.id)); }
+    catch { setNotice('素材数据读取失败，请先检查素材库，再复制完整项目。'); return; }
     const linkedPrompts = data.prompts.filter((prompt) => prompt.projectId === project.id);
     const linkedTimerRecords = timerRecords.filter((record) => record.projectId === project.id);
     const text = [
@@ -322,6 +345,7 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
       ...project.tasks.map((task) => `- [${task.done ? 'x' : ' '}] ${task.title}`),
       ...(linkedTimerRecords.length ? ['', '## 关联计时', ...linkedTimerRecords.map((record) => `- ${record.projectStageLabel || '未标记阶段'} · ${formatTimerDuration(record.totalSeconds)}${record.note ? ` · ${record.note}` : ''}`)] : []),
       ...(project.record ? ['', '## 创作记录', '', `- 镜数：${project.record.shots || '未填写'}`, `- 时长：${project.record.duration || '未填写'}`, `- 使用工具：${project.record.tools || '未填写'}`, '', '### 遇到的问题', '', project.record.problems || '未填写', '', '### 心得笔记', '', project.record.notes || '未填写'] : []),
+      ...(linkedMaterials.length ? ['', '## 素材视频', ...linkedMaterials.map(video => `- ${video.title}\n  链接：${video.url}\n  用途：${video.assignments.find(item => item.projectId === project.id)?.usage || '未填写'}${video.note ? `\n  备注：${video.note}` : ''}`)] : []),
       ...(linkedPrompts.length ? ['', '## 关联提示词', ...linkedPrompts.map((prompt) => `### ${getMaterialTypeLabel(prompt)}\n\n${prompt.body}`)] : []),
     ].join('\n');
     try { await copyText(text); setNotice('项目 Markdown 已复制，可直接粘贴到 Obsidian。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); }
@@ -330,7 +354,8 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
   const showOverview = view === 'overview';
   const showProjects = view === 'projects';
   const showMaterials = view === 'materials';
-  const displayedPrompts = materialTypeFilter ? data.prompts.filter(prompt => prompt.materialType === materialTypeFilter) : data.prompts;
+  const categoryPrompts = materialTypeFilter ? data.prompts.filter(prompt => prompt.materialType === materialTypeFilter) : data.prompts;
+  const displayedPrompts = subcategoryFilter ? categoryPrompts.filter(prompt => subcategoryFilter === 'unclassified' ? !prompt.subcategoryId : prompt.subcategoryId === subcategoryFilter) : categoryPrompts;
   const showReview = view === 'review';
   const overviewMonth = new Date();
   const overviewMonthLabel = `${overviewMonth.getFullYear()} 年 ${overviewMonth.getMonth() + 1} 月`;
@@ -354,7 +379,15 @@ export function CreatorDashboard({ view = 'overview', projectSeed = null, onProj
 
       {showProjects && <section className="creator-single-column"><article className="creator-card"><div className="creator-card-head"><div><h3>改编项目</h3><p>优先从对标视频创建项目，依次完成研究、拆解、素材、剪辑与发布。</p></div><Film size={19} /></div><form className="creator-add-row" onSubmit={addProject}><input value={projectDraft} onChange={(event) => setProjectDraft(event.target.value)} placeholder="手动录入一个改编项目" maxLength="80" /><button type="submit"><Plus size={16} />录入</button></form><div className="creator-project-list">{data.projects.length ? data.projects.map((project) => <ProjectCard key={project.id} project={project} timerRecords={timerRecords.filter((record) => record.projectId === project.id)} onToggle={toggleTask} onAddTask={addTask} onUpdateTask={updateTaskTitle} onRemoveTask={removeTask} onUpdateRecord={updateProjectRecord} onUpdateStage={updateProjectStage} onUpdateTimerRecord={updateTimerRecord} onOpenResearch={onOpenResearch} onOpenBreakdown={onOpenBreakdown} onCopy={() => copyProjectMarkdown(project)} />) : <Empty copy="先到对标库选中一条视频，再点击“创建改编项目”。" />}</div></article></section>}
 
-      {showMaterials && <section className="creator-single-column creator-materials-stack">{isPromptCreateOpen && <PromptCreateDialog onClose={onPromptCreateClose}><article className="creator-card creator-materials-save"><div className="creator-card-head"><div><h3 id="creator-prompt-dialog-title">保存新提示词</h3><p>用素材类型与来源分类整理，保留标签、参考链接和作品关联。</p></div><button className="creator-prompt-dialog-close" type="button" aria-label="关闭添加提示词" onClick={onPromptCreateClose}><X size={20} /></button></div><form className="creator-prompt-form" onSubmit={addPrompt}><div className="creator-input-grid"><label>素材类型<select disabled={Boolean(materialTypeFilter)} value={promptDraft.materialType} onChange={(event) => setPromptDraft({ ...promptDraft, materialType: event.target.value })}>{materialTypeOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{promptDraft.materialType === 'custom' && <label>自定义类型<input value={promptDraft.customMaterialType} onChange={(event) => setPromptDraft({ ...promptDraft, customMaterialType: event.target.value })} placeholder="例如：分镜、音频、模板" maxLength="30" /></label>}<label>来源分类<input value={promptDraft.sourceCategory} onChange={(event) => setPromptDraft({ ...promptDraft, sourceCategory: event.target.value })} placeholder="可自定义：抖音、课程、自己整理…" maxLength="40" /></label><input value={promptDraft.tags} onChange={(event) => setPromptDraft({ ...promptDraft, tags: event.target.value })} placeholder="标签，用逗号分隔" /><select value={promptDraft.projectId} onChange={(event) => setPromptDraft({ ...promptDraft, projectId: event.target.value })}><option value="">不关联作品</option>{data.projects.map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}</select><input value={promptDraft.reference} onChange={(event) => setPromptDraft({ ...promptDraft, reference: event.target.value })} placeholder="可选：参考图或视频链接" /></div><textarea value={promptDraft.body} onChange={(event) => setPromptDraft({ ...promptDraft, body: event.target.value })} placeholder={materialTypeFilter === 'script' ? '保存脚本分析、骨架提取或改编创作的提示词' : '保存可直接复用的 AI 绘图 / AI 视频提示词'} required /><button className="creator-save-prompt" type="submit"><Sparkles size={16} />保存提示词</button></form></article></PromptCreateDialog>}<article className="creator-card creator-materials-library"><div className="creator-card-head"><div><h3>已保存的提示词</h3><p>直接浏览提示词卡片，并一键复制正文。</p></div><span className="creator-materials-count">{displayedPrompts.length} 条</span></div><div className="creator-prompt-list">{displayedPrompts.length ? displayedPrompts.map((prompt) => <PromptCard prompt={prompt} projects={data.projects} key={prompt.id} onDelete={() => updateData((current) => ({ ...current, prompts: current.prompts.filter((item) => item.id !== prompt.id) }))} onCopy={async () => { try { await copyText(prompt.body); setNotice('提示词已复制。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); } }} />) : <Empty copy="保存后的提示词会直接显示在这里。" />}</div></article></section>}
+      {showMaterials && <section className="creator-single-column creator-materials-stack">{isPromptCreateOpen && <PromptCreateDialog onClose={onPromptCreateClose}><article className="creator-card creator-materials-save"><div className="creator-card-head"><div><h3 id="creator-prompt-dialog-title">提示词管理</h3></div><button className="creator-prompt-dialog-close" type="button" aria-label="关闭提示词管理" onClick={onPromptCreateClose}><X size={20} /></button></div><form className="creator-prompt-form" onSubmit={addPrompt}><div className="creator-input-grid"><label>标题<span className="prompt-required-mark" aria-hidden="true"> *</span><input value={promptDraft.title} onChange={event => setPromptDraft(current => ({ ...current, title: event.target.value }))} placeholder="填写提示词标题" maxLength="120" required pattern={".*\\S.*"} /></label><div className="prompt-category-field"><div className="prompt-category-field-heading"><label htmlFor="prompt-category-select">提示词大类<span className="prompt-required-mark" aria-hidden="true"> *</span></label><button type="button" className="prompt-category-toggle" aria-expanded={isCategoryManagerOpen} aria-controls="prompt-category-manager" onClick={() => { setIsCategoryManagerOpen(open => !open); setIsSubcategoryManagerOpen(false); }}>管理提示词类别</button></div><select required id="prompt-category-select" value={promptDraft.materialType} onChange={(event) => setPromptDraft({ ...promptDraft, materialType: event.target.value, subcategoryId: '' })}>{promptCategories.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></div><label>简介<span className="prompt-required-mark" aria-hidden="true"> *</span><input value={promptDraft.description} onChange={event => setPromptDraft(current => ({ ...current, description: event.target.value }))} placeholder="简要说明用途或适用场景" maxLength="500" required pattern={".*\\S.*"} /></label><div className="prompt-category-field"><div className="prompt-category-field-heading"><label htmlFor="prompt-subcategory-select">二级分类<span className="prompt-required-mark" aria-hidden="true"> *</span></label><button type="button" className="prompt-category-toggle" aria-expanded={isSubcategoryManagerOpen} aria-controls="prompt-subcategory-manager" onClick={() => { setIsSubcategoryManagerOpen(open => !open); setIsCategoryManagerOpen(false); }}>管理二级分类</button></div><select required id="prompt-subcategory-select" value={promptDraft.subcategoryId} onChange={event => setPromptDraft(current => ({ ...current, subcategoryId: event.target.value }))}><option value="">请选择二级分类</option>{draftSubcategories.map(item => <option value={item.value} key={item.value}>{item.label}</option>)}</select></div><PromptCategoryManager key={promptDraft.materialType} secondary isOpen={isSubcategoryManagerOpen} categories={draftSubcategories} onSave={subcategories => savePromptCategories(promptCategories.map(item => item.value === promptDraft.materialType ? { ...item, subcategories } : item))} onSelect={subcategoryId => setPromptDraft(current => ({ ...current, subcategoryId }))} onDelete={(value, transferTo) => {
+      updateData(current => ({ ...current, prompts: current.prompts.map(prompt => prompt.materialType === promptDraft.materialType && prompt.subcategoryId === value ? { ...prompt, subcategoryId: transferTo } : prompt) }));
+      savePromptCategories(promptCategories.map(item => item.value === promptDraft.materialType ? { ...item, subcategories: draftSubcategories.filter(child => child.value !== value) } : item));
+      setPromptDraft(current => current.subcategoryId === value ? { ...current, subcategoryId: transferTo } : current);
+    }} /><label>来源分类<input value={promptDraft.sourceCategory} onChange={(event) => setPromptDraft({ ...promptDraft, sourceCategory: event.target.value })} placeholder="可自定义：抖音、课程、自己整理…" maxLength="40" /></label><PromptCategoryManager isOpen={isCategoryManagerOpen} categories={promptCategories} onSave={savePromptCategories} onSelect={(materialType) => setPromptDraft(current => ({ ...current, materialType, subcategoryId: current.materialType === materialType ? current.subcategoryId : '' }))} onDelete={(value, transferTo) => {
+      updateData(current => ({ ...current, prompts: current.prompts.map(prompt => prompt.materialType === value ? { ...prompt, materialType: transferTo, subcategoryId: '' } : prompt) }));
+      savePromptCategories(promptCategories.filter(item => item.value !== value));
+      setPromptDraft(current => current.materialType === value ? { ...current, materialType: transferTo } : current);
+    }} /></div><textarea value={promptDraft.body} onChange={(event) => setPromptDraft({ ...promptDraft, body: event.target.value })} placeholder={promptDraft.materialType === 'script' ? '保存脚本分析、骨架提取或改编创作的提示词' : '保存可直接复用的 AI 绘图 / AI 视频提示词'} required /><button className="creator-save-prompt" type="submit"><Sparkles size={16} />保存提示词</button></form></article></PromptCreateDialog>}<article className="creator-card creator-materials-library"><div className="creator-card-head"><div><h3>已保存的提示词</h3><p>直接浏览提示词卡片，并一键复制正文。</p></div><span className="creator-materials-count">{displayedPrompts.length} 条</span></div>{filterSubcategories.length > 0 && <nav className="prompt-subcategory-filters" aria-label="二级分类筛选"><button type="button" aria-pressed={!subcategoryFilter} onClick={() => setSubcategoryFilter('')}>全部</button>{filterSubcategories.map(item => <button key={item.value} type="button" aria-pressed={subcategoryFilter === item.value} onClick={() => setSubcategoryFilter(item.value)}>{item.label}</button>)}<button type="button" aria-pressed={subcategoryFilter === 'unclassified'} onClick={() => setSubcategoryFilter('unclassified')}>未分类</button></nav>}<div className="creator-prompt-list">{displayedPrompts.length ? displayedPrompts.map((prompt) => <PromptCard prompt={{ ...prompt, subcategoryLabel: promptCategories.find(item => item.value === prompt.materialType)?.subcategories?.find(item => item.value === prompt.subcategoryId)?.label }} projects={data.projects} key={prompt.id} onDelete={() => updateData((current) => ({ ...current, prompts: current.prompts.filter((item) => item.id !== prompt.id) }))} onCopy={async () => { try { await copyText(prompt.body); setNotice('提示词已复制。'); } catch { setNotice('复制失败，请允许浏览器访问剪贴板。'); } }} />) : <Empty copy="保存后的提示词会直接显示在这里。" />}</div></article></section>}
 
       {showReview && <section className="creator-page-stack">
         <ReviewFocus counts={recentReviewCounts} onAddActivity={addManualActivity} />
@@ -494,6 +527,7 @@ function ProjectCard({ project, timerRecords, onToggle, onAddTask, onUpdateTask,
   return <article className="creator-project">
     <div className="creator-project-title"><div><h4>{project.title}</h4><span>{project.status}</span></div><button type="button" title="复制项目 Markdown" onClick={onCopy}><Copy size={15} /></button></div>
     {project.sourceVideoTitle && <div className="creator-project-source"><span>来源对标视频</span>{project.sourceVideoUrl ? <a href={project.sourceVideoUrl} target="_blank" rel="noreferrer">{project.sourceVideoTitle}</a> : <b>{project.sourceVideoTitle}</b>}<div><button type="button" onClick={() => onOpenResearch?.({ id: project.sourceVideoId, title: project.sourceVideoTitle, url: project.sourceVideoUrl })}>爆款研究</button><button type="button" onClick={() => onOpenBreakdown?.({ id: project.sourceVideoId, title: project.sourceVideoTitle, url: project.sourceVideoUrl })}>拆解视频</button></div></div>}
+    <MaterialVideosPanel projectId={project.id} />
     <div className="creator-project-stages"><div><b>制作阶段</b><span>当前：{PROJECT_STAGES.find((stage) => stage.id === currentStage)?.label}</span></div><div className="creator-project-stage-list" role="group" aria-label={`${project.title} 的制作阶段`}>{PROJECT_STAGES.map((stage, index) => <button type="button" className={stage.id === currentStage ? 'active' : ''} aria-pressed={stage.id === currentStage} onClick={() => onUpdateStage(project.id, stage.id)} key={stage.id}><i>{index + 1}</i>{stage.label}</button>)}</div></div>
     <div className="creator-project-progress"><span><i style={{ width: `${percent}%` }} /></span><b>{percent}%</b></div>
     {timerRecords.length > 0 && <section className="creator-project-timer-results" aria-label={`${project.title} 的关联计时`}><div className="creator-project-timer-heading"><b>关联计时</b><span>{timerRecords.length} 条</span></div>{timerRecords.map((record) => <ProjectTimerResult record={record} onSave={onUpdateTimerRecord} key={record.id} />)}</section>}
@@ -506,7 +540,7 @@ function ProjectCard({ project, timerRecords, onToggle, onAddTask, onUpdateTask,
 function PromptCard({ prompt, projects, onCopy, onDelete }) {
   const project = projects.find((item) => item.id === prompt.projectId);
   const typeLabel = getMaterialTypeLabel(prompt);
-  return <article className="creator-prompt"><header><div className="creator-prompt-meta"><b>{typeLabel}</b>{prompt.sourceCategory && <i>来源：{prompt.sourceCategory}</i>}{(prompt.tags || []).map((tag) => <span key={tag}>#{tag}</span>)}</div><div className="creator-prompt-actions"><button type="button" onClick={onCopy}><Copy size={14} />复制</button><button type="button" className="delete" onClick={onDelete}><Trash2 size={14} />删除</button></div></header><p>{prompt.body}</p>{(project || prompt.reference) && <small>{project ? `关联：${project.title}` : ''}{project && prompt.reference ? ' · ' : ''}{prompt.reference ? '含参考链接' : ''}</small>}</article>;
+  return <article className="creator-prompt"><header><div className="creator-prompt-meta"><h4 className="creator-prompt-title">{prompt.title || `${typeLabel}提示词`}</h4><b>{typeLabel}</b>{prompt.subcategoryLabel && <i>{prompt.subcategoryLabel}</i>}{prompt.sourceCategory && <i>来源：{prompt.sourceCategory}</i>}{(prompt.tags || []).map((tag) => <span key={tag}>#{tag}</span>)}</div><div className="creator-prompt-actions"><button type="button" onClick={onCopy}><Copy size={14} />复制</button><button type="button" className="delete" onClick={onDelete}><Trash2 size={14} />删除</button></div></header>{prompt.description && <p className="creator-prompt-description">{prompt.description}</p>}<p className="creator-prompt-body">{prompt.body}</p>{(project || prompt.reference) && <small>{project ? `关联：${project.title}` : ''}{project && prompt.reference ? ' · ' : ''}{prompt.reference ? '含参考链接' : ''}</small>}</article>;
 }
 
 function Milestones({ data, weekly, onToggle }) {
