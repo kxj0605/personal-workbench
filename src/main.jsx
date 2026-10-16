@@ -61,12 +61,10 @@ import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from '
 import { LongTermTasksPanel } from './components/LongTermTasksPanel';
 import { SubscriptionsPanel } from './components/SubscriptionsPanel';
 import { CreatorDashboard } from './components/CreatorDashboard';
-import { usePromptCategories } from './utils/promptCategories';
+import { PromptHubPanel } from './components/PromptHubPanel';
 import { VideoCollectionPanel } from './components/VideoCollectionPanel';
 import { IntegratedBenchmarkLibrary as BenchmarkLibraryPanel } from './components/IntegratedBenchmarkLibrary';
-import { PromptLibraryGuide } from './components/PromptLibraryGuide';
 import { ViralResearchPanel } from './components/ViralResearchPanel';
-import { ImageGenerationPanel } from './components/ImageGenerationPanel';
 import { loadBenchmarkAccounts, loadBenchmarkVideos } from './utils/benchmarkLibrary';
 import { WebsiteNavigationPanel, WebsiteQuickLinks } from './components/WebsiteNavigationPanel';
 import { FocusTimerCard } from './components/FocusTimerCard';
@@ -506,23 +504,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
   const creatorTabs = [tabs.imageGeneration, tabs.scriptPrompts, tabs.creator, tabs.creatorProjects, tabs.creatorBenchmark, tabs.creatorCollection, tabs.breakdown, tabs.creatorResearch, tabs.creatorMaterials, tabs.creatorReview];
   const isCreatorTab = creatorTabs.includes(activeTab);
   const isPromptLibraryTab = activeTab === tabs.creatorMaterials || activeTab === tabs.imageGeneration || activeTab === tabs.scriptPrompts;
-  const [promptCategories] = usePromptCategories();
   const [customPromptCategory, setCustomPromptCategory] = React.useState('');
-  const selectedCustomCategory = promptCategories.find(item => item.value === customPromptCategory);
-  React.useEffect(() => {
-    if (customPromptCategory && !selectedCustomCategory) setCustomPromptCategory('');
-  }, [customPromptCategory, selectedCustomCategory]);
-  const activePromptCategory = activeTab === tabs.imageGeneration ? 'image-edit' : activeTab === tabs.scriptPrompts ? 'script' : customPromptCategory || 'personal';
-  const promptLibraryTitle = promptCategories.find(item => item.value === activePromptCategory)?.label || '全部提示词';
-  const promptLibraryDescription = activeTab === tabs.creatorMaterials ? '保存和整理自己的提示词，按提示词类型与来源分类，随时复制复用。' : activeTab === tabs.scriptPrompts ? '整理脚本分析、骨架提取与改编创作的提示词，随时复制使用。' : '按改图需求选择模板，复制后补全方括号中的内容，配合原图使用。';
-  const [isPromptGuideOpen, setIsPromptGuideOpen] = React.useState(false);
-  const [isPromptCreateOpen, setIsPromptCreateOpen] = React.useState(false);
-  React.useEffect(() => {
-    if (!isPromptLibraryTab || isPromptCreateOpen || promptCategories.some(item => item.value === activePromptCategory)) return;
-    const fallback = promptCategories[0].value;
-    setActiveTab(fallback === 'image-edit' ? tabs.imageGeneration : fallback === 'script' ? tabs.scriptPrompts : tabs.creatorMaterials);
-    setCustomPromptCategory(fallback.startsWith('category-') ? fallback : '');
-  }, [isPromptLibraryTab, isPromptCreateOpen, promptCategories, activePromptCategory]);
   const workspaceTitle = {
     [tabs.imageGeneration]: '提示词库',
     [tabs.creator]: '创作概览',
@@ -564,7 +546,6 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
       return;
     }
     setTaskViewRequest(tab === tabs.tasks ? taskViews.list : null);
-    setIsPromptCreateOpen(false);
     setActiveTab(tab);
     setIsUserMenuOpen(false);
   };
@@ -661,7 +642,7 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
               <SidebarButton icon={Flag} label="改编项目" active={activeTab === tabs.creatorProjects} onClick={() => navigateTo(tabs.creatorProjects)} />
               <SidebarButton icon={Sparkles} label="爆款研究" active={activeTab === tabs.creatorResearch} onClick={() => navigateTo(tabs.creatorResearch)} />
               <SidebarButton icon={PanelsTopLeft} label="拆解学习" active={activeTab === tabs.breakdown} onClick={() => navigateTo(tabs.breakdown)} />
-              <SidebarButton icon={LibraryBig} label="提示词" active={isPromptLibraryTab} onClick={() => navigateTo(tabs.creatorMaterials)} />
+              <SidebarButton icon={LibraryBig} label="提示词" active={isPromptLibraryTab} onClick={() => { setCustomPromptCategory(''); navigateTo(tabs.creatorMaterials); }} />
               <SidebarButton icon={Clock3} label="复盘" active={activeTab === tabs.creatorReview} onClick={() => navigateTo(tabs.creatorReview)} />
               <SidebarButton icon={ChartNoAxesColumnIncreasing} label="创作概览" active={activeTab === tabs.creator} onClick={() => navigateTo(tabs.creator)} />
             </nav>
@@ -736,19 +717,8 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
           </header>
         )}
 
-        {activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && activeTab !== tabs.breakdown && (
-          <header className={`workspace-heading compact-heading${isPromptLibraryTab ? ' workspace-prompt-library-hero' : ''}`}>
-            <div>
-              <div className={isPromptLibraryTab ? 'prompt-library-title-row' : undefined}><h1>{isPromptLibraryTab ? promptLibraryTitle : workspaceTitle}</h1>{isPromptLibraryTab && <button type="button" className="prompt-library-guide-trigger" onClick={() => setIsPromptGuideOpen(true)}>使用教程</button>}</div>
-              {(isPromptLibraryTab || workspaceDescription) && <p className="auth-state">{isPromptLibraryTab ? promptLibraryDescription : workspaceDescription}</p>}
-              {isPromptLibraryTab && <div className="prompt-library-navigation"><nav className="prompt-library-tabs" aria-label="提示词库分类">
-{promptCategories.map(item => <button key={item.value} type="button" className={activePromptCategory === item.value ? 'active' : ''} aria-pressed={activePromptCategory === item.value} onClick={() => {
-                  navigateTo(item.value === 'image-edit' ? tabs.imageGeneration : item.value === 'script' ? tabs.scriptPrompts : tabs.creatorMaterials);
-                  if (item.value.startsWith('category-')) setCustomPromptCategory(item.value);
-                }}>{item.label}</button>)}
-              </nav>{<button type="button" className="prompt-library-add-trigger" aria-haspopup="dialog" onClick={() => setIsPromptCreateOpen(true)}><Plus size={16} />提示词管理</button>}</div>}
-            </div>
-          </header>
+        {!isPromptLibraryTab && activeTab !== tabs.dashboard && activeTab !== tabs.creator && activeTab !== tabs.creatorCollection && activeTab !== tabs.creatorBenchmark && activeTab !== tabs.creatorResearch && activeTab !== tabs.breakdown && (
+          <header className="workspace-heading compact-heading"><div><h1>{workspaceTitle}</h1>{workspaceDescription && <p className="auth-state">{workspaceDescription}</p>}</div></header>
         )}
 
         {message && <p className="form-message global-message">{message}</p>}
@@ -763,14 +733,10 @@ function WorkspacePage({ session, profile, initialTab, onProfileChange, onLogin,
             updateTaskStatus(task, task.status === 'completed' ? 'in_progress' : 'completed', setTasks, setMessage);
           }} />
         )}
-        {isPromptLibraryTab && (
-          <section className="prompt-library-content" aria-label="提示词库内容">
-            {isPromptGuideOpen && <PromptLibraryGuide onClose={() => setIsPromptGuideOpen(false)} />}
-            {activeTab === tabs.creatorMaterials && <CreatorDashboard key="personal-prompts" view="materials" materialTypeFilter={selectedCustomCategory?.value || ""} isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
-            {activeTab === tabs.scriptPrompts && <CreatorDashboard key="script-prompts" view="materials" materialTypeFilter="script" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} />}
-            {activeTab === tabs.imageGeneration && <><ImageGenerationPanel /><CreatorDashboard key="image-edit-prompts" view="materials" materialTypeFilter="image-edit" isPromptCreateOpen={isPromptCreateOpen} onPromptCreateClose={() => setIsPromptCreateOpen(false)} /></>}
-          </section>
-        )}
+        {isPromptLibraryTab && <PromptHubPanel initialCategory={activeTab === tabs.imageGeneration ? 'image-edit' : activeTab === tabs.scriptPrompts ? 'script' : customPromptCategory || 'all'} onCategoryChange={value => {
+          navigateTo(value === 'image-edit' ? tabs.imageGeneration : value === 'script' ? tabs.scriptPrompts : tabs.creatorMaterials);
+          setCustomPromptCategory(value === 'all' || value === 'image-edit' || value === 'script' ? '' : value);
+        }} />}
         {activeTab === tabs.creator && <CreatorDashboard view="overview" />}
         {activeTab === tabs.creatorProjects && <CreatorDashboard view="projects" projectSeed={projectSeed} onProjectSeedHandled={() => setProjectSeed(null)} onOpenResearch={openResearchFromVideo} onOpenBreakdown={openBreakdownFromVideo} />}
         {activeTab === tabs.creatorBenchmark && <BenchmarkLibraryPanel onOpenBreakdown={openBreakdownFromVideo} onCreateProject={openProjectFromVideo} />}

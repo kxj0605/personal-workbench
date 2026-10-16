@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Copy, Pencil, X } from 'lucide-react';
+import { PromptCard } from './PromptCard';
 import './ImageGenerationPanel.css';
 
 const EDIT_METHODS = [
@@ -252,6 +252,15 @@ const EDIT_SUBCATEGORIES = {
   ],
 };
 const PROMPT_STORAGE_KEY = 'image-generation-edit-prompts-v1';
+const DETAILS_STORAGE_KEY = 'image-generation-edit-details-v1';
+const TEMPLATE_CATEGORIES = EDIT_GROUPS.map(group => ({ value: group.id, label: group.title, subcategories: EDIT_SUBCATEGORIES[group.id].filter(item => item.id !== 'all').map(item => ({ value: item.id, label: item.title })) }));
+function loadDetails() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(DETAILS_STORAGE_KEY) || '{}');
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  } catch { return {}; }
+}
+
 
 function loadPrompts() {
   try {
@@ -265,65 +274,40 @@ function loadPrompts() {
   }
 }
 
-function PromptPreview({ text }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [overflowing, setOverflowing] = React.useState(false);
-  const textRef = React.useRef(null);
-  const contentId = React.useId();
-  React.useLayoutEffect(() => {
-    const element = textRef.current;
-    const measure = () => setOverflowing(element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 3 + 1);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [text]);
-  return <div className={`image-prompt-template${expanded ? ' is-expanded' : ''}`}>
-    <p ref={textRef} id={contentId}>{text}</p>
-    <div className="image-prompt-preview-footer">{overflowing && <button type="button" className="image-prompt-expand" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}>{expanded ? '收起 ▴' : '展开全文 ▾'}</button>}</div>
-  </div>;
-}
-
 export function ImageGenerationPanel() {
-  const [copiedId, setCopiedId] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState('all');
   const [activeSubcategory, setActiveSubcategory] = React.useState('all');
   const [prompts, setPrompts] = React.useState(loadPrompts);
-  const [editingId, setEditingId] = React.useState('');
-  const [editDraft, setEditDraft] = React.useState('');
-
+  const [details, setDetails] = React.useState(loadDetails);
   const copyPrompt = async (method) => {
-    try {
-      const promptForCopy = prompts[method.id].replace(/【[^】]*】/g, '【】');
-      await navigator.clipboard.writeText(promptForCopy);
-      setCopiedId(method.id);
-      window.setTimeout(() => setCopiedId((current) => current === method.id ? '' : current), 2200);
-    } catch {
-      setCopiedId('');
-    }
+    await navigator.clipboard.writeText(prompts[method.id].replace(/【[^】]*】/g, '【】'));
   };
 
-  const startEditing = (method) => {
-    setEditingId(method.id);
-    setEditDraft(prompts[method.id]);
-  };
-
-  const savePrompt = (methodId) => {
-    const nextPrompts = { ...prompts, [methodId]: editDraft };
-    setPrompts(nextPrompts);
+  const savePrompt = (methodId, changes) => {
+    const { body, ...metadata } = changes;
+    const nextDetails = { ...details, [methodId]: metadata };
+    const nextPrompts = { ...prompts, [methodId]: body };
     window.localStorage.setItem(PROMPT_STORAGE_KEY, JSON.stringify(nextPrompts));
-    setEditingId('');
-    setEditDraft('');
+    window.localStorage.setItem(DETAILS_STORAGE_KEY, JSON.stringify(nextDetails));
+    setPrompts(nextPrompts);
+    setDetails(nextDetails);
   };
+  const methodDetails = method => ({
+    title: method.title, description: method.description, tags: [], sourceCategory: '',
+    materialType: EDIT_GROUPS.find(group => group.methodIds.includes(method.id))?.id,
+    subcategoryId: method.subcategory,
+    ...details[method.id],
+  });
+  const groupedMethods = EDIT_GROUPS.map(group => ({ ...group, methodIds: EDIT_GROUPS.flatMap(item => item.methodIds).filter(id => methodDetails(EDIT_METHODS.find(method => method.id === id)).materialType === group.id) }));
 
   const activeGroup = EDIT_GROUPS.find((group) => group.id === activeFilter);
   const activeSubcategories = activeFilter === 'all' ? [] : (EDIT_SUBCATEGORIES[activeFilter] || []);
   const activeEditSubcategory = activeSubcategories.find((subcategory) => subcategory.id === activeSubcategory);
   const visibleGroups = (activeFilter === 'all'
-    ? EDIT_GROUPS
-    : EDIT_GROUPS.filter((group) => group.id === activeFilter)
+    ? groupedMethods
+    : groupedMethods.filter((group) => group.id === activeFilter)
   ).map((group) => activeFilter === group.id && activeSubcategory !== 'all'
-    ? { ...group, methodIds: group.methodIds.filter((methodId) => EDIT_METHODS.find((method) => method.id === methodId)?.subcategory === activeSubcategory) }
+    ? { ...group, methodIds: group.methodIds.filter((methodId) => methodDetails(EDIT_METHODS.find((method) => method.id === methodId)).subcategoryId === activeSubcategory) }
     : group,
   );
 
@@ -358,37 +342,14 @@ export function ImageGenerationPanel() {
                 <p>{activeEditSubcategory.description}</p>
               </div>
             )}
-            <div className="image-edit-method-grid">
+            <div className="prompt-card-grid">
               {group.methodIds.map((methodId) => {
                 const method = EDIT_METHODS.find((item) => item.id === methodId);
                 const groupedMethodIndex = EDIT_GROUPS.flatMap((item) => item.methodIds).indexOf(methodId);
                 const methodIndex = groupedMethodIndex >= 0 ? groupedMethodIndex : EDIT_METHODS.findIndex((item) => item.id === methodId);
+                const info = methodDetails(method);
                 return (
-                  <article className="image-edit-method-card" key={method.id}>
-                    <header className="image-edit-method-heading">
-                      <span className="image-method-number">{String(methodIndex + 1).padStart(2, '0')}</span>
-                      <div><h3 title={method.title}>{method.title}</h3></div>
-                      {editingId === method.id ? (
-                        <div className="image-edit-actions">
-                          <button className="image-prompt-action image-prompt-save" type="button" onClick={() => savePrompt(method.id)}>保存</button>
-                          <button className="image-prompt-action image-prompt-cancel" type="button" onClick={() => { setEditingId(''); setEditDraft(''); }}><X size={15} />取消</button>
-                        </div>
-                      ) : (
-                        <div className="image-edit-actions">
-                          <button className="image-prompt-action image-prompt-edit-icon" type="button" aria-label={`修改提示词：${method.title}`} title="修改提示词" onClick={() => startEditing(method)}><Pencil size={16} /></button>
-                          <button className={copiedId === method.id ? 'image-copy-button copied' : 'image-copy-button'} type="button" aria-label={copiedId === method.id ? `已复制：${method.title}` : `复制模板：${method.title}`} title={copiedId === method.id ? '已复制' : '复制模板'} onClick={() => copyPrompt(method)}>
-                        {copiedId === method.id ? <Check size={17} /> : <Copy size={17} />}
-                          </button>
-                        </div>
-                      )}
-                    </header>
-                    <p className="image-method-description" title={method.description}>{method.description}</p>
-                    {editingId === method.id ? (
-                      <textarea className="image-prompt-editor" aria-label={`修改提示词：${method.title}`} value={editDraft} onChange={(event) => setEditDraft(event.target.value)} />
-                    ) : (
-                      <PromptPreview text={prompts[method.id]} />
-                    )}
-                  </article>
+                  <PromptCard key={method.id} number={methodIndex + 1} title={info.title} description={info.description} body={prompts[method.id]} editDetails={info} categories={TEMPLATE_CATEGORIES} metadata={<>{info.tags.map((tag, index) => <span key={index}>#{tag}</span>)}{info.sourceCategory && <span className="is-source">来源：{info.sourceCategory}</span>}</>} onCopy={() => copyPrompt(method)} onSave={changes => savePrompt(method.id, changes)} />
                 );
               })}
             </div>
